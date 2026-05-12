@@ -1,0 +1,23 @@
+# Secrets - nunca subir
+subastas/src/main/resources/application.properties
+**/.env
+
+# Build output
+subastas/target/
+
+# Maven wrapper jar
+subastas/.mvn/wrapper/maven-wrapper.jar
+
+# IDEs
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+.springBeans
+
+# macOS
+.DS_Store
