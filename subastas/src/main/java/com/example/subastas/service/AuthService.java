@@ -11,6 +11,7 @@ import com.example.subastas.dto.LoginResponse;
 import com.example.subastas.model.Cliente;
 import com.example.subastas.model.UsuarioAuth;
 import com.example.subastas.repository.ClienteRepository;
+import com.example.subastas.repository.NotificacionRepository;
 import com.example.subastas.repository.UsuarioAuthRepository;
 import com.example.subastas.security.JwtUtil;
 
@@ -22,6 +23,9 @@ public class AuthService {
 
     @Autowired
     private ClienteRepository clienteRepository;
+
+    @Autowired
+    private NotificacionRepository notificacionRepository;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -52,6 +56,10 @@ public class AuthService {
                 cliente.getCategoria()
         );
 
-        return new LoginResponse(token, usuario.getEmail(), usuario.getEstado(), cliente.getCategoria());
+        int pendientes = notificacionRepository
+                .findByClienteIdAndLeidaFalseOrderByCreatedAtDesc(usuario.getClienteId())
+                .size();
+
+        return new LoginResponse(token, usuario.getEmail(), usuario.getEstado(), cliente.getCategoria(), pendientes);
     }
 }
