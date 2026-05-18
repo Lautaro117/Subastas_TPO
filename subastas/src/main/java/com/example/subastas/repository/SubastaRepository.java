@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface SubastaRepository extends JpaRepository<Subasta, Integer> {
     List<Subasta> findByCategoria(String categoria);
+    List<Subasta> findByEstado(String estado);
 }
