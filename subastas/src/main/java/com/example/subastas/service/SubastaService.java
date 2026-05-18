@@ -233,7 +233,12 @@ public class SubastaService {
         pujo.setMedioPagoId(medio.getId());
         pujo.setEstado("confirmada"); // Simplificamos: confirmación inmediata por ahora
         
-        return pujoRepository.save(pujo);
+        Pujo savedPujo = pujoRepository.save(pujo);
+
+        // NOTIFICACIÓN WEBSOCKET EN TIEMPO REAL
+        notificationService.notificarNuevaPuja(subastaId, savedPujo.getImporte(), savedPujo.getMoneda(), savedPujo.getIdentificador());
+
+        return savedPujo;
     }
 
     private SalaResponse construirSalaResponse(Integer subastaId) {
