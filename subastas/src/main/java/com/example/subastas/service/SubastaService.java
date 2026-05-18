@@ -1,16 +1,21 @@
 package com.example.subastas.service;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+
+import jakarta.transaction.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.subastas.dto.BidRequest;
 import com.example.subastas.dto.CatalogoDTO;
 import com.example.subastas.dto.SalaResponse;
-import com.example.subastas.dto.BidRequest;
 import com.example.subastas.model.Asistente;
 import com.example.subastas.model.Catalogo;
 import com.example.subastas.model.ItemCatalogo;
@@ -24,23 +29,17 @@ import com.example.subastas.repository.MedioPagoRepository;
 import com.example.subastas.repository.PujoRepository;
 import com.example.subastas.repository.SubastaRepository;
 import com.example.subastas.repository.UsuarioAuthRepository;
-import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
-
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import com.example.subastas.service.AuctionNotificationService;
 
 @Service
 public class SubastaService {
 
     @Autowired
+    private AuctionNotificationService auctionNotificationService;
+
+    @Autowired
     private SubastaRepository subastaRepository;
+
 
     @Autowired
     private CatalogoRepository catalogoRepository;
@@ -236,7 +235,8 @@ public class SubastaService {
         Pujo savedPujo = pujoRepository.save(pujo);
 
         // NOTIFICACIÓN WEBSOCKET EN TIEMPO REAL
-        notificationService.notificarNuevaPuja(subastaId, savedPujo.getImporte(), savedPujo.getMoneda(), savedPujo.getIdentificador());
+        auctionNotificationService.notificarNuevaPuja(subastaId, savedPujo.getImporte(), savedPujo.getMoneda(), savedPujo.getIdentificador());
+
 
         return savedPujo;
     }
