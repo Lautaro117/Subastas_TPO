@@ -1,11 +1,14 @@
 package com.example.subastas.controller;
 
+import com.example.subastas.dto.BidRequest;
 import com.example.subastas.dto.CatalogoDTO;
 import com.example.subastas.dto.SalaResponse;
+import com.example.subastas.model.Pujo;
 import com.example.subastas.model.Subasta;
 import com.example.subastas.security.JwtUtil;
 import com.example.subastas.service.SubastaService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -63,5 +66,16 @@ public class SubastaController {
         String email = jwtUtil.extractEmail(token);
         subastaService.salirDeSala(id, email);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/bids")
+    public ResponseEntity<Pujo> bids(
+            @PathVariable Integer id,
+            @RequestBody BidRequest request,
+            @RequestHeader("Authorization") String authHeader) {
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractEmail(token);
+        Pujo pujo = subastaService.enviarPuja(id, email, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(pujo);
     }
 }
