@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 
 @Entity
 @Table(name = "pujos")
+//esta clase representa una puja realizada por un asistente en una subasta. Contiene información sobre el asistente, el item, el importe de la puja y si es el ganador o no.
 public class Pujo {
 
     @Id
