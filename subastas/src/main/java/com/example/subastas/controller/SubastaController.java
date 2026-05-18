@@ -78,4 +78,14 @@ public class SubastaController {
         Pujo pujo = subastaService.enviarPuja(id, email, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(pujo);
     }
+
+    @GetMapping("/{id}/live")
+    public ResponseEntity<SalaResponse> getLive(
+            @PathVariable Integer id,
+            @RequestHeader("Authorization") String authHeader) {
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractEmail(token);
+        SalaResponse response = subastaService.obtenerEstadoVivo(id, email);
+        return ResponseEntity.ok(response);
+    }
 }

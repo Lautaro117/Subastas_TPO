@@ -132,6 +132,21 @@ public class SubastaService {
         asistenteRepository.deleteByClienteIdAndSubastaId(usuario.getClienteId(), subastaId);
     }
 
+    public SalaResponse obtenerEstadoVivo(Integer subastaId, String email) {
+        // 1. Validar que la subasta existe
+        buscarPorId(subastaId);
+
+        // 2. Validar que el usuario está unido a esta sala (403 Forbidden según contrato)
+        var usuario = usuarioAuthRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        
+        asistenteRepository.findByClienteIdAndSubastaId(usuario.getClienteId(), subastaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No estás conectado a esta subasta"));
+
+        // 3. Retornar el estado actual usando el helper
+        return construirSalaResponse(subastaId);
+    }
+
     @Transactional
     public Pujo enviarPuja(Integer subastaId, String email, BidRequest request) {
         // 1. Validar que la subasta existe y está abierta (422 según contrato)
