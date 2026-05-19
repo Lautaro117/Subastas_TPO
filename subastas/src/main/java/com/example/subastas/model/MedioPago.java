@@ -1,13 +1,17 @@
 package com.example.subastas.model;
 
-import jakarta.persistence.*;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "medios_pago")
-@Inheritance(strategy = InheritanceType.JOINED)
-public abstract class MedioPago {
+public class MedioPago {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -17,15 +21,17 @@ public abstract class MedioPago {
     private Integer clienteId;
 
     @Column(nullable = false)
-    private String tipo; // "banco", "tarjeta", "cheque"
+    private String tipo;
 
-    @Column(nullable = false)
-    private String estado = "pendiente"; // "pendiente", "verificado"
+@Column(columnDefinition = "jsonb", nullable = false)
+@org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+private String datos;
+
+    private Boolean verificado = false;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    // Getters y Setters
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
 
@@ -35,8 +41,11 @@ public abstract class MedioPago {
     public String getTipo() { return tipo; }
     public void setTipo(String tipo) { this.tipo = tipo; }
 
-    public String getEstado() { return estado; }
-    public void setEstado(String estado) { this.estado = estado; }
+    public String getDatos() { return datos; }
+    public void setDatos(String datos) { this.datos = datos; }
+
+    public Boolean getVerificado() { return verificado; }
+    public void setVerificado(Boolean verificado) { this.verificado = verificado; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

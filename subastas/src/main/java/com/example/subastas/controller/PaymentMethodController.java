@@ -47,4 +47,14 @@ public class PaymentMethodController {
         String email = jwtUtil.extractEmail(authHeader.substring(7));
         return ResponseEntity.status(HttpStatus.CREATED).body(paymentMethodService.registrarCheque(dto, email));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminar(@PathVariable Integer id,
+                                     @RequestHeader("Authorization") String authHeader) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        paymentMethodService.eliminar(id, email);
+        return ResponseEntity.noContent().build();
+}
+
+
 }

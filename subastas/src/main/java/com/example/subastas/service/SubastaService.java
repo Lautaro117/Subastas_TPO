@@ -6,8 +6,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import jakarta.transaction.Transactional;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -29,7 +27,8 @@ import com.example.subastas.repository.MedioPagoRepository;
 import com.example.subastas.repository.PujoRepository;
 import com.example.subastas.repository.SubastaRepository;
 import com.example.subastas.repository.UsuarioAuthRepository;
-import com.example.subastas.service.AuctionNotificationService;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class SubastaService {
@@ -177,7 +176,7 @@ public class SubastaService {
         MedioPago medio = medioPagoRepository.findById(request.getPayment_method_id())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Medio de pago no encontrado"));
         
-        if (!medio.getClienteId().equals(usuario.getClienteId()) || !"verificado".equalsIgnoreCase(medio.getEstado())) {
+        if (!medio.getClienteId().equals(usuario.getClienteId()) || !Boolean.TRUE.equals(medio.getVerificado())) {            
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El medio de pago no está verificado");
         }
 

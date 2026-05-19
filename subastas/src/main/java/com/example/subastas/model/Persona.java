@@ -20,12 +20,6 @@ public class Persona {
 
     private String estado;
 
-    @Column(name = "foto_frente")
-    private byte[] fotoFrente;
-
-    @Column(name = "foto_dorso")
-    private byte[] fotoDorso;
-
     // Getters y Setters
     public Integer getIdentificador() { return identificador; }
     public void setIdentificador(Integer identificador) { this.identificador = identificador; }
@@ -42,9 +36,5 @@ public class Persona {
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
 
-    public byte[] getFotoFrente() { return fotoFrente; }
-    public void setFotoFrente(byte[] fotoFrente) { this.fotoFrente = fotoFrente; }
 
-    public byte[] getFotoDorso() { return fotoDorso; }
-    public void setFotoDorso(byte[] fotoDorso) { this.fotoDorso = fotoDorso; }
 }

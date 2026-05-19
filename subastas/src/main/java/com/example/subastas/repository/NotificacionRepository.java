@@ -8,4 +8,6 @@ import com.example.subastas.model.Notificacion;
 
 public interface NotificacionRepository extends JpaRepository<Notificacion, Integer> {
     List<Notificacion> findByClienteIdAndLeidaFalseOrderByCreatedAtDesc(Integer clienteId);
+    List<Notificacion> findByClienteIdOrderByCreatedAtDesc(Integer clienteId);
+    List<Notificacion> findByClienteId(Integer clienteId);
 }
