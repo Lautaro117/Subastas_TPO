@@ -12,9 +12,11 @@ import com.example.subastas.dto.LoginResponse;
 import com.example.subastas.dto.RegisterRequest;
 import com.example.subastas.dto.RegisterResponse;
 import com.example.subastas.model.Cliente;
+import com.example.subastas.model.FotoDni;
 import com.example.subastas.model.Persona;
 import com.example.subastas.model.UsuarioAuth;
 import com.example.subastas.repository.ClienteRepository;
+import com.example.subastas.repository.FotoDniRepository;
 import com.example.subastas.repository.NotificacionRepository;
 import com.example.subastas.repository.PersonaRepository;
 import com.example.subastas.repository.UsuarioAuthRepository;
@@ -31,6 +33,9 @@ public class AuthService {
 
     @Autowired
     private PersonaRepository personaRepository;
+
+    @Autowired
+    private FotoDniRepository fotoDniRepository;
 
     @Autowired
     private NotificacionRepository notificacionRepository;
@@ -108,19 +113,23 @@ public class AuthService {
         }
 
         try {
-            // Guardamos Persona
+            // Guardamos Persona (sin fotos de DNI)
             Persona persona = new Persona();
-            // Como el contrato no pide DNI numérico pero el modelo lo requiere, usamos una combinación temporal
             persona.setDocumento("PEND-" + System.currentTimeMillis()); 
             persona.setNombre(request.getNombre().trim() + " " + request.getApellido().trim());
             persona.setDireccion(request.getDomicilio().trim());
             persona.setEstado("pendiente");
-
-            // Guardamos ambas fotos por separado
-            persona.setFotoFrente(request.getDni_frente().getBytes());
-            persona.setFotoDorso(request.getDni_dorso().getBytes());
+            // No seteamos persona.setFoto() aquí, es para perfil
 
             Persona savedPersona = personaRepository.save(persona);
+
+            // Guardamos las fotos del DNI en la tabla dedicada
+            FotoDni fotoDni = new FotoDni(
+                savedPersona.getIdentificador(),
+                request.getDni_frente().getBytes(),
+                request.getDni_dorso().getBytes()
+            );
+            fotoDniRepository.save(fotoDni);
 
             // Guardamos Cliente (estado pendiente de verificación)
             Cliente cliente = new Cliente();

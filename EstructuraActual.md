@@ -185,4 +185,42 @@ create table registroDeSubasta(
 	constraint fk_registroDeSubasta_producto foreign key (producto) references productos,
 	constraint fk_registroDeSubasta_cliente foreign key (cliente) references clientes
 )
+
+---------------- TABLAS CREADAS POR FUERA DE LAS REGLAMENTARIAS ---------------
+go
+create table foto_dni(
+	id int no null,
+	persona_id int no null,
+	frente_id bytea (hex),
+	dorso_id bytea (hex)
+)
+go
+create table registro_subasta(
+	id int no null,	
+	cliente_id int no null,
+	email varchar (100),
+	passwaord_hash,
+	estado varchar(15),
+	created_at timestap,
+	apellido varchar (30)
+)
+go
+create table medios_de_pago(
+	id int no null identity,
+	cliente_id int no null,
+	tipo varchar (50),
+	datos jsonb,
+	verificado boolean,
+	created_at timestap,
+	estado_verificacion varchar (15) constraint chkestado_verificacion check (estado_verificacion in ('pendiente','aceptado'))
+)
+go
+create table notificaciones(
+	id int no null,
+	cliente_id int no null,
+	tipo varchar (30),
+	mensaje varchar (300),
+	leida boolean,
+	created_at timestap
+)
 go
