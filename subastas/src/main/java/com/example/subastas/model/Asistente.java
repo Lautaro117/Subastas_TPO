@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 @Entity
 @Table(name = "asistentes")
+//esta clase representa a un asistente a una subasta, quien es un cliente que participa en una subasta. Contiene información sobre el número de postor, el cliente y la subasta a la que asiste.
 public class Asistente {
 
     @Id

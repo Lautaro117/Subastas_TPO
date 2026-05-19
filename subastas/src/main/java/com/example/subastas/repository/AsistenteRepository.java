@@ -6,5 +6,7 @@ import java.util.Optional;
 
 public interface AsistenteRepository extends JpaRepository<Asistente, Integer> {
     Optional<Asistente> findByClienteIdAndSubastaId(Integer clienteId, Integer subastaId);
+    Optional<Asistente> findByClienteId(Integer clienteId);
     boolean existsByClienteId(Integer clienteId);
+    void deleteByClienteIdAndSubastaId(Integer clienteId, Integer subastaId);
 }

@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface PujoRepository extends JpaRepository<Pujo, Integer> {
     List<Pujo> findByItemId(Integer itemId);
     Optional<Pujo> findTopByItemIdOrderByImporteDesc(Integer itemId);
+    boolean existsByAsistenteIdAndEstado(Integer asistenteId, String estado);
 }

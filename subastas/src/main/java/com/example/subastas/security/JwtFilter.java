@@ -36,7 +36,6 @@ public class JwtFilter extends OncePerRequestFilter {
                 if (jwtUtil.isTokenValid(token)) {
                     String email = jwtUtil.extractEmail(token);
                     String estado = jwtUtil.extractEstado(token);
-                    String categoria = jwtUtil.extractCategoria(token);
 
                     SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + estado);
 
