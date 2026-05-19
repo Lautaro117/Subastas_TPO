@@ -1,9 +1,14 @@
 package com.example.subastas.model;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "foto_dni")
+@Table(name = "fotos_dni")
 public class FotoDni {
 
     @Id
@@ -13,33 +18,23 @@ public class FotoDni {
     @Column(name = "persona_id", nullable = false)
     private Integer personaId;
 
-    @Lob
-    @Column(name = "frente_id")
-    private byte[] frenteId;
+    @Column(name = "frente_dni", nullable = false)
+    private byte[] frenteDni;
 
-    @Lob
-    @Column(name = "dorso_id")
-    private byte[] dorsoId;
+    @Column(name = "dorso_dni", nullable = false)
+    private byte[] dorsoDni;
 
-    // Constructores
-    public FotoDni() {}
-
-    public FotoDni(Integer personaId, byte[] frenteId, byte[] dorsoId) {
-        this.personaId = personaId;
-        this.frenteId = frenteId;
-        this.dorsoId = dorsoId;
-    }
-
-    // Getters y Setters
+    
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
 
     public Integer getPersonaId() { return personaId; }
     public void setPersonaId(Integer personaId) { this.personaId = personaId; }
 
-    public byte[] getFrenteId() { return frenteId; }
-    public void setFrenteId(byte[] frenteId) { this.frenteId = frenteId; }
+    public byte[] getFrenteDni() { return frenteDni; }
+    public void setFrenteDni(byte[] frenteDni) { this.frenteDni = frenteDni; }
 
-    public byte[] getDorsoId() { return dorsoId; }
-    public void setDorsoId(byte[] dorsoId) { this.dorsoId = dorsoId; }
+    public byte[] getDorsoDni() { return dorsoDni; }
+    public void setDorsoDni(byte[] dorsoDni) { this.dorsoDni = dorsoDni; }
+
 }

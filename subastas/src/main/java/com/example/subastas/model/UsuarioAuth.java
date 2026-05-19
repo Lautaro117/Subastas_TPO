@@ -1,7 +1,13 @@
 package com.example.subastas.model;
 
-import jakarta.persistence.*;
 import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "usuarios_auth")
@@ -17,8 +23,14 @@ public class UsuarioAuth {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash", nullable = true)
     private String passwordHash;
+
+    @Column(name = "apellido", nullable = false)
+    private String apellido;
+
+    @Column(name = "token_registro", nullable = true)
+    private String tokenRegistro;
 
     @Column(nullable = false)
     private String estado = "E1";
@@ -37,6 +49,12 @@ public class UsuarioAuth {
 
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+
+    public String getApellido() { return apellido; }
+    public void setApellido(String apellido) { this.apellido = apellido; }
+
+    public void setTokenRegistro(String tokenRegistro) { this.tokenRegistro = tokenRegistro; }
+    public String getTokenRegistro() { return tokenRegistro; }
 
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }

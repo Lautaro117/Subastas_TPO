@@ -41,4 +41,5 @@ public class Persona {
 
     public byte[] getFoto() { return foto; }
     public void setFoto(byte[] foto) { this.foto = foto; }
+
 }

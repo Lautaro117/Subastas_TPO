@@ -8,14 +8,12 @@ public class RegisterRequest {
     private String apellido;
     private String email;
     private String domicilio;
-    private String pais_origen;
-    private MultipartFile dni_frente;
-    private MultipartFile dni_dorso;
-    private String password;
-    private String password_confirmation;
+    private Integer numeroPais;
+    private MultipartFile frenteDni;
+    private MultipartFile dorsoDni;
 
-    // opcional: username si el front lo envía
-    private String usuario;
+
+    
 
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }
@@ -29,22 +27,14 @@ public class RegisterRequest {
     public String getDomicilio() { return domicilio; }
     public void setDomicilio(String domicilio) { this.domicilio = domicilio; }
 
-    public String getPais_origen() { return pais_origen; }
-    public void setPais_origen(String pais_origen) { this.pais_origen = pais_origen; }
+    public Integer getNumeroPais() { return numeroPais; }
+    public void setNumeroPais(Integer numeroPais) { this.numeroPais = numeroPais; }
 
-    public MultipartFile getDni_frente() { return dni_frente; }
-    public void setDni_frente(MultipartFile dni_frente) { this.dni_frente = dni_frente; }
+    public MultipartFile getFrenteDni() { return frenteDni; }
+    public void setFrenteDni(MultipartFile frenteDni) { this.frenteDni = frenteDni; }
 
-    public MultipartFile getDni_dorso() { return dni_dorso; }
-    public void setDni_dorso(MultipartFile dni_dorso) { this.dni_dorso = dni_dorso; }
+    public MultipartFile getDorsoDni() { return dorsoDni; }
+    public void setDorsoDni(MultipartFile dorsoDni) { this.dorsoDni = dorsoDni; }
 
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-
-    public String getPassword_confirmation() { return password_confirmation; }
-    public void setPassword_confirmation(String password_confirmation) { this.password_confirmation = password_confirmation; }
-
-    public String getUsuario() { return usuario; }
-    public void setUsuario(String usuario) { this.usuario = usuario; }
 }
 
