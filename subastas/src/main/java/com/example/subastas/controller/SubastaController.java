@@ -1,5 +1,18 @@
 package com.example.subastas.controller;
 
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.example.subastas.dto.BidRequest;
 import com.example.subastas.dto.CatalogoDTO;
 import com.example.subastas.dto.SalaResponse;
@@ -7,12 +20,6 @@ import com.example.subastas.model.Pujo;
 import com.example.subastas.model.Subasta;
 import com.example.subastas.security.JwtUtil;
 import com.example.subastas.service.SubastaService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/auctions")
@@ -48,6 +55,17 @@ public class SubastaController {
         return ResponseEntity.ok(items);
     }
 
+    @GetMapping("/{id}/catalog/{itemId}")
+    public ResponseEntity<CatalogoDTO> detalleItem(
+            @PathVariable Integer id,
+            @PathVariable Integer itemId,
+            @RequestHeader("Authorization") String authHeader) {
+        String token = authHeader.substring(7);
+        String estado = jwtUtil.extractEstado(token);
+        CatalogoDTO item = subastaService.obtenerItem(id, itemId, estado);
+        return ResponseEntity.ok(item);
+    }
+
     @PostMapping("/{id}/join")
     public ResponseEntity<SalaResponse> join(
             @PathVariable Integer id,
@@ -78,6 +96,19 @@ public class SubastaController {
         Pujo pujo = subastaService.enviarPuja(id, email, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(pujo);
     }
+
+    @GetMapping("/{id}/items/{itemId}/bids")
+    public ResponseEntity<List<Pujo>> obtenerpujas(
+            @PathVariable Integer id,
+            @PathVariable Integer itemId,
+            @RequestHeader("Authorization") String authHeader) {
+        String token = authHeader.substring(7);
+        String email = jwtUtil.extractEmail(token);
+        List<Pujo> pujas = subastaService.obtenerPujaPorItem(id, itemId);
+        return ResponseEntity.ok(pujas);
+    }
+
+    
 
     @GetMapping("/{id}/live")
     public ResponseEntity<SalaResponse> getLive(

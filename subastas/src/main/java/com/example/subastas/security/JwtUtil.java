@@ -42,12 +42,12 @@ public class JwtUtil {
         return extractClaims(token).getSubject();
     }
 
-    //el estado es el rol del usuario, es decir, si es admin o cliente
+    //el estado es el rol del usuario
     public String extractEstado(String token) {
         return (String) extractClaims(token).get("estado");
     }
     
-    //la categoria es el tipo de usuario, es decir, si es un usuario normal o un usuario premium    
+    //la categoria es el tipo de usuario   
     public String extractCategoria(String token) {
         return (String) extractClaims(token).get("categoria");
     }

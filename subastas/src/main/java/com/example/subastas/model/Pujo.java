@@ -1,11 +1,16 @@
 package com.example.subastas.model;
 
-import jakarta.persistence.*;
 import java.math.BigDecimal;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "pujos")
-//esta clase representa una puja realizada por un asistente en una subasta. Contiene información sobre el asistente, el item, el importe de la puja y si es el ganador o no.
 public class Pujo {
 
     @Id
@@ -21,18 +26,8 @@ public class Pujo {
     @Column(nullable = false)
     private BigDecimal importe;
 
-    @Column(nullable = false)
-    private String moneda;
-
     private String ganador = "no";
 
-    @Column(nullable = false)
-    private String estado = "en_proceso"; // "en_proceso", "confirmada", "rechazada"
-
-    @Column(name = "medio_pago_id")
-    private Integer medioPagoId;
-
-    // Getters y Setters
     public Integer getIdentificador() { return identificador; }
     public void setIdentificador(Integer identificador) { this.identificador = identificador; }
 
@@ -45,15 +40,6 @@ public class Pujo {
     public BigDecimal getImporte() { return importe; }
     public void setImporte(BigDecimal importe) { this.importe = importe; }
 
-    public String getMoneda() { return moneda; }
-    public void setMoneda(String moneda) { this.moneda = moneda; }
-
     public String getGanador() { return ganador; }
     public void setGanador(String ganador) { this.ganador = ganador; }
-
-    public String getEstado() { return estado; }
-    public void setEstado(String estado) { this.estado = estado; }
-
-    public Integer getMedioPagoId() { return medioPagoId; }
-    public void setMedioPagoId(Integer medioPagoId) { this.medioPagoId = medioPagoId; }
 }
