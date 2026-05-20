@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.subastas.dto.BidRequest;
 import com.example.subastas.dto.CatalogoDTO;
+import com.example.subastas.dto.ResultadoItemDTO;
 import com.example.subastas.dto.SalaResponse;
 import com.example.subastas.model.Pujo;
 import com.example.subastas.model.Subasta;
@@ -108,6 +109,17 @@ public class SubastaController {
         return ResponseEntity.ok(pujas);
     }
 
+    @GetMapping("/{id}/items/{itemId}/result")
+    public ResponseEntity<ResultadoItemDTO> resultado(
+        @PathVariable  Integer id,
+        @PathVariable Integer itemId,
+        @RequestHeader("Authorization") String authHeader){
+            String token = authHeader.substring(7);
+            String email = jwtUtil.extractEmail(token);
+            ResultadoItemDTO resultado = subastaService.obtenerResultadoItem(id, itemId, email);
+            return ResponseEntity.ok(resultado);
+        }
+    
     
 
     @GetMapping("/{id}/live")

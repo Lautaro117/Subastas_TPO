@@ -6,14 +6,21 @@
 ## Estado actual (ya hecho)
 
 - ✅ Base de datos migrada a PostgreSQL y subida a Supabase
-- ✅ Proyecto Spring Boot 4.0.6 configurado y conectado a Supabase
-- ✅ Modelos Java: Persona, Cliente, UsuarioAuth, Subasta, Catalogo, ItemCatalogo, Asistente, Pujo
+- ✅ Proyecto Spring Boot configurado y conectado a Supabase
+- ✅ Modelos Java: Persona, Cliente, UsuarioAuth, Subasta, Catalogo, ItemCatalogo, Asistente, Pujo, Notificacion
 - ✅ Repositorios: todos creados
 - ✅ Seguridad JWT configurada (JwtUtil + JwtFilter + SecurityConfig)
-- ✅ POST /api/auth/login — funcionando con JWT (estado E1–E4 + categoría)
-- ✅ GET /api/auctions — funcionando, filtrado por categoría del postor
-- ✅ GET /api/auctions/{id} — funcionando
-- ✅ GET /api/auctions/{id}/catalog — funcionando, precioBase null para E2
+- ✅ POST /api/auth/login — probado y funcionando
+- ✅ POST /api/auth/register — probado: 201, 409, 422
+- ✅ POST /api/auth/register-complete — probado: 201, 401, 422
+- ✅ GET /api/auctions — probado
+- ✅ GET /api/auctions/{id} — probado
+- ✅ GET /api/auctions/{id}/catalog — probado
+- ✅ POST /api/auctions/{id}/join — probado
+- ✅ POST /api/auctions/{id}/leave — probado
+- ✅ POST /api/auctions/{id}/bids — probado
+- ✅ GET /api/auctions/{id}/live — probado
+- ✅ WebSocket STOMP en /ws — creado (sin probar end-to-end)
 - ✅ Proyecto subido a GitHub
 
 ---
@@ -41,100 +48,107 @@
 **Tecnología:** React / Vue / HTML — consume la misma API del backend  
 **Puede arrancar hoy** con los endpoints ya existentes.
 
-### Tareas
-
-**A1 — Login de admin** ⚠️ HACER PRIMERO
-- Pantalla de login con email y password
-- Llama a POST /api/auth/login
-- Guarda el JWT en localStorage
-- Redirige al dashboard si el login es exitoso
-
-**A2 — Gestión de usuarios**
-- Listar todos los postores registrados
-- Ver detalle de cada usuario
-- Cambiar estado: E1 → E2 → E3 → E4
-- Bloquear/desbloquear cuenta (campo admitido = si/no)
-- *Requiere que el integrante de backend termine B7*
-
-**A3 — Gestión de subastas**
-- Listar todas las subastas
-- Crear nueva subasta (fecha, hora, categoría, ubicación)
-- Cambiar estado: abierta / cerrada
-- Asignar subastador
-- *Requiere que el integrante de backend termine B7*
-
-**A4 — Gestión de catálogo**
-- Ver items del catálogo de cada subasta
-- Editar precio base y comisión de cada item
-- Agregar/quitar productos del catálogo
-- *Requiere que el integrante de backend termine B7*
-
-**A5 — Verificación de medios de pago**
-- Ver lista de medios pendientes de verificación
-- Aprobar o rechazar cuenta bancaria / tarjeta / cheque
-- Al aprobar, el usuario pasa automáticamente a E3
-- *Requiere que el integrante de backend termine B7*
-
-**A6 — Monitor de sala en vivo** *(opcional para la entrega, suma puntos)*
-- Ver pujas en tiempo real de cada subasta activa
-- Solo lectura, sin intervenir
-- *Requiere que el integrante de backend termine B6 (WebSocket)*
-
----
 
 ## Integrante 2 — Backend (endpoints pendientes)
+
+---
 
 **Tecnología:** Java + Spring Boot  
 **Independiente del frontend**, puede trabajar en paralelo.
 
-**B1 — POST /api/auth/register** ⚠️ HACER PRIMERO (desbloquea F4)
-- Recibe: nombre, apellido, email, domicilio, país, fotos DNI frente/dorso, password
-- Crea persona + usuario_auth con estado E1
-- El usuario queda pendiente de verificación
-- Responde con ID de solicitud y estado "pendiente"
-- Códigos: 200 ok, 409 email duplicado, 413 imagen muy grande, 422 formato inválido
+**B1 — POST /api/auth/register** ✅ CREADO Y PROBADO (desbloquea F4)
+- Recibe: nombre, apellido, email, domicilio, país, fotos DNI frente/dorso (multipart/form-data)
+- Crea persona + cliente + usuario_auth (estado E1, token_registro UUID) + fotos_dni
+- Responde 201 con `{ solicitudId, estado: "pendiente" }`
+- Códigos verificados: 201 ok, 409 email duplicado, 422 error de procesamiento
+- Bugs corregidos en esta sesión:
+  - `Persona.java` tenía `foto_frente`/`foto_dorso` mapeados a columnas inexistentes en la DB → eliminados
+  - `AuthService`: `cliente.setIdentificador()` conflictuaba con `@MapsId` → eliminado
+  - `password_hash` tiene NOT NULL en la DB; se setea placeholder `"PENDIENTE"` en E1
 
-**B2 — POST /api/auctions/{id}/join**
+**B1b — POST /api/auth/register-complete** ✅ CREADO Y PROBADO
+- Recibe: `{ token, password }`
+- Valida token contra `token_registro` en DB
+- Actualiza `password_hash` (BCrypt), `estado → E2`, `token_registro → null`
+- Códigos verificados: 201 ok, 401 token inválido, 422 password no cumple requisitos
+
+**B2 — POST /api/auctions/{id}/join** ✅ CREADO Y PROBADO
 - Valida que la categoría del postor sea suficiente para la subasta
 - Valida que el postor no esté en otra sala al mismo tiempo
 - Crea un registro en la tabla asistentes
 - Códigos: 200 ok, 403 categoría insuficiente, 409 ya está en otra sala
 
-**B3 — POST /api/auctions/{id}/bids**
+**B2b — POST /api/auctions/{id}/leave** ✅ CREADO Y PROBADO *(extra, no estaba en el plan original)*
+- Desconecta al usuario de la sala
+- Necesario para poder ingresar a otra subasta
+
+**B3 — POST /api/auctions/{id}/bids** ✅ CREADO Y PROBADO
 - Valida que el importe esté dentro del rango min/max permitido
 - Bloquea si ya hay una puja del mismo usuario en proceso
 - Guarda en la tabla pujos
 - Notifica por WebSocket a todos los asistentes de la sala
-- Códigos: 200 ok, 400 fuera de rango, 409 puja en proceso
+- Códigos: 201 creado, 400 fuera de rango, 409 puja en proceso
 
-**B4 — GET /api/auctions/{id}/live**
+**B4 — GET /api/auctions/{id}/live** ✅ CREADO Y PROBADO
 - Devuelve el estado actual de la sala: artículo actual, mejor oferta, lista de pujas recientes
 - Funciona como fallback si no hay WebSocket disponible
 - Códigos: 200 ok, 404 subasta no encontrada
 
-**B5 — Medios de pago (3 endpoints)**
-- POST /api/payment-methods/bank-account — cuenta bancaria
-- POST /api/payment-methods/credit-card — tarjeta de crédito
-- POST /api/payment-methods/certified-check — cheque certificado
+**B5 — Medios de pago** ✅ CREADOS Y PROBADOS
+- ✅ GET /api/payment-methods — listar medios del usuario autenticado
+- ✅ POST /api/payment-methods/bank-account — cuenta bancaria
+- ✅ POST /api/payment-methods/credit-card — tarjeta de crédito
+- ✅ POST /api/payment-methods/certified-check — cheque certificado
+- ✅ DELETE /api/payment-methods/{id} — eliminar medio (valida ownership)
 - Todos quedan en estado "pendiente" hasta que admin los apruebe
 - Códigos: 201 creado, 400 campos faltantes, 422 formato inválido
 
-**B6 — WebSocket con STOMP** ⚠️ BLOQUEANTE para sala (desbloquea S1/S2/S3/A6)
-- Configurar endpoint /ws para conexión WebSocket
-- Canal /topic/auction/{id} → broadcast a todos los asistentes
-- Canal /topic/auction/{id}/bid → notificación de nueva puja
-- Canal /app/bid → el cliente envía una puja
+**B6 — WebSocket con STOMP** ✅ CREADO (desbloquea S1/S2/S3/A6)
+- ✅ Endpoint /ws configurado (con y sin SockJS)
+- ✅ Canal /topic/auction/{id} → broadcast a todos los asistentes
+- ✅ Prefijo /app configurado para mensajes entrantes
+- ✅ Eventos implementados: bid.new, bid.confirmed, item.next
 - Librería: spring-boot-starter-websocket (ya está en el pom.xml)
 
-**B7 — Endpoints de administración** ⚠️ BLOQUEANTE para panel admin (desbloquea A2–A6)
-- GET /api/admin/users — listar todos los usuarios
-- PUT /api/admin/users/{id}/estado — cambiar estado E1–E4
-- PUT /api/admin/users/{id}/admitido — bloquear/desbloquear
-- GET /api/admin/payment-methods/pending — listar medios pendientes
-- PUT /api/admin/payment-methods/{id}/verify — aprobar medio de pago
-- POST /api/admin/auctions — crear subasta
-- PUT /api/admin/auctions/{id}/estado — abrir/cerrar subasta
-- Estos endpoints deben tener un rol de admin diferente al de postor
+**B8 — Endpoints adicionales del spec**
+
+**Módulo 5 — Detalle de artículo** ✅ PROBADO
+- GET /api/auctions/{auction_id}/catalog/{item_id}
+
+**Módulo 6 — Historial de pujas de ítem** ✅ PROBADO
+- GET /api/auctions/{id}/items/{item_id}/bids
+
+**Módulo 7 — Notificaciones** ✅ PROBADAS
+- GET /api/notifications — 200, devuelve array con tipo/mensaje/leida
+- PATCH /api/notifications/{id}/read — 200, actualiza leida → true
+- POST /api/notifications/read-all — 200, devuelve cantidad marcada
+
+**Módulo 1 — Recuperar contraseña** ❌ SIN CREAR
+- POST /api/auth/password/reset-request
+- POST /api/auth/password/reset-code
+- POST /api/auth/password/reset
+
+**Módulo 7 — Resultado y pago**
+- ✅ GET /api/auctions/{id}/items/{item_id}/result — CREADO Y PROBADO
+- ❌ POST /api/purchases/{id}/delivery — SIN CREAR
+- ❌ GET /api/users/me/penalty — SIN CREAR
+- ❌ POST /api/users/me/penalty/pay — SIN CREAR
+
+**Módulo 8 — Ofrecer mis artículos** ❌ SIN CREAR
+- GET /api/my-items
+- POST /api/my-items
+- GET /api/my-items/{id}
+- POST /api/my-items/{id}/conditions
+
+**Módulo 9 — Custodia** ❌ SIN CREAR
+- GET /api/my-items/{id}/custody
+
+**Módulo 10 — Perfil y estadísticas** ❌ SIN CREAR
+- GET /api/users/me
+- PUT /api/users/me/payout-account
+- GET /api/users/me/auction-history
+- GET /api/users/me/stats
+- GET /api/users/me/auction-history/{id}/bids
 
 ---
 

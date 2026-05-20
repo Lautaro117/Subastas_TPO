@@ -12,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.subastas.dto.BidRequest;
 import com.example.subastas.dto.CatalogoDTO;
+import com.example.subastas.dto.ResultadoItemDTO;
 import com.example.subastas.dto.SalaResponse;
 import com.example.subastas.model.Asistente;
 import com.example.subastas.model.Catalogo;
@@ -20,6 +21,7 @@ import com.example.subastas.model.MedioPago;
 import com.example.subastas.model.Pujo;
 import com.example.subastas.model.PujoExt;
 import com.example.subastas.model.Subasta;
+import com.example.subastas.repository.AdjudicacionesRepository;
 import com.example.subastas.repository.AsistenteRepository;
 import com.example.subastas.repository.CatalogoRepository;
 import com.example.subastas.repository.ItemCatalogoRepository;
@@ -60,6 +62,10 @@ public class SubastaService {
 
     @Autowired
     private MedioPagoRepository medioPagoRepository;
+
+    @Autowired
+    private AdjudicacionesRepository adjudicacionesRepository;
+
 
     private static final List<String> ORDEN_CATEGORIAS = Arrays.asList(
             "comun", "especial", "plata", "oro", "platino"
@@ -130,11 +136,19 @@ public class SubastaService {
         return construirSalaResponse(subastaId);
     }
 
-    @Transactional
+   @Transactional
     public void salirDeSala(Integer subastaId, String email) {
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        asistenteRepository.deleteByClienteIdAndSubastaId(usuario.getClienteId(), subastaId);
+        
+        Asistente asistente = asistenteRepository
+                .findByClienteIdAndSubastaId(usuario.getClienteId(), subastaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No estás en esta subasta"));
+
+        boolean tienePujas = !pujoRepository.findByAsistenteId(asistente.getIdentificador()).isEmpty();    
+            if (!tienePujas) {
+                asistenteRepository.delete(asistente);
+            }
     }
 
     public SalaResponse obtenerEstadoVivo(Integer subastaId, String email) {
@@ -207,6 +221,30 @@ public class SubastaService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Item no encontrado"));
         return pujoRepository.findByItemId(item.getIdentificador());
+    }
+
+    public ResultadoItemDTO obtenerResultadoItem(Integer subastaId, Integer itemId, String email) {
+        var usuario = usuarioAuthRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+
+        Asistente asistente = asistenteRepository.findByClienteIdAndSubastaId(usuario.getClienteId(), subastaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No participaste en esta subasta"));
+
+        ResultadoItemDTO resultado = new ResultadoItemDTO();
+
+        // Buscar puja ganadora del usuario en ese ítem
+        Optional<Pujo> pujaGanadora = pujoRepository.findByAsistenteIdAndItemIdAndGanador(asistente.getIdentificador(), itemId, "si");
+
+        if (pujaGanadora.isPresent()) {
+            resultado.setGano(true);
+            resultado.setMontoPujado(pujaGanadora.get().getImporte());
+        } else {
+            resultado.setGano(false);
+            pujoRepository.findTopByAsistenteIdAndItemIdOrderByImporteDesc(
+                    asistente.getIdentificador(), itemId).ifPresent(p -> resultado.setMontoPujado(p.getImporte()));
+        }
+
+        return resultado;
     }
 
     private SalaResponse construirSalaResponse(Integer subastaId) {
