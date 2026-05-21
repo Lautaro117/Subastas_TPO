@@ -128,13 +128,11 @@ export default function RegisterPersonalDataScreen({ navigation }) {
                     autoCorrect={false}
                     keyboardType={field.keyboardType}
                   />
-                  <HelperText
-                    type="error"
-                    visible={shouldShowError}
-                    style={[styles.helperText, { color: theme.colors.error }]}
-                  >
-                    {errors[field.key]}
-                  </HelperText>
+                  {shouldShowError ? (
+                    <HelperText type="error" visible style={[styles.helperText, { color: theme.colors.error }]}>
+                      {errors[field.key]}
+                    </HelperText>
+                  ) : null}
                 </View>
               );
             })}
@@ -161,11 +159,11 @@ export default function RegisterPersonalDataScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   inputBlock: {
-    marginBottom: 14,
+    marginBottom: 8,
   },
   helperText: {
-    marginTop: 4,
-    marginBottom: -2,
+    marginTop: 2,
+    marginBottom: 0,
     marginLeft: 0,
   },
   nextAction: {
