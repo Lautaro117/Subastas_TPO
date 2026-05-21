@@ -38,7 +38,6 @@ export default function AuthTextInput({
           primary: theme.colors.primary,
           outline: theme.colors.outline,
           onSurfaceVariant: theme.colors.onSurfaceVariant,
-          background: 'transparent',
         },
       }}
       {...rest}

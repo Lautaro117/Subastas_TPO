@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     height: 20,
   },
   linksSection: {
-    gap: 12,
+    gap: 10,
   },
   guestButtonSection: {
     marginTop: 72,

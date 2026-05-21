@@ -17,9 +17,9 @@ export default function AuthGhostButton({
       mode="contained-tonal"
       onPress={onPress}
       disabled={disabled}
-      style={[styles.button, { backgroundColor: theme.colors.secondaryContainer }, style]}
+      style={[styles.button, { backgroundColor: theme.colors.surfaceContainerHigh }, style]}
       contentStyle={[styles.content, contentStyle]}
-      labelStyle={[styles.label, { color: theme.colors.onSecondaryContainer }]}
+      labelStyle={[styles.label, { color: theme.colors.onSurface }]}
       {...rest}
     >
       {children}

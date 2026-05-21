@@ -20,7 +20,8 @@ const styles = StyleSheet.create({
   text: {
     textAlign: 'center',
     textDecorationLine: 'underline',
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '500',
   },
 });
