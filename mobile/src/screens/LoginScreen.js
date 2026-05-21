@@ -10,7 +10,7 @@ import {
   AuthTextInput,
 } from '../components';
 
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }) {
   const theme = useTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -140,7 +140,9 @@ export default function LoginScreen() {
 
           <View style={styles.linksSection}>
             <AuthLinkText>Olvide mi contrasena</AuthLinkText>
-            <AuthLinkText>Crear cuenta</AuthLinkText>
+            <AuthLinkText onPress={() => navigation.navigate('RegisterPersonalData')}>
+              Crear cuenta
+            </AuthLinkText>
           </View>
         </View>
 
