@@ -58,6 +58,7 @@ export async function loginRequest({ email, password }) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Accept: 'application/json',
     },
     body: JSON.stringify({
       email,
@@ -86,6 +87,9 @@ export async function loginRequest({ email, password }) {
 export async function registerRequest(formData) {
   const response = await fetch(buildApiUrl('/api/auth/register'), {
     method: 'POST',
+    headers: {
+      Accept: 'application/json',
+    },
     body: formData,
   });
 
@@ -110,6 +114,9 @@ export async function registerRequest(formData) {
 export async function getRegisterStatus(solicitudId) {
   const response = await fetch(buildApiUrl(`/api/auth/status/${solicitudId}`), {
     method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
   });
 
   const rawBody = await response.text();

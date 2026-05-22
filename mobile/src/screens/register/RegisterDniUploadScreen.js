@@ -122,6 +122,18 @@ export default function RegisterDniUploadScreen({ navigation }) {
       return;
     }
 
+    const missingBasicFields = [];
+    if (!registerForm.firstName?.trim()) missingBasicFields.push('nombre');
+    if (!registerForm.lastName?.trim()) missingBasicFields.push('apellido');
+    if (!registerForm.email?.trim()) missingBasicFields.push('email');
+    if (!registerForm.address?.trim()) missingBasicFields.push('domicilio');
+    if (!Number.isInteger(registerForm.countryCode)) missingBasicFields.push('numeroPais');
+
+    if (missingBasicFields.length > 0) {
+      setSubmitError(`Completa estos campos antes de continuar: ${missingBasicFields.join(', ')}`);
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError('');
 
