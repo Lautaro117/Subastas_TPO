@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +51,9 @@ public class AuthService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     public LoginResponse login(LoginRequest request) {
         UsuarioAuth usuario = usuarioAuthRepository.findByEmail(request.getEmail())
@@ -108,6 +112,23 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Campos faltantes");
         }
 
+        // 400 — numeroPais inexistente
+        if (!existsPais(request.getNumeroPais())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El codigo de pais no existe en la base de datos"
+            );
+        }
+
+        // 503 — no hay verificador configurable para nuevas altas
+        Integer verificadorId = 1;
+        if (!existsEmpleado(verificadorId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "No hay verificador disponible para procesar nuevos registros"
+            );
+        }
+
         // 413 — imagen muy grande (máx 5MB)
         validarTamanio(request.getFrenteDni(), 5 * 1024 * 1024);
         validarTamanio(request.getDorsoDni(), 5 * 1024 * 1024);
@@ -127,7 +148,7 @@ public class AuthService {
             cliente.setNumeroPais(request.getNumeroPais());
             cliente.setAdmitido("no");
             cliente.setCategoria("comun");
-            cliente.setVerificador(1);
+            cliente.setVerificador(verificadorId);
             clienteRepository.save(cliente);
 
             // 3. INSERT en usuarios_auth (sin password, con token UUID)
@@ -168,6 +189,26 @@ public class AuthService {
         if (f.getSize() > maxBytes) {
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Imagen supera el tamaño máximo permitido (5MB)");
         }
+    }
+
+    private boolean existsPais(Integer numeroPais) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM paises WHERE numero = ?",
+                Integer.class,
+                numeroPais
+        );
+
+        return count != null && count > 0;
+    }
+
+    private boolean existsEmpleado(Integer empleadoId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM empleados WHERE identificador = ?",
+                Integer.class,
+                empleadoId
+        );
+
+        return count != null && count > 0;
     }
 
     private boolean validarPassword(String password) {
