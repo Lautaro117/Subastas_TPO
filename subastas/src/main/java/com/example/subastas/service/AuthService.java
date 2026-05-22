@@ -20,6 +20,7 @@ import jakarta.persistence.PersistenceContext;
 import com.example.subastas.dto.LoginRequest;
 import com.example.subastas.dto.LoginResponse;
 import com.example.subastas.dto.AuthStatusResponse;
+import com.example.subastas.dto.RegisterCountryDTO;
 import com.example.subastas.dto.RegisterRequest;
 import com.example.subastas.dto.RegisterRequestComplete;
 import com.example.subastas.dto.RegisterResponse;
@@ -94,6 +95,16 @@ public class AuthService {
                 .size();
 
         return new LoginResponse(token, usuario.getEmail(), usuario.getEstado(), cliente.getCategoria(), pendientes);
+    }
+
+    public List<RegisterCountryDTO> getRegisterCountries() {
+        return jdbcTemplate.query(
+                "SELECT numero, nombre FROM paises ORDER BY nombre ASC",
+                (rs, rowNum) -> new RegisterCountryDTO(
+                        rs.getInt("numero"),
+                        rs.getString("nombre")
+                )
+        );
     }
 
     @Transactional

@@ -136,3 +136,29 @@ export async function getRegisterStatus(solicitudId) {
 
   return payload;
 }
+
+export async function getRegisterCountries() {
+  const response = await fetch(buildApiUrl('/api/auth/countries'), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  const rawBody = await response.text();
+  const backendMessage = parseErrorBody(rawBody);
+
+  let payload = null;
+
+  try {
+    payload = rawBody ? JSON.parse(rawBody) : [];
+  } catch (_error) {
+    payload = [];
+  }
+
+  if (!response.ok) {
+    throw new Error(backendMessage || 'No se pudo cargar el catalogo de paises');
+  }
+
+  return Array.isArray(payload) ? payload : [];
+}

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,6 +11,7 @@ import { Button, HelperText, IconButton, Menu, Text, useTheme } from 'react-nati
 
 import { AuthTextInput } from '../../components';
 import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
+import { getRegisterCountries } from '../../services/authApi';
 import { registerSharedStyles } from './sharedStyles';
 
 const fieldConfig = [
@@ -21,13 +22,6 @@ const fieldConfig = [
   { key: 'address', label: 'Domicilio', placeholder: 'Ingresa tu domicilio', icon: 'map-marker-outline' },
 ];
 
-const COUNTRY_OPTIONS = [
-  { label: 'Argentina (+54)', code: 54, country: 'Argentina' },
-  { label: 'Uruguay (+598)', code: 598, country: 'Uruguay' },
-  { label: 'Chile (+56)', code: 56, country: 'Chile' },
-  { label: 'Brasil (+55)', code: 55, country: 'Brasil' },
-];
-
 export default function RegisterPersonalDataScreen({ navigation }) {
   const theme = useTheme();
   const { registerForm, updateRegisterForm } = useRegisterFlow();
@@ -35,10 +29,65 @@ export default function RegisterPersonalDataScreen({ navigation }) {
   const [touched, setTouched] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [countryMenuVisible, setCountryMenuVisible] = useState(false);
+  const [countryOptions, setCountryOptions] = useState([]);
+  const [countryLoadError, setCountryLoadError] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCountries() {
+      try {
+        const countries = await getRegisterCountries();
+
+        if (!isMounted) {
+          return;
+        }
+
+        const mapped = countries
+          .filter((item) => Number.isInteger(item?.numero) && typeof item?.nombre === 'string')
+          .map((item) => ({
+            code: item.numero,
+            country: item.nombre,
+            label: item.nombre,
+          }));
+
+        setCountryOptions(mapped);
+        setCountryLoadError(mapped.length > 0 ? '' : 'No hay paises disponibles para registro');
+
+        if (
+          Number.isInteger(formValues.countryCode)
+          && !mapped.some((option) => option.code === formValues.countryCode)
+        ) {
+          setFormValues((prev) => ({
+            ...prev,
+            country: '',
+            countryCode: null,
+          }));
+        }
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setCountryOptions([]);
+        setCountryLoadError(error?.message || 'No se pudo cargar el catalogo de paises');
+      }
+    }
+
+    loadCountries();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const validateField = (key, value) => {
     if (key === 'countryCode') {
       if (!Number.isInteger(value)) {
+        return 'Selecciona un pais valido';
+      }
+
+      if (!countryOptions.some((option) => option.code === value)) {
         return 'Selecciona un pais valido';
       }
 
@@ -74,7 +123,7 @@ export default function RegisterPersonalDataScreen({ navigation }) {
 
     mapped.countryCode = validateField('countryCode', formValues.countryCode);
     return mapped;
-  }, [formValues]);
+  }, [formValues, countryOptions]);
 
   const isFormValid = useMemo(() => Object.values(errors).every((error) => !error), [errors]);
 
@@ -174,18 +223,19 @@ export default function RegisterPersonalDataScreen({ navigation }) {
                   <Button
                     mode="contained-tonal"
                     onPress={() => setCountryMenuVisible(true)}
+                    disabled={countryOptions.length === 0}
                     style={[styles.countryButton, { backgroundColor: theme.colors.surfaceContainerLow }]}
                     contentStyle={styles.countryButtonContent}
                     labelStyle={[styles.countryButtonLabel, { color: theme.colors.onSurface }]}
                     icon="earth"
                   >
                     {formValues.countryCode
-                      ? `${formValues.country} (+${formValues.countryCode})`
+                      ? formValues.country
                       : 'Selecciona pais de origen'}
                   </Button>
                 }
               >
-                {COUNTRY_OPTIONS.map((option) => (
+                {countryOptions.map((option) => (
                   <Menu.Item
                     key={option.code}
                     onPress={() => handleCountrySelect(option)}
@@ -193,6 +243,12 @@ export default function RegisterPersonalDataScreen({ navigation }) {
                   />
                 ))}
               </Menu>
+
+              {countryLoadError ? (
+                <HelperText type="error" visible style={[styles.helperText, { color: theme.colors.error }]}>
+                  {countryLoadError}
+                </HelperText>
+              ) : null}
 
               {(touched.countryCode || submitted) && errors.countryCode ? (
                 <HelperText type="error" visible style={[styles.helperText, { color: theme.colors.error }]}>
