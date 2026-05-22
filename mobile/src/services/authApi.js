@@ -1,5 +1,18 @@
 import { buildApiUrl } from '../config/api';
 
+function parseErrorBody(rawBody) {
+  if (!rawBody) {
+    return '';
+  }
+
+  try {
+    const parsed = JSON.parse(rawBody);
+    return parsed?.message || parsed?.error || parsed?.detail || parsed?.title || rawBody;
+  } catch (_error) {
+    return rawBody;
+  }
+}
+
 function mapLoginError(status, fallbackMessage) {
   if (status === 401) {
     return 'Credenciales incorrectas';
@@ -34,7 +47,7 @@ function mapRegisterError(status, fallbackMessage) {
   }
 
   if (status >= 500) {
-    return 'Error del servidor. Intenta de nuevo.';
+    return fallbackMessage || 'Error del servidor. Intenta de nuevo.';
   }
 
   return fallbackMessage || 'No se pudo completar el registro';
@@ -52,17 +65,18 @@ export async function loginRequest({ email, password }) {
     }),
   });
 
+  const rawBody = await response.text();
+  const backendMessage = parseErrorBody(rawBody);
+
   let payload = null;
 
   try {
-    payload = await response.json();
+    payload = rawBody ? JSON.parse(rawBody) : null;
   } catch (_error) {
     payload = null;
   }
 
   if (!response.ok) {
-    const backendMessage = payload?.message || payload?.error;
-
     throw new Error(mapLoginError(response.status, backendMessage));
   }
 
@@ -75,16 +89,18 @@ export async function registerRequest(formData) {
     body: formData,
   });
 
+  const rawBody = await response.text();
+  const backendMessage = parseErrorBody(rawBody);
+
   let payload = null;
 
   try {
-    payload = await response.json();
+    payload = rawBody ? JSON.parse(rawBody) : null;
   } catch (_error) {
     payload = null;
   }
 
   if (!response.ok) {
-    const backendMessage = payload?.message || payload?.error;
     throw new Error(mapRegisterError(response.status, backendMessage));
   }
 
@@ -96,16 +112,18 @@ export async function getRegisterStatus(solicitudId) {
     method: 'GET',
   });
 
+  const rawBody = await response.text();
+  const backendMessage = parseErrorBody(rawBody);
+
   let payload = null;
 
   try {
-    payload = await response.json();
+    payload = rawBody ? JSON.parse(rawBody) : null;
   } catch (_error) {
     payload = null;
   }
 
   if (!response.ok) {
-    const backendMessage = payload?.message || payload?.error;
     throw new Error(backendMessage || 'No se pudo consultar el estado del registro');
   }
 
