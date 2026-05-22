@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Snackbar, Text, useTheme } from 'react-native-paper';
+import { Text, useTheme } from 'react-native-paper';
 
 import {
   AuthGhostButton,
@@ -9,15 +9,16 @@ import {
   AuthPrimaryButton,
   AuthTextInput,
 } from '../components';
+import { useAppSession } from '../navigation/AppSessionContext';
 
 export default function LoginScreen({ navigation }) {
   const theme = useTheme();
+  const { enterApp } = useAppSession();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [touched, setTouched] = useState({ username: false, password: false });
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccessSnackbar, setShowSuccessSnackbar] = useState(false);
 
   const validateUsername = (value) => {
     const normalized = value.trim();
@@ -84,7 +85,7 @@ export default function LoginScreen({ navigation }) {
     });
 
     setIsSubmitting(false);
-    setShowSuccessSnackbar(true);
+    enterApp('auth');
   };
 
   return (
@@ -147,18 +148,10 @@ export default function LoginScreen({ navigation }) {
         </View>
 
         <View style={styles.guestButtonSection}>
-          <AuthGhostButton onPress={() => {}}>Continuar como invitado</AuthGhostButton>
+          <AuthGhostButton onPress={() => enterApp('guest')}>Continuar como invitado</AuthGhostButton>
         </View>
       </View>
 
-      <Snackbar
-        visible={showSuccessSnackbar}
-        onDismiss={() => setShowSuccessSnackbar(false)}
-        duration={2200}
-        style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
-      >
-        Inicio de sesion simulado con exito
-      </Snackbar>
     </SafeAreaView>
   );
 }

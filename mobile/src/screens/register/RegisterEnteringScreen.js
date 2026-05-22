@@ -3,20 +3,22 @@ import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, IconButton, Text, useTheme } from 'react-native-paper';
 
+import { useAppSession } from '../../navigation/AppSessionContext';
 import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
 
 export default function RegisterEnteringScreen({ navigation }) {
   const theme = useTheme();
+  const { enterApp } = useAppSession();
   const { resetRegisterFlow } = useRegisterFlow();
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       resetRegisterFlow();
-      navigation.navigate('Login');
+      enterApp('registered');
     }, 1400);
 
     return () => clearTimeout(timeoutId);
-  }, [navigation, resetRegisterFlow]);
+  }, [enterApp, resetRegisterFlow]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>

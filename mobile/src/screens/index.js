@@ -4,3 +4,6 @@ export { default as RegisterDniUploadScreen } from './register/RegisterDniUpload
 export { default as RegisterVerificationScreen } from './register/RegisterVerificationScreen';
 export { default as RegisterFinalizePasswordScreen } from './register/RegisterFinalizePasswordScreen';
 export { default as RegisterEnteringScreen } from './register/RegisterEnteringScreen';
+export { default as HomeSubastasScreen } from './home/HomeSubastasScreen';
+export { default as HomeProductosScreen } from './home/HomeProductosScreen';
+export { default as HomePerfilScreen } from './home/HomePerfilScreen';

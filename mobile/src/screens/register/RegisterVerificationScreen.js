@@ -3,10 +3,12 @@ import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, IconButton, Text, useTheme } from 'react-native-paper';
 
+import { useAppSession } from '../../navigation/AppSessionContext';
 import { registerSharedStyles } from './sharedStyles';
 
 export default function RegisterVerificationScreen({ navigation }) {
   const theme = useTheme();
+  const { enterApp } = useAppSession();
 
   return (
     <SafeAreaView style={[registerSharedStyles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -31,7 +33,7 @@ export default function RegisterVerificationScreen({ navigation }) {
         <View style={styles.bottomArea}>
           <Button
             mode="contained-tonal"
-            onPress={() => navigation.navigate('Login')}
+            onPress={() => enterApp('guest')}
             style={[styles.secondaryButton, { backgroundColor: theme.colors.surfaceContainerLow }]}
             labelStyle={[styles.secondaryLabel, { color: theme.colors.onSurface }]}
             contentStyle={styles.secondaryContent}
