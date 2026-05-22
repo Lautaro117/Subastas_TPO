@@ -215,7 +215,7 @@ public class AuthService {
             log.error("register failed for email={}: {}", email, detail, e);
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Error al procesar el registro: " + detail
+                    "No se pudo procesar el registro"
             );
         }
     }

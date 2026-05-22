@@ -48,7 +48,7 @@ public class ApiExceptionHandler {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", HttpStatus.UNPROCESSABLE_ENTITY.value());
         body.put("error", HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase());
-        body.put("message", "Error de persistencia: " + detail);
+        body.put("message", "No se pudo procesar la solicitud");
 
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
     }
@@ -61,7 +61,7 @@ public class ApiExceptionHandler {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
         body.put("error", HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase());
-        body.put("message", "Error interno del servidor: " + detail);
+        body.put("message", "Error interno del servidor");
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }

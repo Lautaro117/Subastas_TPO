@@ -47,10 +47,30 @@ function mapRegisterError(status, fallbackMessage) {
   }
 
   if (status >= 500) {
-    return fallbackMessage || 'Error del servidor. Intenta de nuevo.';
+    return 'Error del servidor. Intenta de nuevo.';
   }
 
   return fallbackMessage || 'No se pudo completar el registro';
+}
+
+function mapStatusQueryError(status, fallbackMessage) {
+  if (status === 404) {
+    return 'No se encontro la solicitud de registro';
+  }
+
+  if (status >= 500) {
+    return 'Error del servidor. Intenta de nuevo.';
+  }
+
+  return fallbackMessage || 'No se pudo consultar el estado del registro';
+}
+
+function mapCountriesError(status, fallbackMessage) {
+  if (status >= 500) {
+    return 'No se pudo cargar el catalogo de paises';
+  }
+
+  return fallbackMessage || 'No se pudo cargar el catalogo de paises';
 }
 
 export async function loginRequest({ email, password }) {
@@ -131,7 +151,7 @@ export async function getRegisterStatus(solicitudId) {
   }
 
   if (!response.ok) {
-    throw new Error(backendMessage || 'No se pudo consultar el estado del registro');
+    throw new Error(mapStatusQueryError(response.status, backendMessage));
   }
 
   return payload;
@@ -157,7 +177,7 @@ export async function getRegisterCountries() {
   }
 
   if (!response.ok) {
-    throw new Error(backendMessage || 'No se pudo cargar el catalogo de paises');
+    throw new Error(mapCountriesError(response.status, backendMessage));
   }
 
   return Array.isArray(payload) ? payload : [];
