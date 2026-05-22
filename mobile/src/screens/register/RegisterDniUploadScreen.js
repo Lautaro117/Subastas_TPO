@@ -127,6 +127,7 @@ export default function RegisterDniUploadScreen({ navigation }) {
     if (!registerForm.lastName?.trim()) missingBasicFields.push('apellido');
     if (!registerForm.email?.trim()) missingBasicFields.push('email');
     if (!registerForm.address?.trim()) missingBasicFields.push('domicilio');
+    if (!registerForm.dni?.trim()) missingBasicFields.push('dni');
     if (!Number.isInteger(registerForm.countryCode)) missingBasicFields.push('numeroPais');
 
     if (missingBasicFields.length > 0) {
@@ -141,6 +142,7 @@ export default function RegisterDniUploadScreen({ navigation }) {
       const formData = new FormData();
       formData.append('nombre', registerForm.firstName?.trim() || '');
       formData.append('apellido', registerForm.lastName?.trim() || '');
+      formData.append('documento', registerForm.dni?.trim() || '');
       formData.append('email', registerForm.email?.trim().toLowerCase() || '');
       formData.append('domicilio', registerForm.address?.trim() || '');
       formData.append('numeroPais', String(registerForm.countryCode ?? ''));

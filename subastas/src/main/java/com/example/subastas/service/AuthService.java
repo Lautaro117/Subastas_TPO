@@ -1,10 +1,12 @@
 package com.example.subastas.service;
 
-import java.util.Optional;
-import java.util.UUID;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,14 +14,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 
+import com.example.subastas.dto.AuthStatusResponse;
 import com.example.subastas.dto.LoginRequest;
 import com.example.subastas.dto.LoginResponse;
-import com.example.subastas.dto.AuthStatusResponse;
 import com.example.subastas.dto.RegisterCountryDTO;
 import com.example.subastas.dto.RegisterRequest;
 import com.example.subastas.dto.RegisterRequestComplete;
@@ -34,6 +32,9 @@ import com.example.subastas.repository.NotificacionRepository;
 import com.example.subastas.repository.PersonaRepository;
 import com.example.subastas.repository.UsuarioAuthRepository;
 import com.example.subastas.security.JwtUtil;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 @Service
 public class AuthService {
@@ -170,7 +171,7 @@ public class AuthService {
         try {
             // 1. INSERT en personas
             Persona persona = new Persona();
-            persona.setDocumento("PEND-" + System.currentTimeMillis());
+            persona.setDocumento(request.getDocumento());
             persona.setNombre(request.getNombre().trim() + " " + request.getApellido().trim());
             persona.setDireccion(request.getDomicilio().trim());
             persona.setEstado("inactivo");

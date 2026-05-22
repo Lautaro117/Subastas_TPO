@@ -3,7 +3,7 @@ import React, { createContext, useContext, useMemo, useState } from 'react';
 const initialRegisterForm = {
   firstName: '',
   lastName: '',
-  username: '',
+  dni: '',
   email: '',
   address: '',
   country: '',

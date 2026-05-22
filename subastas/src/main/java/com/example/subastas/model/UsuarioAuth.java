@@ -35,7 +35,7 @@ public class UsuarioAuth {
     @Column(nullable = false)
     private String estado = "E1";
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
     public Integer getId() { return id; }

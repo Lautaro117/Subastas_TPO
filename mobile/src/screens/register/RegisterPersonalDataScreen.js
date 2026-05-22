@@ -17,7 +17,7 @@ import { registerSharedStyles } from './sharedStyles';
 const fieldConfig = [
   { key: 'firstName', label: 'Nombre', placeholder: 'Ingresa tu nombre', icon: 'account-outline' },
   { key: 'lastName', label: 'Apellido', placeholder: 'Ingresa tu apellido', icon: 'account-outline' },
-  { key: 'username', label: 'Usuario', placeholder: 'Crea tu usuario', icon: 'at' },
+  { key: 'dni', label: 'DNI', placeholder: 'Numero de documento', icon: 'card-account-details-outline', keyboardType: 'numeric' },
   { key: 'email', label: 'Email', placeholder: 'tucorreo@dominio.com', icon: 'email-outline', keyboardType: 'email-address' },
   { key: 'address', label: 'Domicilio', placeholder: 'Ingresa tu domicilio', icon: 'map-marker-outline' },
 ];
@@ -108,7 +108,7 @@ export default function RegisterPersonalDataScreen({ navigation }) {
       }
     }
 
-    if (key === 'username' && trimmed.length > 20) {
+    if (key === 'dni' && trimmed.length > 20) {
       return 'Maximo 20 caracteres';
     }
 

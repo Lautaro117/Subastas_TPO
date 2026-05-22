@@ -8,6 +8,7 @@ public class RegisterRequest {
     private String apellido;
     private String email;
     private String domicilio;
+    private String documento;
     private Integer numeroPais;
     private MultipartFile frenteDni;
     private MultipartFile dorsoDni;
@@ -26,6 +27,9 @@ public class RegisterRequest {
 
     public String getDomicilio() { return domicilio; }
     public void setDomicilio(String domicilio) { this.domicilio = domicilio; }
+
+    public String getDocumento() { return documento; }
+    public void setDocumento(String documento) { this.documento = documento; }
 
     public Integer getNumeroPais() { return numeroPais; }
     public void setNumeroPais(Integer numeroPais) { this.numeroPais = numeroPais; }
