@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 import com.example.subastas.dto.LoginRequest;
 import com.example.subastas.dto.LoginResponse;
@@ -60,6 +62,9 @@ public class AuthService {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public LoginResponse login(LoginRequest request) {
         UsuarioAuth usuario = usuarioAuthRepository.findByEmail(request.getEmail())
@@ -186,12 +191,17 @@ public class AuthService {
             fotos.setDorsoDni(request.getDorsoDni().getBytes());
             fotoDniRepository.save(fotos);
 
+            // Forzamos flush dentro del try para capturar violaciones SQL reales
+            // (FK, unique, not-null, etc.) y evitar un 500 generico en commit.
+            entityManager.flush();
+
             return new RegisterResponse(savedPersona.getIdentificador(), "pendiente");
 
         } catch (ResponseStatusException e) {
             throw e;
         } catch (Exception e) {
-            String detail = e.getMessage() != null ? e.getMessage() : "Error desconocido";
+            String detail = getRootCauseMessage(e);
+            log.error("register failed for email={}: {}", email, detail, e);
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY,
                     "Error al procesar el registro: " + detail
@@ -233,6 +243,24 @@ public class AuthService {
         return password != null && password.length() >= 8 &&
             password.matches(".*[A-Z].*") &&
             password.matches(".*[0-9].*");
+    }
+
+    private String getRootCauseMessage(Throwable t) {
+        Throwable root = t;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+
+        String msg = root.getMessage();
+        if (msg == null || msg.isBlank()) {
+            msg = t.getMessage();
+        }
+
+        if (msg == null || msg.isBlank()) {
+            return "Error desconocido";
+        }
+
+        return msg;
     }
 
     public String resetRequest(String email) {
