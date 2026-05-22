@@ -30,7 +30,7 @@ function mapRegisterError(status, fallbackMessage) {
   }
 
   if (status === 422) {
-    return 'No se pudo procesar el registro';
+    return fallbackMessage || 'No se pudo procesar el registro';
   }
 
   if (status >= 500) {

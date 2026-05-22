@@ -152,7 +152,11 @@ public class AuthService {
         } catch (ResponseStatusException e) {
             throw e;
         } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Error al procesar el registro");
+            String detail = e.getMessage() != null ? e.getMessage() : "Error desconocido";
+            throw new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Error al procesar el registro: " + detail
+            );
         }
     }
 
