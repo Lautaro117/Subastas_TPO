@@ -12,6 +12,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.example.subastas.dto.LoginRequest;
 import com.example.subastas.dto.LoginResponse;
@@ -32,6 +34,8 @@ import com.example.subastas.security.JwtUtil;
 
 @Service
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     @Autowired
     private UsuarioAuthRepository usuarioAuthRepository;
@@ -117,6 +121,7 @@ public class AuthService {
         if (request.getDorsoDni() == null || request.getDorsoDni().isEmpty()) missingFields.add("dorsoDni");
 
         if (!missingFields.isEmpty()) {
+            log.warn("register rejected: missing fields {} for email={}", missingFields, email);
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Campos faltantes: " + String.join(", ", missingFields)
@@ -125,6 +130,7 @@ public class AuthService {
 
         // 400 — numeroPais inexistente
         if (!existsPais(request.getNumeroPais())) {
+            log.warn("register rejected: numeroPais {} does not exist for email={}", request.getNumeroPais(), email);
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "El codigo de pais no existe en la base de datos"
@@ -134,6 +140,7 @@ public class AuthService {
         // 503 — no hay verificador configurable para nuevas altas
         Integer verificadorId = 1;
         if (!existsEmpleado(verificadorId)) {
+            log.warn("register rejected: verificador {} does not exist for email={}", verificadorId, email);
             throw new ResponseStatusException(
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "No hay verificador disponible para procesar nuevos registros"
