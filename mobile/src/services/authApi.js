@@ -31,7 +31,7 @@ function mapLoginError(status, fallbackMessage) {
 
 function mapRegisterError(status, fallbackMessage) {
   if (status === 400) {
-    return 'Faltan campos requeridos';
+    return fallbackMessage || 'Faltan campos requeridos';
   }
 
   if (status === 409) {

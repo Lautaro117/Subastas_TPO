@@ -2,6 +2,8 @@ package com.example.subastas.service;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -106,10 +108,19 @@ public class AuthService {
         }
 
         // 400 — campos obligatorios faltantes
-        if (isBlank(request.getNombre()) || isBlank(request.getApellido())
-                || isBlank(request.getDomicilio()) || request.getNumeroPais() == null
-                || request.getFrenteDni() == null || request.getDorsoDni() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Campos faltantes");
+        List<String> missingFields = new ArrayList<>();
+        if (isBlank(request.getNombre())) missingFields.add("nombre");
+        if (isBlank(request.getApellido())) missingFields.add("apellido");
+        if (isBlank(request.getDomicilio())) missingFields.add("domicilio");
+        if (request.getNumeroPais() == null) missingFields.add("numeroPais");
+        if (request.getFrenteDni() == null || request.getFrenteDni().isEmpty()) missingFields.add("frenteDni");
+        if (request.getDorsoDni() == null || request.getDorsoDni().isEmpty()) missingFields.add("dorsoDni");
+
+        if (!missingFields.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Campos faltantes: " + String.join(", ", missingFields)
+            );
         }
 
         // 400 — numeroPais inexistente
