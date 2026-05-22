@@ -5,6 +5,7 @@ import { Button, IconButton, Surface, Text, useTheme } from 'react-native-paper'
 import * as ImagePicker from 'expo-image-picker';
 
 import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
+import { registerRequest } from '../../services/authApi';
 import { registerSharedStyles } from './sharedStyles';
 
 function UploadBox({ label, imageUri, onPickFromCamera, onPickFromGallery }) {
@@ -59,10 +60,22 @@ function UploadBox({ label, imageUri, onPickFromCamera, onPickFromGallery }) {
 
 export default function RegisterDniUploadScreen({ navigation }) {
   const theme = useTheme();
-  const { dniData, setDniImage } = useRegisterFlow();
+  const { registerForm, dniData, setDniImage, setRegisterResult } = useRegisterFlow();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const canContinue = useMemo(() => !!dniData.frontUri && !!dniData.backUri, [dniData]);
+
+  const buildImageFile = (uri, fallbackName) => {
+    const extension = uri.split('.').pop()?.toLowerCase();
+    const type = extension ? `image/${extension === 'jpg' ? 'jpeg' : extension}` : 'image/jpeg';
+
+    return {
+      uri,
+      name: `${fallbackName}.${extension || 'jpg'}`,
+      type,
+    };
+  };
 
   const pickFromGallery = async (side) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -80,6 +93,7 @@ export default function RegisterDniUploadScreen({ navigation }) {
 
     if (!result.canceled && result.assets?.[0]?.uri) {
       setDniImage(side, result.assets[0].uri);
+      setSubmitError('');
     }
   };
 
@@ -99,6 +113,7 @@ export default function RegisterDniUploadScreen({ navigation }) {
 
     if (!result.canceled && result.assets?.[0]?.uri) {
       setDniImage(side, result.assets[0].uri);
+      setSubmitError('');
     }
   };
 
@@ -108,13 +123,26 @@ export default function RegisterDniUploadScreen({ navigation }) {
     }
 
     setIsSubmitting(true);
+    setSubmitError('');
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 1000);
-    });
+    try {
+      const formData = new FormData();
+      formData.append('nombre', registerForm.firstName?.trim() || '');
+      formData.append('apellido', registerForm.lastName?.trim() || '');
+      formData.append('email', registerForm.email?.trim().toLowerCase() || '');
+      formData.append('domicilio', registerForm.address?.trim() || '');
+      formData.append('numeroPais', String(registerForm.countryCode ?? ''));
+      formData.append('frenteDni', buildImageFile(dniData.frontUri, 'frente-dni'));
+      formData.append('dorsoDni', buildImageFile(dniData.backUri, 'dorso-dni'));
 
-    setIsSubmitting(false);
-    navigation.navigate('RegisterVerification');
+      const response = await registerRequest(formData);
+      setRegisterResult(response);
+      navigation.navigate('RegisterVerification');
+    } catch (error) {
+      setSubmitError(error.message || 'No se pudo completar el registro');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -157,6 +185,10 @@ export default function RegisterDniUploadScreen({ navigation }) {
                 onPickFromGallery={() => pickFromGallery('backUri')}
               />
             </View>
+
+            {submitError ? (
+              <Text style={[styles.submitErrorText, { color: theme.colors.error }]}>{submitError}</Text>
+            ) : null}
 
             <View style={registerSharedStyles.bottomRow}>
               <Button
@@ -236,5 +268,10 @@ const styles = StyleSheet.create({
   bottomButtonLabel: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  submitErrorText: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

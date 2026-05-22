@@ -7,6 +7,7 @@ const initialRegisterForm = {
   email: '',
   address: '',
   country: '',
+  countryCode: null,
 };
 
 const initialDniData = {
@@ -14,11 +15,17 @@ const initialDniData = {
   backUri: '',
 };
 
+const initialRegisterStatus = {
+  solicitudId: null,
+  estado: null,
+};
+
 const RegisterFlowContext = createContext(undefined);
 
 export function RegisterFlowProvider({ children }) {
   const [registerForm, setRegisterForm] = useState(initialRegisterForm);
   const [dniData, setDniData] = useState(initialDniData);
+  const [registerStatus, setRegisterStatus] = useState(initialRegisterStatus);
 
   const updateRegisterForm = (payload) => {
     setRegisterForm((prev) => ({ ...prev, ...payload }));
@@ -31,17 +38,27 @@ export function RegisterFlowProvider({ children }) {
   const resetRegisterFlow = () => {
     setRegisterForm(initialRegisterForm);
     setDniData(initialDniData);
+    setRegisterStatus(initialRegisterStatus);
+  };
+
+  const setRegisterResult = (payload) => {
+    setRegisterStatus({
+      solicitudId: payload?.solicitudId ?? null,
+      estado: payload?.estado ?? null,
+    });
   };
 
   const value = useMemo(
     () => ({
       registerForm,
       dniData,
+      registerStatus,
       updateRegisterForm,
       setDniImage,
+      setRegisterResult,
       resetRegisterFlow,
     }),
-    [registerForm, dniData]
+    [registerForm, dniData, registerStatus]
   );
 
   return <RegisterFlowContext.Provider value={value}>{children}</RegisterFlowContext.Provider>;

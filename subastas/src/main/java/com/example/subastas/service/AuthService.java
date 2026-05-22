@@ -12,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.subastas.dto.LoginRequest;
 import com.example.subastas.dto.LoginResponse;
+import com.example.subastas.dto.AuthStatusResponse;
 import com.example.subastas.dto.RegisterRequest;
 import com.example.subastas.dto.RegisterRequestComplete;
 import com.example.subastas.dto.RegisterResponse;
@@ -183,6 +184,25 @@ public class AuthService {
         
         return null; // Si no hay mail vuelve vacio, por seguridad no se muestra ningun mensaje 
 }
+
+    public AuthStatusResponse getRegisterStatus(Integer solicitudId) {
+        if (solicitudId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solicitud invalida");
+        }
+
+        Cliente cliente = clienteRepository.findById(solicitudId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud no encontrada"));
+
+        UsuarioAuth usuario = usuarioAuthRepository.findByClienteId(solicitudId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+
+        return new AuthStatusResponse(
+                solicitudId,
+                usuario.getEmail(),
+                usuario.getEstado(),
+                cliente.getAdmitido()
+        );
+    }
 
     @Transactional
     public void registerComplete(RegisterRequestComplete request, boolean esReset) {

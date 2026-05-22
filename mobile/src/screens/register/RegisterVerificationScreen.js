@@ -1,14 +1,65 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, IconButton, Text, useTheme } from 'react-native-paper';
+import { ActivityIndicator, Button, IconButton, Text, useTheme } from 'react-native-paper';
 
 import { useAppSession } from '../../navigation/AppSessionContext';
+import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
+import { getRegisterStatus } from '../../services/authApi';
 import { registerSharedStyles } from './sharedStyles';
 
 export default function RegisterVerificationScreen({ navigation }) {
   const theme = useTheme();
   const { enterApp } = useAppSession();
+  const { registerStatus } = useRegisterFlow();
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [statusError, setStatusError] = useState('');
+
+  useEffect(() => {
+    let isActive = true;
+    let intervalId;
+
+    const checkStatus = async () => {
+      if (!registerStatus.solicitudId) {
+        return;
+      }
+
+      setIsCheckingStatus(true);
+
+      try {
+        const response = await getRegisterStatus(registerStatus.solicitudId);
+
+        if (!isActive) {
+          return;
+        }
+
+        setStatusError('');
+
+        if (response?.admitido === 'si') {
+          navigation.replace('RegisterFinalizePassword');
+        }
+      } catch (_error) {
+        if (isActive) {
+          setStatusError('No pudimos verificar el estado. Reintentando...');
+        }
+      } finally {
+        if (isActive) {
+          setIsCheckingStatus(false);
+        }
+      }
+    };
+
+    checkStatus();
+    intervalId = setInterval(checkStatus, 30000);
+
+    return () => {
+      isActive = false;
+
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [navigation, registerStatus.solicitudId]);
 
   return (
     <SafeAreaView style={[registerSharedStyles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -28,6 +79,15 @@ export default function RegisterVerificationScreen({ navigation }) {
             Recibimos tu informacion. Esto puede demorar hasta 24 horas y es parte del proceso de
             revision manual.
           </Text>
+
+          <View style={styles.statusRow}>
+            {isCheckingStatus ? <ActivityIndicator size="small" color={theme.colors.primary} /> : null}
+            <Text style={[styles.statusText, { color: theme.colors.onSurfaceVariant }]}> 
+              Verificando estado cada 30 segundos...
+            </Text>
+          </View>
+
+          {statusError ? <Text style={[styles.statusError, { color: theme.colors.error }]}>{statusError}</Text> : null}
         </View>
 
         <View style={styles.bottomArea}>
@@ -39,16 +99,6 @@ export default function RegisterVerificationScreen({ navigation }) {
             contentStyle={styles.secondaryContent}
           >
             Continuar como invitado
-          </Button>
-
-          <Button
-            mode="contained"
-            onPress={() => navigation.navigate('RegisterFinalizePassword')}
-            style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-            labelStyle={[styles.primaryLabel, { color: theme.colors.onPrimary }]}
-            contentStyle={styles.primaryContent}
-          >
-            Seguir
           </Button>
         </View>
       </View>
@@ -75,6 +125,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 320,
   },
+  statusRow: {
+    marginTop: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statusText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  statusError: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
+  },
   bottomArea: {
     gap: 12,
     paddingBottom: 6,
@@ -88,15 +155,5 @@ const styles = StyleSheet.create({
   secondaryLabel: {
     fontSize: 15,
     fontWeight: '500',
-  },
-  primaryButton: {
-    borderRadius: 999,
-  },
-  primaryContent: {
-    minHeight: 54,
-  },
-  primaryLabel: {
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
