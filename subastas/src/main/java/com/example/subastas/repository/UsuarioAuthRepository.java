@@ -9,6 +9,7 @@ import com.example.subastas.model.UsuarioAuth;
 public interface UsuarioAuthRepository extends JpaRepository<UsuarioAuth, Integer> {
     Optional<UsuarioAuth> findByEmail(String email);
     boolean existsByEmail(String email);
+    Optional<UsuarioAuth> findByClienteId(Integer clienteId);
 
     Optional<UsuarioAuth> findByTokenRegistro(String token);
     boolean existsByTokenRegistro(String token);

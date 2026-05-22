@@ -2,16 +2,25 @@ package com.example.subastas.service;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 import com.example.subastas.dto.LoginRequest;
 import com.example.subastas.dto.LoginResponse;
+import com.example.subastas.dto.AuthStatusResponse;
+import com.example.subastas.dto.RegisterCountryDTO;
 import com.example.subastas.dto.RegisterRequest;
 import com.example.subastas.dto.RegisterRequestComplete;
 import com.example.subastas.dto.RegisterResponse;
@@ -28,6 +37,8 @@ import com.example.subastas.security.JwtUtil;
 
 @Service
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     @Autowired
     private UsuarioAuthRepository usuarioAuthRepository;
@@ -49,6 +60,12 @@ public class AuthService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public LoginResponse login(LoginRequest request) {
         UsuarioAuth usuario = usuarioAuthRepository.findByEmail(request.getEmail())
@@ -80,6 +97,16 @@ public class AuthService {
         return new LoginResponse(token, usuario.getEmail(), usuario.getEstado(), cliente.getCategoria(), pendientes);
     }
 
+    public List<RegisterCountryDTO> getRegisterCountries() {
+        return jdbcTemplate.query(
+                "SELECT numero, nombre FROM paises ORDER BY nombre ASC",
+                (rs, rowNum) -> new RegisterCountryDTO(
+                        rs.getInt("numero"),
+                        rs.getString("nombre")
+                )
+        );
+    }
+
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
 
@@ -101,10 +128,39 @@ public class AuthService {
         }
 
         // 400 — campos obligatorios faltantes
-        if (isBlank(request.getNombre()) || isBlank(request.getApellido())
-                || isBlank(request.getDomicilio()) || request.getNumeroPais() == null
-                || request.getFrenteDni() == null || request.getDorsoDni() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Campos faltantes");
+        List<String> missingFields = new ArrayList<>();
+        if (isBlank(request.getNombre())) missingFields.add("nombre");
+        if (isBlank(request.getApellido())) missingFields.add("apellido");
+        if (isBlank(request.getDomicilio())) missingFields.add("domicilio");
+        if (request.getNumeroPais() == null) missingFields.add("numeroPais");
+        if (request.getFrenteDni() == null || request.getFrenteDni().isEmpty()) missingFields.add("frenteDni");
+        if (request.getDorsoDni() == null || request.getDorsoDni().isEmpty()) missingFields.add("dorsoDni");
+
+        if (!missingFields.isEmpty()) {
+            log.warn("register rejected: missing fields {} for email={}", missingFields, email);
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Campos faltantes: " + String.join(", ", missingFields)
+            );
+        }
+
+        // 400 — numeroPais inexistente
+        if (!existsPais(request.getNumeroPais())) {
+            log.warn("register rejected: numeroPais {} does not exist for email={}", request.getNumeroPais(), email);
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "El codigo de pais no existe en la base de datos"
+            );
+        }
+
+        // 503 — no hay verificador configurable para nuevas altas
+        Integer verificadorId = 1;
+        if (!existsEmpleado(verificadorId)) {
+            log.warn("register rejected: verificador {} does not exist for email={}", verificadorId, email);
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "No hay verificador disponible para procesar nuevos registros"
+            );
         }
 
         // 413 — imagen muy grande (máx 5MB)
@@ -126,7 +182,7 @@ public class AuthService {
             cliente.setNumeroPais(request.getNumeroPais());
             cliente.setAdmitido("no");
             cliente.setCategoria("comun");
-            cliente.setVerificador(1);
+            cliente.setVerificador(verificadorId);
             clienteRepository.save(cliente);
 
             // 3. INSERT en usuarios_auth (sin password, con token UUID)
@@ -146,12 +202,21 @@ public class AuthService {
             fotos.setDorsoDni(request.getDorsoDni().getBytes());
             fotoDniRepository.save(fotos);
 
+            // Forzamos flush dentro del try para capturar violaciones SQL reales
+            // (FK, unique, not-null, etc.) y evitar un 500 generico en commit.
+            entityManager.flush();
+
             return new RegisterResponse(savedPersona.getIdentificador(), "pendiente");
 
         } catch (ResponseStatusException e) {
             throw e;
         } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Error al procesar el registro");
+            String detail = getRootCauseMessage(e);
+            log.error("register failed for email={}: {}", email, detail, e);
+            throw new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "No se pudo procesar el registro"
+            );
         }
     }
 
@@ -165,10 +230,48 @@ public class AuthService {
         }
     }
 
+    private boolean existsPais(Integer numeroPais) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM paises WHERE numero = ?",
+                Integer.class,
+                numeroPais
+        );
+
+        return count != null && count > 0;
+    }
+
+    private boolean existsEmpleado(Integer empleadoId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM empleados WHERE identificador = ?",
+                Integer.class,
+                empleadoId
+        );
+
+        return count != null && count > 0;
+    }
+
     private boolean validarPassword(String password) {
         return password != null && password.length() >= 8 &&
             password.matches(".*[A-Z].*") &&
             password.matches(".*[0-9].*");
+    }
+
+    private String getRootCauseMessage(Throwable t) {
+        Throwable root = t;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+
+        String msg = root.getMessage();
+        if (msg == null || msg.isBlank()) {
+            msg = t.getMessage();
+        }
+
+        if (msg == null || msg.isBlank()) {
+            return "Error desconocido";
+        }
+
+        return msg;
     }
 
     public String resetRequest(String email) {
@@ -183,6 +286,25 @@ public class AuthService {
         
         return null; // Si no hay mail vuelve vacio, por seguridad no se muestra ningun mensaje 
 }
+
+    public AuthStatusResponse getRegisterStatus(Integer solicitudId) {
+        if (solicitudId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solicitud invalida");
+        }
+
+        Cliente cliente = clienteRepository.findById(solicitudId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Solicitud no encontrada"));
+
+        UsuarioAuth usuario = usuarioAuthRepository.findByClienteId(solicitudId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+
+        return new AuthStatusResponse(
+                solicitudId,
+                usuario.getEmail(),
+                usuario.getEstado(),
+                cliente.getAdmitido()
+        );
+    }
 
     @Transactional
     public void registerComplete(RegisterRequestComplete request, boolean esReset) {
