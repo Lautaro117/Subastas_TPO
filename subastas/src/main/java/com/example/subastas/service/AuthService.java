@@ -1,5 +1,6 @@
 package com.example.subastas.service;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -170,8 +171,21 @@ public class AuthService {
             password.matches(".*[0-9].*");
     }
 
+    public String resetRequest(String email) {
+        Optional<UsuarioAuth> usuario = usuarioAuthRepository.findByEmail(email);
+        
+        if (usuario.isPresent()) {
+            String token = UUID.randomUUID().toString();
+            usuario.get().setTokenRegistro(token);
+            usuarioAuthRepository.save(usuario.get());
+            return token;
+        }
+        
+        return null; // Si no hay mail vuelve vacio, por seguridad no se muestra ningun mensaje 
+}
+
     @Transactional
-    public void registerComplete(RegisterRequestComplete request) {
+    public void registerComplete(RegisterRequestComplete request, boolean esReset) {
 
         // 400 — campos faltantes
         if (request == null || isBlank(request.getToken()) || isBlank(request.getPassword())) {
@@ -191,7 +205,8 @@ public class AuthService {
 
         // Actualizar password, estado y limpiar token
         usuario.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        usuario.setEstado("E2");
+        if (!esReset) {
+            usuario.setEstado("E2");}
         usuario.setTokenRegistro(null);
         usuarioAuthRepository.save(usuario);
     }
