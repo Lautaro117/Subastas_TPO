@@ -10,25 +10,29 @@ import {
   AuthTextInput,
 } from '../components';
 import { useAppSession } from '../navigation/AppSessionContext';
+import { loginRequest } from '../services/authApi';
 
 export default function LoginScreen({ navigation }) {
   const theme = useTheme();
   const { enterApp } = useAppSession();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [touched, setTouched] = useState({ username: false, password: false });
+  const [touched, setTouched] = useState({ email: false, password: false });
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
-  const validateUsername = (value) => {
+  const validateEmail = (value) => {
     const normalized = value.trim();
 
     if (!normalized) {
-      return 'El usuario es requerido';
+      return 'El email es requerido';
     }
 
-    if (normalized.length > 20) {
-      return 'El usuario no puede superar los 20 caracteres';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(normalized)) {
+      return 'Ingresa un email valido';
     }
 
     return '';
@@ -42,24 +46,26 @@ export default function LoginScreen({ navigation }) {
     return '';
   };
 
-  const usernameError = validateUsername(username);
+  const emailError = validateEmail(email);
   const passwordError = validatePassword(password);
 
-  const shouldShowUsernameError = (touched.username || submitted) && !!usernameError;
+  const shouldShowEmailError = (touched.email || submitted) && !!emailError;
   const shouldShowPasswordError = (touched.password || submitted) && !!passwordError;
 
-  const isFormValid = useMemo(() => !usernameError && !passwordError, [usernameError, passwordError]);
+  const isFormValid = useMemo(() => !emailError && !passwordError, [emailError, passwordError]);
 
-  const handleUsernameChange = (value) => {
-    setUsername(value);
+  const handleEmailChange = (value) => {
+    setEmail(value);
+    setSubmitError('');
   };
 
   const handlePasswordChange = (value) => {
     setPassword(value);
+    setSubmitError('');
   };
 
-  const handleUsernameBlur = () => {
-    setTouched((prev) => ({ ...prev, username: true }));
+  const handleEmailBlur = () => {
+    setTouched((prev) => ({ ...prev, email: true }));
   };
 
   const handlePasswordBlur = () => {
@@ -72,20 +78,27 @@ export default function LoginScreen({ navigation }) {
     }
 
     setSubmitted(true);
+    setSubmitError('');
 
     if (!isFormValid) {
-      setTouched({ username: true, password: true });
+      setTouched({ email: true, password: true });
       return;
     }
 
     setIsSubmitting(true);
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 1200);
-    });
+    try {
+      await loginRequest({
+        email: email.trim().toLowerCase(),
+        password,
+      });
 
-    setIsSubmitting(false);
-    enterApp('auth');
+      enterApp('auth');
+    } catch (error) {
+      setSubmitError(error.message || 'No se pudo iniciar sesion');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -96,20 +109,21 @@ export default function LoginScreen({ navigation }) {
 
           <View style={styles.inputsSection}>
             <AuthTextInput
-              value={username}
-              onChangeText={handleUsernameChange}
-              onBlur={handleUsernameBlur}
-              label="Usuario"
-              placeholder="Ingresa tu usuario"
-              icon="account-outline"
-              error={shouldShowUsernameError}
+              value={email}
+              onChangeText={handleEmailChange}
+              onBlur={handleEmailBlur}
+              label="Email"
+              placeholder="tucorreo@dominio.com"
+              icon="email-outline"
+              error={shouldShowEmailError}
               autoCapitalize="none"
               autoCorrect={false}
+              keyboardType="email-address"
               returnKeyType="next"
             />
 
-            {shouldShowUsernameError ? (
-              <Text style={[styles.errorText, { color: theme.colors.error }]}>{usernameError}</Text>
+            {shouldShowEmailError ? (
+              <Text style={[styles.errorText, { color: theme.colors.error }]}>{emailError}</Text>
             ) : null}
 
             <View style={styles.inputGap} />
@@ -132,6 +146,10 @@ export default function LoginScreen({ navigation }) {
           </View>
 
           <View style={styles.primaryButtonGap} />
+
+          {submitError ? (
+            <Text style={[styles.submitErrorText, { color: theme.colors.error }]}>{submitError}</Text>
+          ) : null}
 
           <AuthPrimaryButton disabled={!isFormValid || isSubmitting} loading={isSubmitting} onPress={handleSubmit}>
             Iniciar Sesion
@@ -188,6 +206,11 @@ const styles = StyleSheet.create({
   },
   primaryButtonGap: {
     height: 24,
+  },
+  submitErrorText: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
   },
   linksGap: {
     height: 20,
