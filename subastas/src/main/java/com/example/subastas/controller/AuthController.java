@@ -14,6 +14,7 @@ import com.example.subastas.dto.LoginResponse;
 import com.example.subastas.dto.RegisterRequest;
 import com.example.subastas.dto.RegisterRequestComplete;
 import com.example.subastas.dto.RegisterResponse;
+import com.example.subastas.dto.ResetRequestDTO;
 import com.example.subastas.service.AuthService;
 
 @RestController
@@ -36,7 +37,20 @@ public class AuthController {
 
     @PostMapping("/register-complete")
     public ResponseEntity<Void> registerComplete(@RequestBody RegisterRequestComplete request) {
-        authService.registerComplete(request);
+        authService.registerComplete(request, false);
         return ResponseEntity.status(HttpStatus.CREATED).build();    }
+
+    @PostMapping("/password/reset-request")
+        public ResponseEntity<String> resetRequest(@RequestBody ResetRequestDTO request) {
+            String token = authService.resetRequest(request.getEmail());
+            return ResponseEntity.ok(token != null ? token : "");
+        }
+
+    @PostMapping("/password/reset")
+    public ResponseEntity<Void> resetPassword(@RequestBody RegisterRequestComplete request) {
+        authService.registerComplete(request, true);
+        return ResponseEntity.status(HttpStatus.CREATED).build();   
+    }
+
 }
 

@@ -26,7 +26,7 @@ public class UsuarioAuth {
     @Column(name = "password_hash", nullable = true)
     private String passwordHash;
 
-    @Column(name = "apellido", nullable = false)
+    @Column(name = "apellido", nullable = true)
     private String apellido;
 
     @Column(name = "token_registro", nullable = true)
