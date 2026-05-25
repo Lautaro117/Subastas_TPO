@@ -108,8 +108,8 @@ export default function RegisterPersonalDataScreen({ navigation }) {
       }
     }
 
-    if (key === 'dni' && trimmed.length > 20) {
-      return 'Maximo 20 caracteres';
+    if (key === 'dni' && trimmed.length > 10) {
+      return 'Maximo 10 caracteres';
     }
 
     return '';

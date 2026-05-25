@@ -182,3 +182,19 @@ export async function getRegisterCountries() {
 
   return Array.isArray(payload) ? payload : [];
 }
+
+export async function resetPasswordApi({ token, password }) {
+  const response = await fetch(buildApiUrl('/api/auth/password/reset'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, password }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Token inválido o expirado');
+    if (response.status === 422) throw new Error('La contraseña no cumple los requisitos');
+    throw new Error('No se pudo restablecer la contraseña');
+  }
+
+  return true;
+}

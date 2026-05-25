@@ -5,9 +5,11 @@ import { Button, HelperText, IconButton, Text, useTheme } from 'react-native-pap
 
 import { AuthTextInput } from '../../components';
 import { registerSharedStyles } from './sharedStyles';
+import { resetPasswordApi } from '../../services/authApi';
 
 export default function RegisterFinalizePasswordScreen({ navigation }) {
   const theme = useTheme();
+  const [token, setToken] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [touched, setTouched] = useState({ password: false, confirmPassword: false });
@@ -17,8 +19,8 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
     const trimmed = password.trim();
 
     if (!trimmed) return '';
-    if (trimmed.length < 6) return 'Baja';
-    if (trimmed.length < 10) return 'Media';
+    if (trimmed.length < 8) return 'Baja';
+    if (trimmed.length < 12) return 'Media';
     return 'Alta';
   }, [password]);
 
@@ -27,9 +29,15 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
       return 'La contrasena es requerida';
     }
 
-    if (password.trim().length < 6) {
-      return 'Minimo 6 caracteres';
+    if (password.trim().length < 8) {
+      return 'Minimo 8 caracteres';
     }
+    if (!/[A-Z]/.test(password)) {
+    return 'Debe tener al menos una mayuscula';
+  }
+  if (!/[0-9]/.test(password)) {
+    return 'Debe tener al menos un numero';
+  }
 
     return '';
   }, [password]);
@@ -51,15 +59,17 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
   const showPasswordError = (touched.password || submitted) && !!passwordError;
   const showConfirmError = (touched.confirmPassword || submitted) && !!confirmError;
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     setSubmitted(true);
 
-    if (!isValid) {
-      setTouched({ password: true, confirmPassword: true });
-      return;
+    if (!isValid || !token.trim()) return; 
+     
+    try{
+      await resetPasswordApi({ token: token.trim(), password});
+      navigation.navigate('RegisterEntering');
+    } catch (error) {
+      // agregar error
     }
-
-    navigation.navigate('RegisterEntering');
   };
 
   return (
@@ -87,6 +97,16 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
             <Text style={[registerSharedStyles.subtitle, { color: theme.colors.onSurfaceVariant }]}> 
               Ultimo paso para activar tu cuenta y continuar a la app.
             </Text>
+
+            <View style={styles.inputBlock}>
+              <AuthTextInput
+                value={token}
+                onChangeText={setToken}
+                label="Código de verificación"
+                placeholder="Ingresa el código recibido"
+                icon="key-outline"
+              />
+            </View>
 
             <View style={styles.inputBlock}>
               <AuthTextInput
@@ -131,7 +151,7 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
                 mode="contained"
                 compact
                 onPress={handleFinish}
-                disabled={!isValid}
+                disabled={!isValid || !token.trim()}
                 style={[styles.finishButton, { backgroundColor: theme.colors.primary }]}
                 contentStyle={styles.finishContent}
                 labelStyle={[styles.finishLabel, { color: theme.colors.onPrimary }]}
