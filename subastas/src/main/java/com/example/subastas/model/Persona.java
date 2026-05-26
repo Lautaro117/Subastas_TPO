@@ -1,6 +1,11 @@
 package com.example.subastas.model;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "personas")
@@ -20,7 +25,10 @@ public class Persona {
 
     private String estado;
 
-    // Getters y Setters
+    @Column(name = "foto")
+    private byte[] foto;
+
+
     public Integer getIdentificador() { return identificador; }
     public void setIdentificador(Integer identificador) { this.identificador = identificador; }
 
@@ -35,6 +43,9 @@ public class Persona {
 
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
+
+    public byte[] getFoto() { return foto; }
+    public void setFoto(byte[] foto) { this.foto = foto; }
 
 
 }
