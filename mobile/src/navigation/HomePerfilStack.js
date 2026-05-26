@@ -2,6 +2,8 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import HomePerfilScreen from '../screens/home/HomePerfilScreen';
+import EditProfileScreen from '../screens/home/EditProfileScreen';
+import PlaceholderScreen from '../screens/home/PlaceholderScreen';
 import PaymentMethodsScreen from '../screens/PaymentMethodsScreen';
 import AddBankAccountScreen from '../screens/payments/AddBankAccountScreen';
 import AddCreditCardScreen from '../screens/payments/AddCreditCardScreen';
@@ -13,10 +15,15 @@ export function HomePerfilStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="HomePerfil" component={HomePerfilScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
       <Stack.Screen name="AddBankAccount" component={AddBankAccountScreen} />
       <Stack.Screen name="AddCreditCard" component={AddCreditCardScreen} />
       <Stack.Screen name="AddCertifiedCheck" component={AddCertifiedCheckScreen} />
+      <Stack.Screen name="AuctionHistory" component={PlaceholderScreen} />
+      <Stack.Screen name="Penalizaciones" component={PlaceholderScreen} />
+      <Stack.Screen name="Notificaciones" component={PlaceholderScreen} />
+      <Stack.Screen name="Apariencia" component={PlaceholderScreen} />
     </Stack.Navigator>
   );
 }
