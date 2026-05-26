@@ -11,7 +11,7 @@ import { registerSharedStyles } from './sharedStyles';
 export default function RegisterVerificationScreen({ navigation }) {
   const theme = useTheme();
   const { enterApp } = useAppSession();
-  const { registerStatus } = useRegisterFlow();
+  const { registerStatus, setRegistrationToken } = useRegisterFlow();
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [statusError, setStatusError] = useState('');
 
@@ -36,6 +36,9 @@ export default function RegisterVerificationScreen({ navigation }) {
         setStatusError('');
 
         if (response?.admitido === 'si') {
+          if (response?.tokenRegistro) {
+            setRegistrationToken(response.tokenRegistro);
+          }
           navigation.replace('RegisterFinalizePassword');
         }
       } catch (_error) {

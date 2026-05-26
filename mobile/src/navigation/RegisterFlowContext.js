@@ -18,6 +18,7 @@ const initialDniData = {
 const initialRegisterStatus = {
   solicitudId: null,
   estado: null,
+  token: null,
 };
 
 const RegisterFlowContext = createContext(undefined);
@@ -45,7 +46,12 @@ export function RegisterFlowProvider({ children }) {
     setRegisterStatus({
       solicitudId: payload?.solicitudId ?? null,
       estado: payload?.estado ?? null,
+      token: null,
     });
+  };
+
+  const setRegistrationToken = (token) => {
+    setRegisterStatus((prev) => ({ ...prev, token }));
   };
 
   const value = useMemo(
@@ -56,6 +62,7 @@ export function RegisterFlowProvider({ children }) {
       updateRegisterForm,
       setDniImage,
       setRegisterResult,
+      setRegistrationToken,
       resetRegisterFlow,
     }),
     [registerForm, dniData, registerStatus]

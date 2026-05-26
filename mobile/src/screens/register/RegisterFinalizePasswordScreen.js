@@ -6,10 +6,11 @@ import { Button, HelperText, IconButton, Text, useTheme } from 'react-native-pap
 import { AuthTextInput } from '../../components';
 import { registerSharedStyles } from './sharedStyles';
 import { resetPasswordApi } from '../../services/authApi';
+import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
 
 export default function RegisterFinalizePasswordScreen({ navigation }) {
   const theme = useTheme();
-  const [token, setToken] = useState('');
+  const { registerStatus } = useRegisterFlow();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [touched, setTouched] = useState({ password: false, confirmPassword: false });
@@ -62,10 +63,10 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
   const handleFinish = async () => {
     setSubmitted(true);
 
-    if (!isValid || !token.trim()) return; 
+    if (!isValid || !registerStatus.token) return;
      
     try{
-      await resetPasswordApi({ token: token.trim(), password});
+      await resetPasswordApi({ token: registerStatus.token, password});
       navigation.navigate('RegisterEntering');
     } catch (error) {
       // agregar error
@@ -97,16 +98,6 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
             <Text style={[registerSharedStyles.subtitle, { color: theme.colors.onSurfaceVariant }]}> 
               Ultimo paso para activar tu cuenta y continuar a la app.
             </Text>
-
-            <View style={styles.inputBlock}>
-              <AuthTextInput
-                value={token}
-                onChangeText={setToken}
-                label="Código de verificación"
-                placeholder="Ingresa el código recibido"
-                icon="key-outline"
-              />
-            </View>
 
             <View style={styles.inputBlock}>
               <AuthTextInput
@@ -151,7 +142,7 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
                 mode="contained"
                 compact
                 onPress={handleFinish}
-                disabled={!isValid || !token.trim()}
+                disabled={!isValid || !registerStatus.token}
                 style={[styles.finishButton, { backgroundColor: theme.colors.primary }]}
                 contentStyle={styles.finishContent}
                 labelStyle={[styles.finishLabel, { color: theme.colors.onPrimary }]}

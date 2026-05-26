@@ -299,11 +299,14 @@ public class AuthService {
         UsuarioAuth usuario = usuarioAuthRepository.findByClienteId(solicitudId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
 
+        String tokenParaRespuesta = "si".equals(cliente.getAdmitido()) ? usuario.getTokenRegistro() : null;
+
         return new AuthStatusResponse(
                 solicitudId,
                 usuario.getEmail(),
                 usuario.getEstado(),
-                cliente.getAdmitido()
+                cliente.getAdmitido(),
+                tokenParaRespuesta
         );
     }
 
