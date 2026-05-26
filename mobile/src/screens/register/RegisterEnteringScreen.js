@@ -8,13 +8,12 @@ import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
 
 export default function RegisterEnteringScreen({ navigation }) {
   const theme = useTheme();
-  const { enterApp } = useAppSession();
   const { resetRegisterFlow } = useRegisterFlow();
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       resetRegisterFlow();
-      enterApp('registered');
+      navigation.navigate('PaymentMethodsOnboarding');
     }, 1400);
 
     return () => clearTimeout(timeoutId);
