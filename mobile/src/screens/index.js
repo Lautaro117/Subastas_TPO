@@ -1,6 +1,10 @@
 export { default as ForgotPasswordEmailScreen } from './ForgotPasswordEmailScreen';
 export { default as ForgotPasswordNewPasswordScreen } from './ForgotPasswordNewPasswordScreen';
 export { default as LoginScreen } from './LoginScreen';
+export { default as PaymentMethodsScreen } from './PaymentMethodsScreen';
+export { default as AddBankAccountScreen } from './payments/AddBankAccountScreen';
+export { default as AddCreditCardScreen } from './payments/AddCreditCardScreen';
+export { default as AddCertifiedCheckScreen } from './payments/AddCertifiedCheckScreen';
 export { default as RegisterPersonalDataScreen } from './register/RegisterPersonalDataScreen';
 export { default as RegisterDniUploadScreen } from './register/RegisterDniUploadScreen';
 export { default as RegisterVerificationScreen } from './register/RegisterVerificationScreen';

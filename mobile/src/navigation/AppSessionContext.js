@@ -6,19 +6,26 @@ export function AppSessionProvider({ children }) {
   const [session, setSession] = useState({
     isAuthenticated: false,
     entryMode: null,
+    token: null,
   });
 
-  const enterApp = (entryMode) => {
-    setSession({
+  const enterApp = (entryMode, token) => {
+    setSession((prev) => ({
       isAuthenticated: true,
       entryMode,
-    });
+      token: token ?? prev.token,
+    }));
+  };
+
+  const setAuthToken = (token) => {
+    setSession((prev) => ({ ...prev, token }));
   };
 
   const exitApp = () => {
     setSession({
       isAuthenticated: false,
       entryMode: null,
+      token: null,
     });
   };
 
@@ -26,6 +33,7 @@ export function AppSessionProvider({ children }) {
     () => ({
       session,
       enterApp,
+      setAuthToken,
       exitApp,
     }),
     [session]

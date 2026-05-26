@@ -5,12 +5,14 @@ import { Button, HelperText, IconButton, Text, useTheme } from 'react-native-pap
 
 import { AuthTextInput } from '../../components';
 import { registerSharedStyles } from './sharedStyles';
-import { resetPasswordApi } from '../../services/authApi';
+import { loginRequest, resetPasswordApi } from '../../services/authApi';
 import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
+import { useAppSession } from '../../navigation/AppSessionContext';
 
 export default function RegisterFinalizePasswordScreen({ navigation }) {
   const theme = useTheme();
-  const { registerStatus } = useRegisterFlow();
+  const { registerStatus, registerForm } = useRegisterFlow();
+  const { setAuthToken } = useAppSession();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [touched, setTouched] = useState({ password: false, confirmPassword: false });
@@ -64,12 +66,22 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
     setSubmitted(true);
 
     if (!isValid || !registerStatus.token) return;
-     
-    try{
-      await resetPasswordApi({ token: registerStatus.token, password});
+
+    try {
+      await resetPasswordApi({ token: registerStatus.token, password });
+
+      try {
+        const loginResult = await loginRequest({ email: registerForm.email, password });
+        if (loginResult?.token) {
+          setAuthToken(loginResult.token);
+        }
+      } catch (_loginError) {
+        // auto-login fallido: el usuario podrá hacer login manual después
+      }
+
       navigation.navigate('RegisterEntering');
     } catch (error) {
-      // agregar error
+      // error al establecer contraseña — silent por ahora, la navegación no avanza
     }
   };
 
