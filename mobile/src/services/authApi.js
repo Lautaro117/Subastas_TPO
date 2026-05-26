@@ -183,6 +183,28 @@ export async function getRegisterCountries() {
   return Array.isArray(payload) ? payload : [];
 }
 
+export async function resetRequestApi({ email }) {
+  const response = await fetch(buildApiUrl('/api/auth/password/reset-request'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  const rawBody = await response.text();
+
+  if (!response.ok) {
+    if (response.status === 404) throw new Error('El email no está registrado');
+    if (response.status === 422) throw new Error('Formato de email inválido');
+    if (response.status === 400) throw new Error('El email es requerido');
+    throw new Error('No se pudo procesar la solicitud');
+  }
+
+  return rawBody?.trim() || null;
+}
+
 export async function resetPasswordApi({ token, password }) {
   const response = await fetch(buildApiUrl('/api/auth/password/reset'), {
     method: 'POST',

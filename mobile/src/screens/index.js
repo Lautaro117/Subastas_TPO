@@ -1,3 +1,5 @@
+export { default as ForgotPasswordEmailScreen } from './ForgotPasswordEmailScreen';
+export { default as ForgotPasswordNewPasswordScreen } from './ForgotPasswordNewPasswordScreen';
 export { default as LoginScreen } from './LoginScreen';
 export { default as RegisterPersonalDataScreen } from './register/RegisterPersonalDataScreen';
 export { default as RegisterDniUploadScreen } from './register/RegisterDniUploadScreen';

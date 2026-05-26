@@ -158,7 +158,7 @@ export default function LoginScreen({ navigation }) {
           <View style={styles.linksGap} />
 
           <View style={styles.linksSection}>
-            <AuthLinkText>Olvide mi contrasena</AuthLinkText>
+            <AuthLinkText onPress={() => navigation.navigate('ForgotPasswordEmail')}>Olvide mi contrasena</AuthLinkText>
             <AuthLinkText onPress={() => navigation.navigate('RegisterPersonalData')}>
               Crear cuenta
             </AuthLinkText>
