@@ -88,12 +88,15 @@ export default function LoginScreen({ navigation }) {
     setIsSubmitting(true);
 
     try {
-      await loginRequest({
+      const payload = await loginRequest({
         email: email.trim().toLowerCase(),
         password,
       });
 
-      enterApp('auth');
+
+      console.log('PAYLOAD:', payload);
+
+      enterApp('auth', payload?.token);
     } catch (error) {
       setSubmitError(error.message || 'No se pudo iniciar sesion');
     } finally {

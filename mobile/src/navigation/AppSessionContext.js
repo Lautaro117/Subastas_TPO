@@ -6,12 +6,14 @@ export function AppSessionProvider({ children }) {
   const [session, setSession] = useState({
     isAuthenticated: false,
     entryMode: null,
+    token: null,
   });
 
-  const enterApp = (entryMode) => {
+  const enterApp = (entryMode, token = null) => {
     setSession({
       isAuthenticated: true,
       entryMode,
+      token,
     });
   };
 
@@ -19,6 +21,7 @@ export function AppSessionProvider({ children }) {
     setSession({
       isAuthenticated: false,
       entryMode: null,
+      token: null,
     });
   };
 
