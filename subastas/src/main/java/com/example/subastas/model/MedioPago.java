@@ -23,14 +23,20 @@ public class MedioPago {
     @Column(nullable = false)
     private String tipo;
 
-@Column(columnDefinition = "jsonb", nullable = false)
-@org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
-private String datos;
+    @Column(columnDefinition = "jsonb", nullable = false)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    private String datos;
 
     private Boolean verificado = false;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "cuenta_cobro")
+    private Boolean cuentaCobro = false;
+
+    public Boolean getCuentaCobro() { return cuentaCobro; }
+    public void setCuentaCobro(Boolean cuentaCobro) { this.cuentaCobro = cuentaCobro; }
 
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }

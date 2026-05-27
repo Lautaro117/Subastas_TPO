@@ -70,6 +70,9 @@ public class MiProductoService {
 
         ap.setEstadoPropuesta("propuesta_aceptada");
         adminProductoRepository.save(ap);
+
+        producto.setEstadoAdmin("aprobado");
+        productoRepository.save(producto);
     }
 
     public void rechazarPropuesta(String email, Integer productoId) {

@@ -10,14 +10,19 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.subastas.dto.HistorialPujasDTO;
 import com.example.subastas.dto.UserDTO;
+import com.example.subastas.dto.UserStatsDTO;
 import com.example.subastas.model.Asistente;
 import com.example.subastas.model.Cliente;
+import com.example.subastas.model.MedioPago;
 import com.example.subastas.model.Persona;
 import com.example.subastas.model.Pujo;
 import com.example.subastas.model.UsuarioAuth;
+import com.example.subastas.repository.AdjudicacionesRepository;
 import com.example.subastas.repository.AsistenteRepository;
 import com.example.subastas.repository.ClienteRepository;
+import com.example.subastas.repository.MedioPagoRepository;
 import com.example.subastas.repository.PersonaRepository;
+import com.example.subastas.repository.ProductoRepository;
 import com.example.subastas.repository.PujoRepository;
 import com.example.subastas.repository.SubastaRepository;
 import com.example.subastas.repository.UsuarioAuthRepository;
@@ -42,6 +47,15 @@ public class UserService {
 
     @Autowired
     private PersonaRepository personaRepository;
+
+    @Autowired
+    private ProductoRepository productoRepository;
+
+    @Autowired
+    private MedioPagoRepository medioPagoRepository;
+
+    @Autowired
+    private AdjudicacionesRepository adjudicacionesRepository;
 
     public List<HistorialPujasDTO> obtenerHistorial(String email) {
         var usuario = usuarioAuthRepository.findByEmail(email)
@@ -139,5 +153,35 @@ public class UserService {
 
         return getMyProfile(auth.getEmail());
         }
+
+    public UserStatsDTO getMyStats(String email) {
+        UsuarioAuth auth = usuarioAuthRepository.findByEmail(email)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+
+        Integer clienteId = auth.getClienteId();
+
+        Cliente cliente = clienteRepository.findById(clienteId)
+        .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+
+        int subastasParticipadas = asistenteRepository.findAllByClienteId(clienteId).size();
+
+        int pujasRealizadas = asistenteRepository.findAllByClienteId(clienteId).stream()
+        .mapToInt(a -> pujoRepository.findByAsistenteId(a.getIdentificador()).size())
+        .sum();
+
+        int productosPublicados = productoRepository.findByDuenio(clienteId).size();
+
+        int articulosGanados = asistenteRepository.findAllByClienteId(clienteId).stream()
+        .mapToInt(a -> adjudicacionesRepository.countByAsistenteId(a.getIdentificador()))
+        .sum();
+        
+        List<MedioPago> medios = medioPagoRepository.findByClienteId(clienteId).stream()
+        .filter(m -> Boolean.TRUE.equals(m.getVerificado()))
+        .collect(Collectors.toList());
+
+        return new UserStatsDTO(subastasParticipadas, pujasRealizadas, productosPublicados, articulosGanados, cliente.getCategoria(), medios);
+        }
+
+
 
 }

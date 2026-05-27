@@ -139,4 +139,23 @@ public class PaymentMethodService {
     private boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();
     }
+
+    public void setPayoutAccount(Integer medioId, String email) {
+    var usuario = usuarioAuthRepository.findByEmail(email)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+
+    var medio = medioPagoRepository.findById(medioId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Medio de pago no encontrado"));
+
+    if (!medio.getClienteId().equals(usuario.getClienteId())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+
+    medioPagoRepository.findByClienteId(usuario.getClienteId())
+        .forEach(m -> { m.setCuentaCobro(false); medioPagoRepository.save(m); });
+
+    medio.setCuentaCobro(true);
+    medioPagoRepository.save(medio);
+}
+
 }

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.subastas.dto.HistorialPujasDTO;
 import com.example.subastas.dto.UserDTO;
+import com.example.subastas.dto.UserStatsDTO;
 import com.example.subastas.model.Pujo;
 import com.example.subastas.security.JwtUtil;
 import com.example.subastas.service.UserService;
@@ -64,5 +65,11 @@ public class UserController {
         return ResponseEntity.ok(userService.updateMyProfile(email, datos));
 }
 
+
+    @GetMapping("/stats")
+    public ResponseEntity<UserStatsDTO> getMyStats(@RequestHeader("Authorization") String authHeader) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        return ResponseEntity.ok(userService.getMyStats(email));
+}
 
 }
