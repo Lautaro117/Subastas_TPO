@@ -193,7 +193,7 @@ public class AuthService {
             auth.setClienteId(savedPersona.getIdentificador());
             auth.setEstado("E1");
             auth.setPasswordHash("PENDIENTE");
-            auth.setTokenRegistro(UUID.randomUUID().toString().substring(0,8));
+            auth.setTokenRegistro(UUID.randomUUID().toString().replace("-", "").substring(0, 32));
             usuarioAuthRepository.save(auth);
 
             // 4. INSERT en fotos_dni
@@ -279,7 +279,7 @@ public class AuthService {
         Optional<UsuarioAuth> usuario = usuarioAuthRepository.findByEmail(email);
         
         if (usuario.isPresent()) {
-            String token = UUID.randomUUID().toString().substring(0, 8); 
+            String token = UUID.randomUUID().toString().replace("-", "").substring(0, 32);
             usuario.get().setTokenRegistro(token);
             usuarioAuthRepository.save(usuario.get());
             return token;
