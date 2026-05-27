@@ -1,11 +1,13 @@
 package com.example.subastas.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.subastas.dto.HistorialPujasDTO;
 import com.example.subastas.dto.UserDTO;
 import com.example.subastas.dto.UserStatsDTO;
+import com.example.subastas.model.Multas;
 import com.example.subastas.model.Pujo;
 import com.example.subastas.security.JwtUtil;
 import com.example.subastas.service.UserService;
@@ -29,10 +32,10 @@ public class UserController {
     @Autowired
     private JwtUtil jwtUtil;
 
-    @GetMapping("/penalty")
+    /*@GetMapping("/penalty")
     public ResponseEntity<Object> getPenalty() {
         return ResponseEntity.ok(null);
-    }
+    }*/
 
     @GetMapping("/auction-history")
     public ResponseEntity<List<HistorialPujasDTO>> getAuctionHistory(
@@ -70,6 +73,20 @@ public class UserController {
     public ResponseEntity<UserStatsDTO> getMyStats(@RequestHeader("Authorization") String authHeader) {
         String email = jwtUtil.extractEmail(authHeader.substring(7));
         return ResponseEntity.ok(userService.getMyStats(email));
+}
+
+    @GetMapping("/penalty")
+    public ResponseEntity<Multas> getMultaActiva(@RequestHeader("Authorization") String authHeader) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+    return ResponseEntity.ok(userService.getMultaActiva(email));
+}
+
+    @PostMapping("/penalty/pay")
+        public ResponseEntity<Void> pagarMulta(@RequestHeader("Authorization") String authHeader,
+                                            @RequestBody Map<String, Integer> body) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        userService.pagarMulta(email, body.get("multaId"));
+    return ResponseEntity.ok().build();
 }
 
 }

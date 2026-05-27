@@ -14,6 +14,7 @@ import com.example.subastas.dto.UserStatsDTO;
 import com.example.subastas.model.Asistente;
 import com.example.subastas.model.Cliente;
 import com.example.subastas.model.MedioPago;
+import com.example.subastas.model.Multas;
 import com.example.subastas.model.Persona;
 import com.example.subastas.model.Pujo;
 import com.example.subastas.model.UsuarioAuth;
@@ -21,6 +22,7 @@ import com.example.subastas.repository.AdjudicacionesRepository;
 import com.example.subastas.repository.AsistenteRepository;
 import com.example.subastas.repository.ClienteRepository;
 import com.example.subastas.repository.MedioPagoRepository;
+import com.example.subastas.repository.MultasRepository;
 import com.example.subastas.repository.PersonaRepository;
 import com.example.subastas.repository.ProductoRepository;
 import com.example.subastas.repository.PujoRepository;
@@ -56,6 +58,9 @@ public class UserService {
 
     @Autowired
     private AdjudicacionesRepository adjudicacionesRepository;
+
+    @Autowired
+    private MultasRepository multasRepository;
 
     public List<HistorialPujasDTO> obtenerHistorial(String email) {
         var usuario = usuarioAuthRepository.findByEmail(email)
@@ -182,6 +187,27 @@ public class UserService {
         return new UserStatsDTO(subastasParticipadas, pujasRealizadas, productosPublicados, articulosGanados, cliente.getCategoria(), medios);
         }
 
+        public Multas getMultaActiva(String email) {
+    UsuarioAuth auth = usuarioAuthRepository.findByEmail(email)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
+    return multasRepository.findByClienteIdAndEstado(auth.getClienteId(), "pendiente")
+        .stream().findFirst().orElse(null);
+}
+
+public void pagarMulta(String email, Integer multaId) {
+    UsuarioAuth auth = usuarioAuthRepository.findByEmail(email)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+
+    Multas multa = multasRepository.findById(multaId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Multa no encontrada"));
+
+    if (!multa.getClienteId().equals(auth.getClienteId())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+
+    multa.setEstado("pagada");
+    multasRepository.save(multa);
+}
 
 }

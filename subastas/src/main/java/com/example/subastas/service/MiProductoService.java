@@ -8,12 +8,20 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.subastas.dto.CustodiaDTO;
 import com.example.subastas.dto.MiProductoDTO;
 import com.example.subastas.model.AdminProducto;
+import com.example.subastas.model.CustodiaProductos;
+import com.example.subastas.model.Depositos;
 import com.example.subastas.model.Producto;
+import com.example.subastas.model.Seguro;
 import com.example.subastas.repository.AdminProductoRepository;
+import com.example.subastas.repository.CustodiaProductoRepository;
+import com.example.subastas.repository.DepositoRepository;
 import com.example.subastas.repository.ProductoRepository;
+import com.example.subastas.repository.SeguroRepository;
 import com.example.subastas.repository.UsuarioAuthRepository;
+
 
 @Service
 public class MiProductoService {
@@ -26,6 +34,15 @@ public class MiProductoService {
 
     @Autowired
     private UsuarioAuthRepository usuarioAuthRepository;
+
+    @Autowired
+    private CustodiaProductoRepository custodiaProductoRepository;
+
+    @Autowired
+    private DepositoRepository depositoRepository;
+
+    @Autowired
+    private SeguroRepository seguroRepository;
 
     private Integer getClienteId(String email) {
         return usuarioAuthRepository.findByEmail(email)
@@ -89,5 +106,58 @@ public class MiProductoService {
 
         ap.setEstadoPropuesta("propuesta_rechazada");
         adminProductoRepository.save(ap);
+    }
+
+    public CustodiaDTO getCustodia(String email, Integer productoId) {
+        Integer clienteId = getClienteId(email);
+
+        Producto producto = productoRepository.findById(productoId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+
+        if (!producto.getDuenio().equals(clienteId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+
+        CustodiaProductos custodia = custodiaProductoRepository.findByProductoId(productoId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "El producto no está en custodia"));
+
+        Depositos deposito = depositoRepository.findById(custodia.getDepositoId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Depósito no encontrado"));
+
+        String nroPoliza = null;
+        String compania = null;
+
+        if (producto.getSeguro() != null) {
+            Seguro seguro = seguroRepository.findById(producto.getSeguro().toString()).orElse(null);
+            if (seguro != null) {
+                nroPoliza = seguro.getNroPoliza();
+                compania = seguro.getCompania();
+            }
+        }
+
+        return new CustodiaDTO(deposito.getNombre(), deposito.getDireccion(),
+            custodia.getEstado(), nroPoliza, compania);
+    }
+
+    public MiProductoDTO getDetalle(String email, Integer productoId) {
+        Integer clienteId = getClienteId(email);
+
+        Producto producto = productoRepository.findById(productoId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+
+        if (!producto.getDuenio().equals(clienteId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+
+        AdminProducto ap = adminProductoRepository.findByProductoId(productoId).orElse(null);
+
+        return new MiProductoDTO(
+            producto.getIdentificador(),
+            producto.getDescripcionCatalogo(),
+            producto.getDescripcionCompleta(),
+            producto.getEstadoAdmin(),
+            ap != null ? ap.getEstadoPropuesta() : null,
+            ap != null ? ap.getPrecioPropuesto() : null
+        );
     }
 }

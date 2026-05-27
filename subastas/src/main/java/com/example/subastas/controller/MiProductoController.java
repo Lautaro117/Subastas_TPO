@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.subastas.dto.CustodiaDTO;
 import com.example.subastas.dto.MiProductoDTO;
 import com.example.subastas.model.Producto;
 import com.example.subastas.security.JwtUtil;
@@ -41,6 +42,14 @@ public class MiProductoController {
         return ResponseEntity.ok(miProductoService.agregarProducto(email, producto));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<MiProductoDTO> getDetalle(
+        @PathVariable Integer id,
+        @RequestHeader("Authorization") String authHeader) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        return ResponseEntity.ok(miProductoService.getDetalle(email, id));
+    }
+
     @PostMapping("/{id}/accept")
     public ResponseEntity<Void> aceptarPropuesta(
             @RequestHeader("Authorization") String authHeader,
@@ -57,6 +66,14 @@ public class MiProductoController {
         String email = jwtUtil.extractEmail(authHeader.substring(7));
         miProductoService.rechazarPropuesta(email, id);
         return ResponseEntity.ok().build();
+    }
+
+
+    @GetMapping("/{id}/custody")
+        public ResponseEntity<CustodiaDTO> getCustodia(@PathVariable Integer id,
+                                                @RequestHeader("Authorization") String authHeader) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        return ResponseEntity.ok(miProductoService.getCustodia(email, id));
     }
 }
 
