@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Icon } from 'react-native-paper';
 
 import { HomeProductosScreen, HomeSubastasScreen } from '../screens';
+import { HomeProductosStack } from './HomeProductosStack';
 import { HomePerfilStack } from './HomePerfilStack';
 import { paperTheme } from '../theme/theme';
 
@@ -45,7 +46,7 @@ export function MainTabs() {
       })}
     >
       <Tab.Screen name="HomeSubastas" component={HomeSubastasScreen} options={{ title: 'Subastas' }} />
-      <Tab.Screen name="HomeProductos" component={HomeProductosScreen} options={{ title: 'Productos' }} />
+      <Tab.Screen name="HomeProductos" component={HomeProductosStack} options={{ title: 'Productos' }} />
       <Tab.Screen name="HomePerfil" component={HomePerfilStack} options={{ title: 'Perfil' }} />
     </Tab.Navigator>
   );

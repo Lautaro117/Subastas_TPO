@@ -95,7 +95,7 @@ function CompraCard({ item }) {
   );
 }
 
-export default function HomeProductosScreen() {
+export default function HomeProductosScreen({ navigation }) {
   const theme = useTheme();
   const { session } = useAppSession();
   const [activeTab, setActiveTab] = useState('publicados');
@@ -183,7 +183,7 @@ export default function HomeProductosScreen() {
           icon="plus"
           style={[styles.fab, { backgroundColor: theme.colors.primary }]}
           color={theme.colors.onPrimary}
-          onPress={() => {}}
+          onPress={() => navigation.navigate('AgregarProducto')}
         />
       ) : null}
     </SafeAreaView>

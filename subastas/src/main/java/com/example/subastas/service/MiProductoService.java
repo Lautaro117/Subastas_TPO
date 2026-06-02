@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.subastas.dto.CustodiaDTO;
@@ -13,15 +14,16 @@ import com.example.subastas.dto.MiProductoDTO;
 import com.example.subastas.model.AdminProducto;
 import com.example.subastas.model.CustodiaProductos;
 import com.example.subastas.model.Depositos;
+import com.example.subastas.model.FotoProducto;
 import com.example.subastas.model.Producto;
 import com.example.subastas.model.Seguro;
 import com.example.subastas.repository.AdminProductoRepository;
 import com.example.subastas.repository.CustodiaProductoRepository;
 import com.example.subastas.repository.DepositoRepository;
+import com.example.subastas.repository.FotoProductoRepository;
 import com.example.subastas.repository.ProductoRepository;
 import com.example.subastas.repository.SeguroRepository;
 import com.example.subastas.repository.UsuarioAuthRepository;
-
 
 @Service
 public class MiProductoService {
@@ -44,6 +46,9 @@ public class MiProductoService {
     @Autowired
     private SeguroRepository seguroRepository;
 
+    @Autowired
+    private FotoProductoRepository fotoProductoRepository;
+
     private Integer getClienteId(String email) {
         return usuarioAuthRepository.findByEmail(email)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED))
@@ -65,12 +70,33 @@ public class MiProductoService {
         }).collect(Collectors.toList());
     }
 
-    public Producto agregarProducto(String email, Producto producto) {
+    public Producto agregarProducto(String email, String descripcionCatalogo, String descripcionCompleta, List<MultipartFile> fotos) {
+        if (fotos == null || fotos.size() < 6) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Se requieren al menos 6 fotos");
+        }
+
         Integer clienteId = getClienteId(email);
+
+        Producto producto = new Producto();
         producto.setDuenio(clienteId);
+        producto.setDescripcionCatalogo(descripcionCatalogo);
+        producto.setDescripcionCompleta(descripcionCompleta);
         producto.setEstadoAdmin("pendiente");
-        producto.setRevisor(1); // empleado por defecto
-        return productoRepository.save(producto);
+        producto.setRevisor(1);
+        productoRepository.save(producto);
+
+        for (MultipartFile foto : fotos) {
+            try {
+                FotoProducto fp = new FotoProducto();
+                fp.setProductoId(producto.getIdentificador());
+                fp.setFoto(foto.getBytes());
+                fotoProductoRepository.save(fp);
+            } catch (Exception e) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error al guardar foto");
+            }
+        }
+
+        return producto;
     }
 
     public void aceptarPropuesta(String email, Integer productoId) {

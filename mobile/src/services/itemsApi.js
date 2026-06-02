@@ -39,11 +39,40 @@ export async function getMisProductos(token) {
   return authedRequest('/api/my-items', token);
 }
 
-export async function agregarProducto(token, datos) {
-  return authedRequest('/api/my-items', token, {
+export async function agregarProducto(token, descripcionCatalogo, descripcionCompleta, fotos) {
+  const formData = new FormData();
+  formData.append('descripcionCatalogo', descripcionCatalogo);
+  formData.append('descripcionCompleta', descripcionCompleta);
+
+  for (const foto of fotos) {
+    formData.append('fotos', {
+      uri: foto.uri,
+      name: foto.fileName || 'foto.jpg',
+      type: foto.mimeType || 'image/jpeg',
+    });
+  }
+
+  const response = await fetch(buildApiUrl('/api/my-items'), {
     method: 'POST',
-    body: JSON.stringify(datos),
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
   });
+
+  const rawBody = await response.text();
+  const backendMessage = parseErrorBody(rawBody);
+
+  if (!response.ok) {
+    throw new Error(backendMessage || 'No se pudo agregar el producto');
+  }
+
+  try {
+    return rawBody ? JSON.parse(rawBody) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function aceptarPropuesta(token, productoId) {
