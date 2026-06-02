@@ -20,7 +20,7 @@ export default function AgregarProducto({ navigation }) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      quality: 0.7,
+      quality: 0.3,
     });
 
     if (!result.canceled) {
@@ -31,6 +31,8 @@ export default function AgregarProducto({ navigation }) {
   const eliminarFoto = (index) => {
     setFotos(prev => prev.filter((_, i) => i !== index));
   };
+
+
 
   const handleSubmit = async () => {
     if (!descripcionCatalogo.trim()) { setError('La descripción corta es requerida'); return; }

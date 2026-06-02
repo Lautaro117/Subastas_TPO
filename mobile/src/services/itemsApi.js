@@ -86,3 +86,7 @@ export async function rechazarPropuesta(token, productoId) {
     method: 'POST',
   });
 }
+
+export async function getMisCompras(token) {
+  return authedRequest('/api/my-purchases', token);
+}
