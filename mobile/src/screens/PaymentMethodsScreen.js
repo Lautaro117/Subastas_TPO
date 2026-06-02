@@ -121,7 +121,8 @@ export default function PaymentMethodsScreen({ navigation, route }) {
             ) : (
               <View style={styles.list}>
                 {methods.map(method => (
-                  <Surface key={method.id} style={styles.card} elevation={0}>
+                  <Pressable key={method.id} onPress={() => navigation.navigate('PaymentMethodDetalle', { method, onUpdate: cargar })}>
+                    <Surface style={styles.card} elevation={0}>
                     <View style={styles.cardRow}>
                       <View style={styles.cardIcon}>
                         <Icon source={TIPO_ICON[method.tipo] ?? 'credit-card-outline'} size={24} color={COLORS.primary} />
@@ -143,10 +144,11 @@ export default function PaymentMethodsScreen({ navigation, route }) {
                         </View>
                       </View>
                       <TouchableOpacity onPress={() => handleEliminar(method.id)}>
-                        <Icon source="trash-can-outline" size={22} color={COLORS.error} />
+                        <Icon source="chevron-right" size={22} color={COLORS.onSurfaceVariant} />
                       </TouchableOpacity>
                     </View>
                   </Surface>
+                  </Pressable>
                 ))}
               </View>
             )
@@ -219,8 +221,7 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', justifyContent: 'center', marginTop: 60, gap: 12 },
   emptyText: { color: COLORS.onSurfaceVariant, fontSize: 15 },
   list: { gap: 12 },
-  card: { backgroundColor: COLORS.surfaceContainerLow, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+card: { backgroundColor: COLORS.surfaceContainerLow, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: COLORS.outlineVariant },  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   cardIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: COLORS.surfaceContainerHigh, alignItems: 'center', justifyContent: 'center' },
   cardInfo: { flex: 1, gap: 4 },
   cardTitle: { fontSize: 15, fontWeight: '600', color: COLORS.onSurface },

@@ -8,6 +8,7 @@ import PaymentMethodsScreen from '../screens/PaymentMethodsScreen';
 import AddBankAccountScreen from '../screens/payments/AddBankAccountScreen';
 import AddCreditCardScreen from '../screens/payments/AddCreditCardScreen';
 import AddCertifiedCheckScreen from '../screens/payments/AddCertifiedCheckScreen';
+import PaymentMethodDetalle from '../screens/payments/PaymentMethodDetalle';
 
 const Stack = createNativeStackNavigator();
 
@@ -20,6 +21,7 @@ export function HomePerfilStack() {
       <Stack.Screen name="AddBankAccount" component={AddBankAccountScreen} />
       <Stack.Screen name="AddCreditCard" component={AddCreditCardScreen} />
       <Stack.Screen name="AddCertifiedCheck" component={AddCertifiedCheckScreen} />
+      <Stack.Screen name="PaymentMethodDetalle" component={PaymentMethodDetalle} />
       <Stack.Screen name="AuctionHistory" component={PlaceholderScreen} />
       <Stack.Screen name="Penalizaciones" component={PlaceholderScreen} />
       <Stack.Screen name="Notificaciones" component={PlaceholderScreen} />

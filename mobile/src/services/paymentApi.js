@@ -139,3 +139,22 @@ export async function deletePaymentMethod(id, token) {
 
   return true;
 }
+
+
+export async function setPayoutAccount(id, token) {
+  const response = await fetch(buildApiUrl(`/api/payment-methods/payout-account/${id}`), {
+    method: 'PUT',
+    headers: {
+      Accept: 'application/json',
+      ...authHeader(token),
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Sesión expirada. Volvé a iniciar sesión.');
+    if (response.status === 404) throw new Error('Medio de pago no encontrado');
+    throw new Error('No se pudo establecer como cuenta de cobro');
+  }
+
+  return true;
+}
