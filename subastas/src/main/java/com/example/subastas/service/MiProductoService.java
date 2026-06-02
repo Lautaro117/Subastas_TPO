@@ -1,5 +1,6 @@
 package com.example.subastas.service;
 
+import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -60,13 +61,14 @@ public class MiProductoService {
         return productoRepository.findByDuenio(clienteId).stream().map(p -> {
             AdminProducto ap = adminProductoRepository.findByProductoId(p.getIdentificador()).orElse(null);
             return new MiProductoDTO(
-                p.getIdentificador(),
-                p.getDescripcionCatalogo(),
-                p.getDescripcionCompleta(),
-                p.getEstadoAdmin(),
-                ap != null ? ap.getEstadoPropuesta() : null,
-                ap != null ? ap.getPrecioPropuesto() : null
-            );
+            p.getIdentificador(),
+            p.getDescripcionCatalogo(),
+            p.getDescripcionCompleta(),
+            p.getEstadoAdmin(),
+            ap != null ? ap.getEstadoPropuesta() : null,
+            ap != null ? ap.getPrecioPropuesto() : null,
+            null
+        );
         }).collect(Collectors.toList());
     }
 
@@ -88,7 +90,7 @@ public class MiProductoService {
         for (MultipartFile foto : fotos) {
             try {
                 FotoProducto fp = new FotoProducto();
-                fp.setProductoId(producto.getIdentificador());
+                fp.setProducto(producto.getIdentificador());
                 fp.setFoto(foto.getBytes());
                 fotoProductoRepository.save(fp);
             } catch (Exception e) {
@@ -165,25 +167,32 @@ public class MiProductoService {
             custodia.getEstado(), nroPoliza, compania);
     }
 
-    public MiProductoDTO getDetalle(String email, Integer productoId) {
-        Integer clienteId = getClienteId(email);
 
-        Producto producto = productoRepository.findById(productoId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
 
-        if (!producto.getDuenio().equals(clienteId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
+public MiProductoDTO getDetalle(String email, Integer productoId) {
+    Integer clienteId = getClienteId(email);
 
-        AdminProducto ap = adminProductoRepository.findByProductoId(productoId).orElse(null);
+    Producto producto = productoRepository.findById(productoId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
 
-        return new MiProductoDTO(
-            producto.getIdentificador(),
-            producto.getDescripcionCatalogo(),
-            producto.getDescripcionCompleta(),
-            producto.getEstadoAdmin(),
-            ap != null ? ap.getEstadoPropuesta() : null,
-            ap != null ? ap.getPrecioPropuesto() : null
-        );
+    if (!producto.getDuenio().equals(clienteId)) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
     }
+
+    AdminProducto ap = adminProductoRepository.findByProductoId(productoId).orElse(null);
+
+    List<String> fotosBase64 = fotoProductoRepository.findByProducto(productoId).stream()        
+    .map(f -> Base64.getEncoder().encodeToString(f.getFoto()))
+        .collect(Collectors.toList());
+
+    return new MiProductoDTO(
+        producto.getIdentificador(),
+        producto.getDescripcionCatalogo(),
+        producto.getDescripcionCompleta(),
+        producto.getEstadoAdmin(),
+        ap != null ? ap.getEstadoPropuesta() : null,
+        ap != null ? ap.getPrecioPropuesto() : null,
+        fotosBase64
+    );
+}
 }

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Chip, FAB, Text, useTheme } from 'react-native-paper';
 
 import { useAppSession } from '../../navigation/AppSessionContext';
-import { getMisProductos } from '../../services/itemsApi';
+import { getMisProductos, getMisCompras } from '../../services/itemsApi';
 
 const ESTADO_LABEL = {
   pendiente: 'Pendiente',
@@ -20,16 +20,13 @@ const PROPUESTA_LABEL = {
 
 function EstadoChip({ label, color }) {
   return (
-    <Chip
-      style={[styles.chip, { backgroundColor: color + '22' }]}
-      textStyle={[styles.chipText, { color }]}
-    >
+    <Chip style={[styles.chip, { backgroundColor: color + '22' }]} textStyle={[styles.chipText, { color }]}>
       {label}
     </Chip>
   );
 }
 
-function ProductoCard({ item }) {
+function ProductoCard({ item, onPress }) {
   const theme = useTheme();
 
   const estadoColor = {
@@ -45,53 +42,61 @@ function ProductoCard({ item }) {
   }[item.estadoPropuesta];
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.colors.surfaceContainerLow }]}>
-      <Text style={[styles.cardTitle, { color: theme.colors.onSurface }]}>
-        {item.descripcionCatalogo}
-      </Text>
-      <Text style={[styles.cardDesc, { color: theme.colors.onSurfaceVariant }]} numberOfLines={2}>
-        {item.descripcionCompleta}
-      </Text>
-
-      <View style={styles.infoRow}>
-        <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Revisión:</Text>
-        <Text style={[styles.infoValue, { color: estadoColor }]}>
-          {ESTADO_LABEL[item.estadoAdmin] || item.estadoAdmin}
+    <TouchableOpacity onPress={onPress}>
+      <View style={[styles.card, { backgroundColor: theme.colors.surfaceContainerLow }]}>
+        <Text style={[styles.cardTitle, { color: theme.colors.onSurface }]}>{item.descripcionCatalogo}</Text>
+        <Text style={[styles.cardDesc, { color: theme.colors.onSurfaceVariant }]} numberOfLines={2}>
+          {item.descripcionCompleta}
         </Text>
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Revisión:</Text>
+          <Text style={[styles.infoValue, { color: estadoColor }]}>
+            {ESTADO_LABEL[item.estadoAdmin] || item.estadoAdmin}
+          </Text>
+        </View>
+        {item.estadoPropuesta ? (
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Propuesta:</Text>
+            <Text style={[styles.infoValue, { color: propuestaColor }]}>
+              {PROPUESTA_LABEL[item.estadoPropuesta] || item.estadoPropuesta}
+            </Text>
+          </View>
+        ) : null}
+        {item.precioPropuesto ? (
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Precio propuesto:</Text>
+            <Text style={[styles.infoValue, { color: theme.colors.primary }]}>${item.precioPropuesto}</Text>
+          </View>
+        ) : null}
       </View>
-
-      {item.estadoPropuesta ? (
-        <View style={styles.infoRow}>
-          <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Propuesta:</Text>
-          <Text style={[styles.infoValue, { color: propuestaColor }]}>
-            {PROPUESTA_LABEL[item.estadoPropuesta] || item.estadoPropuesta}
-          </Text>
-        </View>
-      ) : null}
-
-      {item.precioPropuesto ? (
-        <View style={styles.infoRow}>
-          <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Precio propuesto:</Text>
-          <Text style={[styles.infoValue, { color: theme.colors.primary }]}>
-            ${item.precioPropuesto}
-          </Text>
-        </View>
-      ) : null}
-    </View>
+    </TouchableOpacity>
   );
 }
 
-function CompraCard({ item }) {
+function CompraCard({ item, onPress }) {
   const theme = useTheme();
   return (
+    <TouchableOpacity onPress={onPress}>
     <View style={[styles.card, { backgroundColor: theme.colors.surfaceContainerLow }]}>
       <Text style={[styles.cardTitle, { color: theme.colors.onSurface }]}>
-        {item.descripcionCatalogo || `Ítem #${item.itemId}`}
+        {item.descripcion || `Ítem #${item.itemId}`}
       </Text>
-      <Text style={[styles.cardDesc, { color: theme.colors.onSurfaceVariant }]}>
-        Importe: ${item.importe}
-      </Text>
+      <View style={styles.infoRow}>
+        <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Importe:</Text>
+        <Text style={[styles.infoValue, { color: theme.colors.primary }]}>${item.importe}</Text>
+      </View>
+      <View style={styles.infoRow}> 
+        <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Comisión:</Text>
+        <Text style={[styles.infoValue, { color: theme.colors.onSurface }]}>${item.comision}</Text>
+      </View>
+      {item.direccionEnvio ? (
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Envío:</Text>
+          <Text style={[styles.infoValue, { color: theme.colors.onSurface }]}>{item.direccionEnvio}</Text>
+        </View>
+      ) : null}
     </View>
+    </TouchableOpacity>
   );
 }
 
@@ -100,7 +105,9 @@ export default function HomeProductosScreen({ navigation }) {
   const { session } = useAppSession();
   const [activeTab, setActiveTab] = useState('publicados');
   const [productos, setProductos] = useState([]);
+  const [compras, setCompras] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingCompras, setLoadingCompras] = useState(false);
   const [error, setError] = useState('');
 
   const cargarProductos = useCallback(async () => {
@@ -116,9 +123,30 @@ export default function HomeProductosScreen({ navigation }) {
     }
   }, [session.token]);
 
+  const cargarCompras = useCallback(async () => {
+    setLoadingCompras(true);
+    try {
+      const data = await getMisCompras(session.token);
+      setCompras(data || []);
+    } catch (err) {
+      setError(err.message || 'No se pudieron cargar las compras');
+    } finally {
+      setLoadingCompras(false);
+    }
+  }, [session.token]);
+
   useEffect(() => {
     cargarProductos();
   }, [cargarProductos]);
+
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', cargarProductos);
+    return unsub;
+  }, [navigation, cargarProductos]);
+
+  useEffect(() => {
+    if (activeTab === 'compras') cargarCompras();
+  }, [activeTab, cargarCompras]);
 
   const tabs = [
     { key: 'publicados', label: 'Productos publicados' },
@@ -137,19 +165,9 @@ export default function HomeProductosScreen({ navigation }) {
               <TouchableOpacity
                 key={tab.key}
                 onPress={() => setActiveTab(tab.key)}
-                style={[
-                  styles.tab,
-                  isActive
-                    ? { backgroundColor: theme.colors.primary }
-                    : { backgroundColor: theme.colors.surfaceContainerLow },
-                ]}
+                style={[styles.tab, isActive ? { backgroundColor: theme.colors.primary } : { backgroundColor: theme.colors.surfaceContainerLow }]}
               >
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: isActive ? theme.colors.onPrimary : theme.colors.onSurfaceVariant },
-                  ]}
-                >
+                <Text style={[styles.tabText, { color: isActive ? theme.colors.onPrimary : theme.colors.onSurfaceVariant }]}>
                   {tab.label}
                 </Text>
               </TouchableOpacity>
@@ -157,24 +175,48 @@ export default function HomeProductosScreen({ navigation }) {
           })}
         </View>
 
-        {loading ? (
+        {activeTab === 'publicados' ? (
+          loading ? (
+            <ActivityIndicator style={styles.loader} />
+          ) : error ? (
+            <Text style={[styles.error, { color: theme.colors.error }]}>{error}</Text>
+          ) : productos.length === 0 ? (
+            <View style={styles.placeholder}>
+              <Text style={[styles.placeholderText, { color: theme.colors.onSurfaceVariant }]}>
+                No tenés productos publicados
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={productos}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <ProductoCard
+                  item={item}
+                  onPress={() => navigation.navigate('DetalleProducto', { productoId: item.id })}
+                />
+              )}
+              contentContainerStyle={styles.list}
+              showsVerticalScrollIndicator={false}
+            />
+          )
+        ) : loadingCompras ? (
           <ActivityIndicator style={styles.loader} />
-        ) : error ? (
-          <Text style={[styles.error, { color: theme.colors.error }]}>{error}</Text>
-        ) : activeTab === 'publicados' ? (
-          <FlatList
-            data={productos}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => <ProductoCard item={item} />}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-          />
-        ) : (
+        ) : compras.length === 0 ? (
           <View style={styles.placeholder}>
             <Text style={[styles.placeholderText, { color: theme.colors.onSurfaceVariant }]}>
               No hay compras registradas
             </Text>
           </View>
+        ) : (
+          <FlatList
+            data={compras}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => <CompraCard item={item} 
+            onPress = {() => navigation.navigate('DetalleCompra', { compraId: item.id })} />}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+          />
         )}
       </View>
 
@@ -200,7 +242,7 @@ const styles = StyleSheet.create({
   loader: { marginTop: 40 },
   error: { marginTop: 20, fontSize: 14 },
   list: { gap: 12, paddingBottom: 100 },
-  card: { borderRadius: 12, padding: 16, gap: 8,borderWidth: 2, borderColor: 'rgba(255, 255, 255, 0.64)'},
+  card: { borderRadius: 12, padding: 16, gap: 8, borderWidth: 2, borderColor: 'rgba(255, 255, 255, 0.64)' },
   cardTitle: { fontSize: 16, fontWeight: '600' },
   cardDesc: { fontSize: 13, lineHeight: 18 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },

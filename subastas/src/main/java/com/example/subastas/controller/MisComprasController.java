@@ -1,6 +1,8 @@
 package com.example.subastas.controller;
 
 import java.util.List;
+import java.util.Map;
+
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +12,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestBody;
+
 
 import com.example.subastas.dto.MisComprasDTO;
 import com.example.subastas.security.JwtUtil;
@@ -45,4 +49,15 @@ public class MisComprasController {
         misComprasService.setDireccionEnvio(email, id);
     return ResponseEntity.ok().build();
     }
+    @PostMapping("/{id}/confirm")
+    public ResponseEntity<Void> confirmarEntrega(
+            @PathVariable Integer id,
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody Map<String, Object> body) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        String tipoEntrega = (String) body.get("tipoEntrega"); // "envio" o "retiro"
+        Integer medioPagoId = (Integer) body.get("medioPagoId");
+        misComprasService.confirmarEntrega(email, id, tipoEntrega, medioPagoId);
+        return ResponseEntity.ok().build();
+}
 }

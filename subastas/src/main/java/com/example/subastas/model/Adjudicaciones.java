@@ -38,6 +38,14 @@ public class Adjudicaciones {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    
+    @Column(name = "tipo_entrega")
+    private String tipoEntrega;
+
+    @Column(name = "medio_pago_id")
+    private Integer medioPagoId;
+
+
 
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
@@ -62,5 +70,11 @@ public class Adjudicaciones {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt;}
+
+    public String getTipoEntrega() { return tipoEntrega; }
+    public void setTipoEntrega(String tipoEntrega) { this.tipoEntrega = tipoEntrega; }
+
+    public Integer getMedioPagoId() { return medioPagoId; }
+    public void setMedioPagoId(Integer medioPagoId) { this.medioPagoId = medioPagoId; }
 
 }

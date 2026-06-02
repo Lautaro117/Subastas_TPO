@@ -24,8 +24,8 @@ public class FotoProducto {
     public Integer getId() { return identificador; }
     public void setId(Integer id) { this.identificador = id; }
 
-    public Integer getProductoId() { return producto; }
-    public void setProductoId(Integer producto) { this.producto = producto; }
+    public Integer getProducto() { return producto; }
+    public void setProducto(Integer producto) { this.producto = producto; }
 
     public byte[] getFoto() { return foto; }
     public void setFoto(byte[] foto) { this.foto = foto; }
