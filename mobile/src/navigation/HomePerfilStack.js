@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomePerfilScreen from '../screens/home/HomePerfilScreen';
 import EditProfileScreen from '../screens/home/EditProfileScreen';
 import PlaceholderScreen from '../screens/home/PlaceholderScreen';
+import NotificationsScreen from '../screens/home/NotificationsScreen';
 import PaymentMethodsScreen from '../screens/PaymentMethodsScreen';
 import AddBankAccountScreen from '../screens/payments/AddBankAccountScreen';
 import AddCreditCardScreen from '../screens/payments/AddCreditCardScreen';
@@ -24,7 +25,7 @@ export function HomePerfilStack() {
       <Stack.Screen name="PaymentMethodDetalle" component={PaymentMethodDetalle} />
       <Stack.Screen name="AuctionHistory" component={PlaceholderScreen} />
       <Stack.Screen name="Penalizaciones" component={PlaceholderScreen} />
-      <Stack.Screen name="Notificaciones" component={PlaceholderScreen} />
+      <Stack.Screen name="Notificaciones" component={NotificationsScreen} />
       <Stack.Screen name="Apariencia" component={PlaceholderScreen} />
     </Stack.Navigator>
   );

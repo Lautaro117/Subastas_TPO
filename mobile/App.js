@@ -1,4 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
 import { NavigationContainer, DarkTheme as NavigationDarkTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PaperProvider } from 'react-native-paper';
@@ -37,7 +38,14 @@ export default function App() {
 }
 
 function AppNavigator() {
-  const { session } = useAppSession();
+  const { session, isLoading } = useAppSession();
+
+  // Block the NavigationContainer from mounting until AsyncStorage has been read.
+  // This ensures AuthStack.initialRouteName is computed with the correct session state
+  // and avoids the race condition where entryMode is still null on first render.
+  if (isLoading) {
+    return <View style={{ flex: 1, backgroundColor: navigationTheme.colors.background }} />;
+  }
 
   return (
     <NavigationContainer theme={navigationTheme}>

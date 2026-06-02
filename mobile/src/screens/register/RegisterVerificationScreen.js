@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, IconButton, Text, useTheme } from 'react-native-paper';
@@ -10,30 +10,36 @@ import { registerSharedStyles } from './sharedStyles';
 
 export default function RegisterVerificationScreen({ navigation }) {
   const theme = useTheme();
-  const { enterApp } = useAppSession();
+  const { enterAppAsPendingGuest, pendingRegistration } = useAppSession();
   const { registerStatus, setRegistrationToken } = useRegisterFlow();
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [statusError, setStatusError] = useState('');
+  // Suppress transient errors: only show the message after 2 consecutive failures.
+  const consecutiveErrorsRef = useRef(0);
+
+  // After an app restart RegisterFlowContext is empty — fall back to the id persisted in AppSessionContext.
+  const solicitudId = registerStatus.solicitudId ?? pendingRegistration.solicitudId;
 
   useEffect(() => {
     let isActive = true;
     let intervalId;
 
     const checkStatus = async () => {
-      if (!registerStatus.solicitudId) {
+      if (!solicitudId) {
         return;
       }
 
       setIsCheckingStatus(true);
 
       try {
-        const response = await getRegisterStatus(registerStatus.solicitudId);
+        const response = await getRegisterStatus(solicitudId);
 
         if (!isActive) {
           return;
         }
 
         setStatusError('');
+        consecutiveErrorsRef.current = 0;
 
         if (response?.admitido === 'si') {
           if (response?.tokenRegistro) {
@@ -43,7 +49,10 @@ export default function RegisterVerificationScreen({ navigation }) {
         }
       } catch (_error) {
         if (isActive) {
-          setStatusError('No pudimos verificar el estado. Reintentando...');
+          consecutiveErrorsRef.current += 1;
+          if (consecutiveErrorsRef.current >= 2) {
+            setStatusError('No pudimos verificar el estado. Reintentando...');
+          }
         }
       } finally {
         if (isActive) {
@@ -62,7 +71,7 @@ export default function RegisterVerificationScreen({ navigation }) {
         clearInterval(intervalId);
       }
     };
-  }, [navigation, registerStatus.solicitudId]);
+  }, [navigation, solicitudId]);
 
   return (
     <SafeAreaView style={[registerSharedStyles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -96,7 +105,7 @@ export default function RegisterVerificationScreen({ navigation }) {
         <View style={styles.bottomArea}>
           <Button
             mode="contained-tonal"
-            onPress={() => enterApp('guest')}
+            onPress={() => enterAppAsPendingGuest(solicitudId)}
             style={[styles.secondaryButton, { backgroundColor: theme.colors.surfaceContainerLow }]}
             labelStyle={[styles.secondaryLabel, { color: theme.colors.onSurface }]}
             contentStyle={styles.secondaryContent}

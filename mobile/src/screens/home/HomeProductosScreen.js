@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Chip, FAB, Text, useTheme } from 'react-native-paper';
+import { ActivityIndicator, Chip, FAB, Icon, Text, useTheme } from 'react-native-paper';
 
 import { useAppSession } from '../../navigation/AppSessionContext';
 import { getMisProductos } from '../../services/itemsApi';
@@ -98,12 +98,17 @@ function CompraCard({ item }) {
 export default function HomeProductosScreen({ navigation }) {
   const theme = useTheme();
   const { session } = useAppSession();
+
+  const isPendingRegister = session.entryMode === 'pending-register';
+  const isGuest = session.entryMode === 'guest' || isPendingRegister;
+
   const [activeTab, setActiveTab] = useState('publicados');
   const [productos, setProductos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isGuest);
   const [error, setError] = useState('');
 
   const cargarProductos = useCallback(async () => {
+    if (isGuest) return;
     setLoading(true);
     setError('');
     try {
@@ -130,55 +135,76 @@ export default function HomeProductosScreen({ navigation }) {
       <View style={styles.container}>
         <Text style={[styles.title, { color: theme.colors.onBackground }]}>Productos</Text>
 
-        <View style={styles.tabRow}>
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.key;
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                onPress={() => setActiveTab(tab.key)}
-                style={[
-                  styles.tab,
-                  isActive
-                    ? { backgroundColor: theme.colors.primary }
-                    : { backgroundColor: theme.colors.surfaceContainerLow },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: isActive ? theme.colors.onPrimary : theme.colors.onSurfaceVariant },
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {loading ? (
-          <ActivityIndicator style={styles.loader} />
-        ) : error ? (
-          <Text style={[styles.error, { color: theme.colors.error }]}>{error}</Text>
-        ) : activeTab === 'publicados' ? (
-          <FlatList
-            data={productos}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => <ProductoCard item={item} />}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-          />
-        ) : (
-          <View style={styles.placeholder}>
-            <Text style={[styles.placeholderText, { color: theme.colors.onSurfaceVariant }]}>
-              No hay compras registradas
+        {/* Guest / pending-register access block */}
+        {isGuest ? (
+          <View style={styles.guestBlock}>
+            <Icon
+              source={isPendingRegister ? 'clock-outline' : 'lock-outline'}
+              size={48}
+              color={theme.colors.onSurfaceVariant}
+            />
+            <Text style={[styles.guestTitle, { color: theme.colors.onSurface }]}>
+              {isPendingRegister ? 'Cuenta en revisión' : 'Sección exclusiva'}
+            </Text>
+            <Text style={[styles.guestDesc, { color: theme.colors.onSurfaceVariant }]}>
+              {isPendingRegister
+                ? 'Una vez que tu cuenta sea aprobada podrás publicar y gestionar tus productos.'
+                : 'Iniciá sesión para ver y gestionar tus productos.'}
             </Text>
           </View>
+        ) : (
+          <>
+            <View style={styles.tabRow}>
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    onPress={() => setActiveTab(tab.key)}
+                    style={[
+                      styles.tab,
+                      isActive
+                        ? { backgroundColor: theme.colors.primary }
+                        : { backgroundColor: theme.colors.surfaceContainerLow },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.tabText,
+                        { color: isActive ? theme.colors.onPrimary : theme.colors.onSurfaceVariant },
+                      ]}
+                    >
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {loading ? (
+              <ActivityIndicator style={styles.loader} />
+            ) : error ? (
+              <Text style={[styles.error, { color: theme.colors.error }]}>{error}</Text>
+            ) : activeTab === 'publicados' ? (
+              <FlatList
+                data={productos}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => <ProductoCard item={item} />}
+                contentContainerStyle={styles.list}
+                showsVerticalScrollIndicator={false}
+              />
+            ) : (
+              <View style={styles.placeholder}>
+                <Text style={[styles.placeholderText, { color: theme.colors.onSurfaceVariant }]}>
+                  No hay compras registradas
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </View>
 
-      {activeTab === 'publicados' ? (
+      {activeTab === 'publicados' && !isGuest ? (
         <FAB
           icon="plus"
           style={[styles.fab, { backgroundColor: theme.colors.primary }]}
@@ -212,4 +238,7 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   infoLabel: { fontSize: 13 },
   infoValue: { fontSize: 13, fontWeight: '600' },
+  guestBlock: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 16, paddingBottom: 60 },
+  guestTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
+  guestDesc: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
 });

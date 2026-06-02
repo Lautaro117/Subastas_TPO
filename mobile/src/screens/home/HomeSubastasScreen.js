@@ -3,6 +3,7 @@ import { FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
+  Badge,
   IconButton,
   Searchbar,
   SegmentedButtons,
@@ -11,6 +12,7 @@ import {
 } from 'react-native-paper';
 
 import AuctionCard from './components/AuctionCard';
+import { useAppSession } from '../../navigation/AppSessionContext';
 
 const mockAuctions = {
   active: [],
@@ -37,8 +39,9 @@ function EmptyState() {
   );
 }
 
-export default function HomeSubastasScreen() {
+export default function HomeSubastasScreen({ navigation }) {
   const theme = useTheme();
+  const { unreadNotificationsCount } = useAppSession();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('active');
   const [isLoading] = useState(false);
@@ -71,13 +74,22 @@ export default function HomeSubastasScreen() {
             inputStyle={[styles.searchInput, { color: theme.colors.onSurface }]}
             placeholderTextColor={theme.colors.onSurfaceVariant}
           />
-          <IconButton
-            icon="bell-outline"
-            iconColor={theme.colors.primary}
-            size={20}
-            style={[styles.bellButton, { backgroundColor: theme.colors.surfaceContainerLow }]}
-            onPress={() => {}}
-          />
+          <View style={styles.bellWrap}>
+            <IconButton
+              icon="bell-outline"
+              iconColor={theme.colors.primary}
+              size={20}
+              style={[styles.bellButton, { backgroundColor: theme.colors.surfaceContainerLow }]}
+              onPress={() => navigation.navigate('HomePerfil', { screen: 'Notificaciones' })}
+            />
+            <Badge
+              visible={unreadNotificationsCount > 0}
+              size={16}
+              style={styles.bellBadge}
+            >
+              {unreadNotificationsCount}
+            </Badge>
+          </View>
         </View>
 
         <View style={styles.filtersWrap}>
@@ -155,6 +167,14 @@ const styles = StyleSheet.create({
   bellButton: {
     margin: 0,
     borderRadius: 999,
+  },
+  bellWrap: {
+    position: 'relative',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
   },
   filtersWrap: {
     marginTop: 28,

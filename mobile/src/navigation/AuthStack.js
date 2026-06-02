@@ -15,12 +15,19 @@ import {
   RegisterPersonalDataScreen,
   RegisterVerificationScreen,
 } from '../screens';
+import { useAppSession } from './AppSessionContext';
 
 const Stack = createNativeStackNavigator();
 
 export function AuthStack() {
+  const { session } = useAppSession();
+  const initialRoute =
+    session.entryMode === 'finalizing'        ? 'RegisterFinalizePassword' :
+    session.entryMode === 'pending-register'  ? 'RegisterVerification' :
+    'Login';
+
   return (
-    <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false, animation: 'fade' }}>
+    <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false, animation: 'fade' }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="RegisterPersonalData" component={RegisterPersonalDataScreen} />
       <Stack.Screen name="RegisterDniUpload" component={RegisterDniUploadScreen} />

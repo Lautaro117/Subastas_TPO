@@ -17,7 +17,7 @@ export default function RegisterEnteringScreen({ navigation }) {
     }, 1400);
 
     return () => clearTimeout(timeoutId);
-  }, [enterApp, resetRegisterFlow]);
+  }, [resetRegisterFlow]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>

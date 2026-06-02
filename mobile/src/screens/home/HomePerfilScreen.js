@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Avatar,
+  Badge,
   Button,
   Chip,
   Icon,
@@ -29,9 +30,10 @@ const MENU_ITEMS = [
 
 export default function HomePerfilScreen({ navigation }) {
   const theme = useTheme();
-  const { session, exitApp } = useAppSession();
+  const { session, exitApp, unreadNotificationsCount, pollingError } = useAppSession();
 
-  const isGuest = session.entryMode === 'guest';
+  const isGuest = session.entryMode === 'guest' || session.entryMode === 'pending-register';
+  const isPendingRegister = session.entryMode === 'pending-register';
   const hasToken = !!session.token;
 
   const [userProfile, setUserProfile] = useState(null);
@@ -84,7 +86,22 @@ export default function HomePerfilScreen({ navigation }) {
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Perfil</Text>
-            <IconButton icon="bell-outline" iconColor={COLORS.primary} size={24} style={styles.bellButton} onPress={() => {}} />
+            <View style={styles.bellWrap}>
+              <IconButton
+                icon="bell-outline"
+                iconColor={COLORS.primary}
+                size={24}
+                style={styles.bellButton}
+                onPress={() => navigation.navigate('Notificaciones')}
+              />
+              <Badge
+                visible={unreadNotificationsCount > 0}
+                size={16}
+                style={styles.bellBadge}
+              >
+                {unreadNotificationsCount}
+              </Badge>
+            </View>
           </View>
 
           {/* User card */}
@@ -112,7 +129,23 @@ export default function HomePerfilScreen({ navigation }) {
             </Surface>
           )}
 
-          {/* Pending validation card */}
+          {/* Pending registration banner (user awaiting approval, entered as pending-register guest) */}
+          {isPendingRegister ? (
+            <Surface style={styles.pendingRegisterCard} elevation={0}>
+              <Icon source="clock-outline" size={22} color={COLORS.onSurfaceVariant} />
+              <View style={styles.pendingTextBlock}>
+                <Text style={styles.pendingTitle}>Registro en revisión</Text>
+                <Text style={styles.pendingDesc}>
+                  Estamos verificando tus datos. Te notificaremos aquí cuando tu cuenta sea aprobada.
+                </Text>
+                {pollingError ? (
+                  <Text style={styles.pollingErrorText}>{pollingError}</Text>
+                ) : null}
+              </View>
+            </Surface>
+          ) : null}
+
+          {/* Pending validation card (authenticated user still waiting) */}
           {isPending ? (
             <Surface style={styles.pendingCard} elevation={0}>
               <Icon source="clock-outline" size={22} color={COLORS.primary} />
@@ -160,7 +193,7 @@ export default function HomePerfilScreen({ navigation }) {
                 key={item.key}
                 icon={item.icon}
                 label={item.label}
-                disabled={isGuest}
+                disabled={item.key === 'notifs' ? session.entryMode === 'guest' : isGuest}
                 onPress={() =>
                   navigation.navigate(item.route, {
                     ...(item.params ?? {}),
@@ -215,6 +248,20 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
   title: { fontSize: 32, fontWeight: '700', color: COLORS.onBackground, letterSpacing: 0.2 },
   bellButton: { margin: 0 },
+  bellWrap: { position: 'relative' },
+  bellBadge: { position: 'absolute', top: 2, right: 2 },
+
+  pendingRegisterCard: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: 18, borderWidth: 1, borderColor: COLORS.outlineVariant,
+    padding: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16,
+  },
+  pollingErrorText: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 17,
+    color: COLORS.error ?? '#B3261E',
+  },
 
   userCard: { backgroundColor: COLORS.surfaceContainerLow, borderRadius: 20, padding: 18, marginBottom: 16 },
   loadingCard: { alignItems: 'center', justifyContent: 'center', minHeight: 90 },
