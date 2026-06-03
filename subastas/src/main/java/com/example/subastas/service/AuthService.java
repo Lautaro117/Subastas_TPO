@@ -172,7 +172,7 @@ public class AuthService {
             // 1. INSERT en personas
             Persona persona = new Persona();
             persona.setDocumento(request.getDocumento());
-            persona.setNombre(request.getNombre().trim() + " " + request.getApellido().trim());
+            persona.setNombre(request.getNombre().trim());
             persona.setDireccion(request.getDomicilio().trim());
             persona.setEstado("inactivo");
             Persona savedPersona = personaRepository.save(persona);
