@@ -1,8 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
 import { NavigationContainer, DarkTheme as NavigationDarkTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { PaperProvider } from 'react-native-paper';
+import { ActivityIndicator, PaperProvider, Text } from 'react-native-paper';
+import { StyleSheet, View } from 'react-native';
 
 import { AppSessionProvider, useAppSession } from './src/navigation/AppSessionContext';
 import { AuthStack } from './src/navigation/AuthStack';
@@ -38,13 +38,10 @@ export default function App() {
 }
 
 function AppNavigator() {
-  const { session, isLoading } = useAppSession();
+  const { session } = useAppSession();
 
-  // Block the NavigationContainer from mounting until AsyncStorage has been read.
-  // This ensures AuthStack.initialRouteName is computed with the correct session state
-  // and avoids the race condition where entryMode is still null on first render.
-  if (isLoading) {
-    return <View style={{ flex: 1, backgroundColor: navigationTheme.colors.background }} />;
+  if (!session.bootstrapped) {
+    return <AppBootstrapScreen />;
   }
 
   return (
@@ -53,3 +50,27 @@ function AppNavigator() {
     </NavigationContainer>
   );
 }
+
+function AppBootstrapScreen() {
+  return (
+    <View style={styles.bootstrapContainer}>
+      <ActivityIndicator size="large" color={paperTheme.colors.primary} />
+      <Text style={styles.bootstrapText}>Recuperando tu sesión...</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  bootstrapContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: paperTheme.colors.background,
+    gap: 16,
+  },
+  bootstrapText: {
+    color: paperTheme.colors.onSurfaceVariant,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+});

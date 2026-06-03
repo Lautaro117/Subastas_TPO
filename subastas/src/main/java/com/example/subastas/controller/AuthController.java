@@ -39,8 +39,7 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<RegisterResponse> register(@ModelAttribute RegisterRequest request) {
         RegisterResponse response = authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
+    return ResponseEntity.status(HttpStatus.CREATED).body(response);    }
 
     @GetMapping("/countries")
     public ResponseEntity<List<RegisterCountryDTO>> getRegisterCountries() {
@@ -63,7 +62,12 @@ public class AuthController {
     @PostMapping("/password/reset-request")
     public ResponseEntity<String> resetRequest(@RequestBody ResetRequestDTO request) {
         String token = authService.resetRequest(request.getEmail());
-        return ResponseEntity.ok(token != null ? token : "");
+
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        return ResponseEntity.ok(token);
     }
 
     @PostMapping("/password/reset")

@@ -1,68 +1,22 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, HelperText, IconButton, Text, useTheme } from 'react-native-paper';
+import { Button, HelperText, IconButton, Text, useTheme } from 'react-native-paper';
 
 import { AuthTextInput } from '../../components';
 import { registerSharedStyles } from './sharedStyles';
-import { getRegisterStatus, loginRequest, resetPasswordApi } from '../../services/authApi';
+import { loginRequest, resetPasswordApi } from '../../services/authApi';
 import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
 import { useAppSession } from '../../navigation/AppSessionContext';
 
 export default function RegisterFinalizePasswordScreen({ navigation }) {
   const theme = useTheme();
   const { registerStatus, registerForm } = useRegisterFlow();
-  const { session, setAuthToken, completeRegistrationFromGuest, pendingRegistration } = useAppSession();
-
-  const isFinalizing = session.entryMode === 'finalizing';
-
-  // Resolve the registration token from all possible sources in priority order:
-  //  1. pendingRegistration.registroToken  — set by AppSessionContext polling when approved
-  //  2. registerStatus.token              — set by RegisterVerificationScreen (Path 1, normal flow)
-  //  3. fetchedToken                      — lazy-fetched below when both above are null
-  const resolvedToken = pendingRegistration.registroToken ?? registerStatus.token ?? null;
-
-  const [fetchedToken, setFetchedToken] = useState(null);
-  const [fetchingToken, setFetchingToken] = useState(false);
-  const [tokenFetchError, setTokenFetchError] = useState('');
-
-  // Lazy-fetch the token when neither in-memory source has it but we know the solicitudId.
-  // This covers: app restarted, navigated to RegisterFinalizePassword with stale context.
-  const solicitudId = pendingRegistration.solicitudId;
-  const registroToken = resolvedToken ?? fetchedToken;
-
-  useEffect(() => {
-    if (registroToken) return;     // already have it
-    if (!solicitudId) return;      // no way to fetch
-
-    let cancelled = false;
-    setFetchingToken(true);
-    setTokenFetchError('');
-
-    getRegisterStatus(solicitudId)
-      .then((response) => {
-        if (cancelled) return;
-        if (response?.tokenRegistro) {
-          setFetchedToken(response.tokenRegistro);
-        } else {
-          setTokenFetchError('No se pudo obtener el token de registro. Contactá a soporte.');
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setTokenFetchError('Error de red al obtener el token. Intentá de nuevo.');
-      })
-      .finally(() => {
-        if (!cancelled) setFetchingToken(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [registroToken, solicitudId]);
-
+  const { setAuthToken } = useAppSession();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [touched, setTouched] = useState({ password: false, confirmPassword: false });
   const [submitted, setSubmitted] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   const passwordStrength = useMemo(() => {
     const trimmed = password.trim();
@@ -111,33 +65,23 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
   const handleFinish = async () => {
     setSubmitted(true);
 
-    if (!isValid || !registroToken) return;
+    if (!isValid || !registerStatus.token) return;
 
-    setSubmitting(true);
     try {
-      await resetPasswordApi({ token: registroToken, password });
+      await resetPasswordApi({ token: registerStatus.token, password });
 
       try {
         const loginResult = await loginRequest({ email: registerForm.email, password });
         if (loginResult?.token) {
-          if (isFinalizing) {
-            completeRegistrationFromGuest(loginResult.token);
-            // completeRegistrationFromGuest flips isAuthenticated → MainTabs remounts automatically
-            return;
-          }
-          setAuthToken(loginResult.token);
+          await setAuthToken(loginResult.token);
         }
       } catch (_loginError) {
         // auto-login fallido: el usuario podrá hacer login manual después
       }
 
-      if (!isFinalizing) {
-        navigation.navigate('RegisterEntering');
-      }
+      navigation.navigate('RegisterEntering');
     } catch (error) {
       // error al establecer contraseña — silent por ahora, la navegación no avanza
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -205,27 +149,18 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
               </Text>
             ) : null}
 
-            {tokenFetchError ? (
-              <Text style={[styles.tokenError, { color: theme.colors.error }]}>{tokenFetchError}</Text>
-            ) : null}
-
             <View style={styles.bottomAction}>
-              {fetchingToken ? (
-                <ActivityIndicator size="small" color={theme.colors.primary} style={styles.tokenLoader} />
-              ) : (
-                <Button
-                  mode="contained"
-                  compact
-                  onPress={handleFinish}
-                  loading={submitting}
-                  disabled={!isValid || !registroToken || submitting}
-                  style={[styles.finishButton, { backgroundColor: theme.colors.primary }]}
-                  contentStyle={styles.finishContent}
-                  labelStyle={[styles.finishLabel, { color: theme.colors.onPrimary }]}
-                >
-                  Finalizar
-                </Button>
-              )}
+              <Button
+                mode="contained"
+                compact
+                onPress={handleFinish}
+                disabled={!isValid || !registerStatus.token}
+                style={[styles.finishButton, { backgroundColor: theme.colors.primary }]}
+                contentStyle={styles.finishContent}
+                labelStyle={[styles.finishLabel, { color: theme.colors.onPrimary }]}
+              >
+                Finalizar
+              </Button>
             </View>
           </View>
         </ScrollView>
@@ -242,16 +177,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 14,
     lineHeight: 20,
-  },
-  tokenError: {
-    marginTop: 8,
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  tokenLoader: {
-    alignSelf: 'flex-end',
-    marginTop: 8,
   },
   bottomAction: {
     marginTop: 'auto',

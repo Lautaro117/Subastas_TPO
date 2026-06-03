@@ -93,7 +93,7 @@ export default function LoginScreen({ navigation }) {
         password,
       });
 
-      enterApp('auth', result?.token ?? null);
+      await enterApp('auth', result?.token ?? null);
     } catch (error) {
       setSubmitError(error.message || 'No se pudo iniciar sesion');
     } finally {
@@ -166,7 +166,9 @@ export default function LoginScreen({ navigation }) {
         </View>
 
         <View style={styles.guestButtonSection}>
-          <AuthGhostButton onPress={() => enterApp('guest')}>Continuar como invitado</AuthGhostButton>
+          <AuthGhostButton onPress={async () => { await enterApp('guest-login'); }}>
+            Continuar como invitado
+          </AuthGhostButton>
         </View>
       </View>
 

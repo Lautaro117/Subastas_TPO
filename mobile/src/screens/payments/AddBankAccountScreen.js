@@ -73,7 +73,7 @@ export default function AddBankAccountScreen({ navigation, route }) {
       );
 
       if (isOnboarding) {
-        enterApp('registered');
+        await enterApp('registered');
       } else {
         navigation.goBack();
       }

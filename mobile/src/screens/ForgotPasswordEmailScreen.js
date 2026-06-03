@@ -44,10 +44,12 @@ export default function ForgotPasswordEmailScreen({ navigation }) {
     setIsSubmitting(true);
     try {
       const token = await resetRequestApi({ email: email.trim().toLowerCase() });
+
       if (!token) {
-        setSubmitError('Si el email está registrado, recibirás las instrucciones en tu bandeja.');
+        setSubmitError('El email no está registrado');
         return;
       }
+
       navigation.navigate('ForgotPasswordNewPassword', { token });
     } catch (error) {
       setSubmitError(error.message || 'No se pudo procesar la solicitud');

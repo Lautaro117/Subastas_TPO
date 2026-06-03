@@ -81,7 +81,7 @@ export default function AddCertifiedCheckScreen({ navigation, route }) {
       );
 
       if (isOnboarding) {
-        enterApp('registered');
+        await enterApp('registered');
       } else {
         navigation.goBack();
       }

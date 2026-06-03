@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Avatar,
-  Badge,
   Button,
   Chip,
   Icon,
@@ -16,6 +15,7 @@ import {
 
 import { useAppSession } from '../../navigation/AppSessionContext';
 import { getMyProfile } from '../../services/userApi';
+import { getPaymentMethods } from '../../services/paymentApi';
 import { COLORS } from '../../theme/colors';
 
 const MENU_ITEMS = [
@@ -29,20 +29,24 @@ const MENU_ITEMS = [
 
 export default function HomePerfilScreen({ navigation }) {
   const theme = useTheme();
-  const { session, exitApp, unreadNotificationsCount, pollingError } = useAppSession();
+  const { session, exitApp } = useAppSession();
 
-  const isGuest = session.entryMode === 'guest' || session.entryMode === 'pending-register';
-  const isPendingRegister = session.entryMode === 'pending-register';
+  const isGuest = session.entryMode === 'guest-login' || session.entryMode === 'guest-register';
   const hasToken = !!session.token;
 
   const [userProfile, setUserProfile] = useState(null);
+  const [paymentMethods, setPaymentMethods] = useState([]);
   const [loading, setLoading] = useState(!isGuest);
 
   const loadData = useCallback(async () => {
     if (!hasToken) return;
     try {
-      const profile = await getMyProfile(session.token);
+      const [profile, methods] = await Promise.all([
+        getMyProfile(session.token),
+        getPaymentMethods(session.token).catch(() => []),
+      ]);
       setUserProfile(profile);
+      setPaymentMethods(Array.isArray(methods) ? methods : []);
     } catch {
       // silent — profile stays null, shows fallback
     } finally {
@@ -69,9 +73,10 @@ export default function HomePerfilScreen({ navigation }) {
 
   const displayEmail    = isGuest ? 'Invitado' : (userProfile?.email    ?? '—');
   const displayCategoria = isGuest ? 'Invitado' : (userProfile?.categoria?.toUpperCase() ?? '—');
-  const isPending             = !isGuest && userProfile?.estado === 'E1';
-  const showPaymentBanner     = !isGuest && hasToken && userProfile?.estado === 'E2';
-  const showPaymentPendingBanner = !isGuest && hasToken && userProfile?.estado === 'E3';
+  const guestMessage = session.entryMode === 'guest-register'
+    ? 'Tu cuenta está en solicitud de aprobación. En breve se te dará respuesta.'
+    : 'Para visualizar esta sección tenés que iniciar sesión o registrarte en la aplicación.';
+  const showPaymentBanner = !isGuest && hasToken && paymentMethods.length === 0;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: COLORS.background }]}>
@@ -81,22 +86,7 @@ export default function HomePerfilScreen({ navigation }) {
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Perfil</Text>
-            <View style={styles.bellWrap}>
-              <IconButton
-                icon="bell-outline"
-                iconColor={COLORS.primary}
-                size={24}
-                style={styles.bellButton}
-                onPress={() => navigation.navigate('Notificaciones')}
-              />
-              <Badge
-                visible={unreadNotificationsCount > 0}
-                size={16}
-                style={styles.bellBadge}
-              >
-                {unreadNotificationsCount}
-              </Badge>
-            </View>
+            <IconButton icon="bell-outline" iconColor={COLORS.primary} size={24} style={styles.bellButton} onPress={() => {}} />
           </View>
 
           {/* User card */}
@@ -124,32 +114,10 @@ export default function HomePerfilScreen({ navigation }) {
             </Surface>
           )}
 
-          {/* Pending registration banner (user awaiting approval, entered as pending-register guest) */}
-          {isPendingRegister ? (
-            <Surface style={styles.pendingRegisterCard} elevation={0}>
-              <Icon source="clock-outline" size={22} color={COLORS.onSurfaceVariant} />
-              <View style={styles.pendingTextBlock}>
-                <Text style={styles.pendingTitle}>Registro en revisión</Text>
-                <Text style={styles.pendingDesc}>
-                  Estamos verificando tus datos. Te notificaremos aquí cuando tu cuenta sea aprobada.
-                </Text>
-                {pollingError ? (
-                  <Text style={styles.pollingErrorText}>{pollingError}</Text>
-                ) : null}
-              </View>
-            </Surface>
-          ) : null}
-
-          {/* Pending validation card (authenticated user still waiting) */}
-          {isPending ? (
-            <Surface style={styles.pendingCard} elevation={0}>
-              <Icon source="clock-outline" size={22} color={COLORS.primary} />
-              <View style={styles.pendingTextBlock}>
-                <Text style={styles.pendingTitle}>Pendiente de aprobación</Text>
-                <Text style={styles.pendingDesc}>
-                  Tu cuenta está pendiente de aprobación. Nuestro equipo está verificando tus datos. Te notificaremos por mail cuando puedas continuar.
-                </Text>
-              </View>
+          {isGuest ? (
+            <Surface style={styles.guestInfoCard} elevation={0}>
+              <Icon source="information-outline" size={22} color={COLORS.primary} />
+              <Text style={styles.guestInfoText}>{guestMessage}</Text>
             </Surface>
           ) : null}
 
@@ -177,19 +145,6 @@ export default function HomePerfilScreen({ navigation }) {
             </Surface>
           ) : null}
 
-          {/* Payment method under review banner (E3) */}
-          {showPaymentPendingBanner ? (
-            <Surface style={styles.pendingCard} elevation={0}>
-              <Icon source="clock-outline" size={22} color={COLORS.primary} />
-              <View style={styles.pendingTextBlock}>
-                <Text style={styles.pendingTitle}>Método de pago en revisión</Text>
-                <Text style={styles.pendingDesc}>
-                  Ya cargaste un método de pago. Nuestro equipo lo está verificando. Te notificaremos cuando sea aprobado.
-                </Text>
-              </View>
-            </Surface>
-          ) : null}
-
           {/* General section */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>General</Text>
@@ -201,7 +156,7 @@ export default function HomePerfilScreen({ navigation }) {
                 key={item.key}
                 icon={item.icon}
                 label={item.label}
-                disabled={item.key === 'notifs' ? session.entryMode === 'guest' : isGuest}
+                disabled={isGuest}
                 onPress={() =>
                   navigation.navigate(item.route, {
                     ...(item.params ?? {}),
@@ -256,20 +211,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
   title: { fontSize: 32, fontWeight: '700', color: COLORS.onBackground, letterSpacing: 0.2 },
   bellButton: { margin: 0 },
-  bellWrap: { position: 'relative' },
-  bellBadge: { position: 'absolute', top: 2, right: 2 },
-
-  pendingRegisterCard: {
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: 18, borderWidth: 1, borderColor: COLORS.outlineVariant,
-    padding: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16,
-  },
-  pollingErrorText: {
-    marginTop: 6,
-    fontSize: 12,
-    lineHeight: 17,
-    color: COLORS.error ?? '#B3261E',
-  },
 
   userCard: { backgroundColor: COLORS.surfaceContainerLow, borderRadius: 20, padding: 18, marginBottom: 16 },
   loadingCard: { alignItems: 'center', justifyContent: 'center', minHeight: 90 },
@@ -280,14 +221,23 @@ const styles = StyleSheet.create({
   categoryChip: { backgroundColor: COLORS.primaryContainer, alignSelf: 'flex-start', borderRadius: 999, marginTop: 4 },
   categoryChipText: { color: COLORS.onPrimaryContainer, fontSize: 12, fontWeight: '500' },
 
-  pendingCard: {
+  guestInfoCard: {
     backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: 18, borderWidth: 1, borderColor: COLORS.primary,
-    padding: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 16,
   },
-  pendingTextBlock: { flex: 1 },
-  pendingTitle: { fontSize: 15, fontWeight: '600', color: COLORS.onSurface, marginBottom: 4 },
-  pendingDesc: { fontSize: 13, lineHeight: 19, color: COLORS.onSurfaceVariant },
+  guestInfoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: COLORS.onSurfaceVariant,
+  },
 
   paymentBanner: {
     backgroundColor: COLORS.surfaceContainerLowest,
