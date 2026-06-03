@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, Icon, Surface, Text } from 'react-native-paper';
+import { ActivityIndicator, Button, Icon, IconButton, Surface, Text } from 'react-native-paper';
 
 import { COLORS } from '../theme/colors';
 import { useAppSession } from '../navigation/AppSessionContext';
@@ -89,6 +89,15 @@ export default function PaymentMethodsScreen({ navigation, route }) {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.container}>
+          {!isOnboarding && (
+            <IconButton
+              icon="arrow-left"
+              iconColor={COLORS.onSurface}
+              size={22}
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+            />
+          )}
           <Text style={styles.title}>Métodos de pago</Text>
 
           <View style={styles.tabRow}>
@@ -211,7 +220,8 @@ function MethodCard({ icon, title, subtitle, onPress }) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.background },
   scroll: { flexGrow: 1 },
-  container: { flex: 1, paddingHorizontal: 24, paddingTop: 64, paddingBottom: 32 },
+  container: { flex: 1, paddingHorizontal: 24, paddingTop: 8, paddingBottom: 32 },
+  backButton: { marginLeft: -8, marginBottom: 4 },
   title: { fontSize: 30, fontWeight: '700', color: COLORS.onBackground, lineHeight: 38, marginBottom: 24 },
   tabRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   tab: { flex: 1, paddingVertical: 10, borderRadius: 999, alignItems: 'center' },

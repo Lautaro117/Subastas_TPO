@@ -208,65 +208,53 @@ export default function HomeProductosScreen({ navigation }) {
                 );
               })}
             </View>
-        <View style={styles.tabRow}>
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.key;
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                onPress={() => setActiveTab(tab.key)}
-                style={[styles.tab, isActive ? { backgroundColor: theme.colors.primary } : { backgroundColor: theme.colors.surfaceContainerLow }]}
-              >
-                <Text style={[styles.tabText, { color: isActive ? theme.colors.onPrimary : theme.colors.onSurfaceVariant }]}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
 
             {activeTab === 'publicados' ? (
-          loading ? (
+              loading ? (
                 <ActivityIndicator style={styles.loader} />
               ) : error ? (
                 <Text style={[styles.error, { color: theme.colors.error }]}>{error}</Text>
               ) : productos.length === 0 ? (
-            <View style={styles.placeholder}>
-              <Text style={[styles.placeholderText, { color: theme.colors.onSurfaceVariant }]}>
-                No tenés productos publicados
-              </Text>
-            </View>
-          ) : (
+                <View style={styles.placeholder}>
+                  <Text style={[styles.placeholderText, { color: theme.colors.onSurfaceVariant }]}>
+                    No tenés productos publicados
+                  </Text>
+                </View>
+              ) : (
                 <FlatList
                   data={productos}
                   keyExtractor={(item) => item.id.toString()}
                   renderItem={({ item }) => (
-                <ProductoCard
-                  item={item}
-                  onPress={() => navigation.navigate('DetalleProducto', { productoId: item.id })}
-                />
-              )}
+                    <ProductoCard
+                      item={item}
+                      onPress={() => navigation.navigate('DetalleProducto', { productoId: item.id })}
+                    />
+                  )}
                   contentContainerStyle={styles.list}
                   showsVerticalScrollIndicator={false}
                 />
-          )
-        ) : loadingCompras ? (
-          <ActivityIndicator style={styles.loader} />
+              )
+            ) : loadingCompras ? (
+              <ActivityIndicator style={styles.loader} />
             ) : compras.length === 0 ? (
               <View style={styles.placeholder}>
                 <Text style={[styles.placeholderText, { color: theme.colors.onSurfaceVariant }]}>
                   No hay compras registradas
                 </Text>
               </View>
-        ) : (
-          <FlatList
-            data={compras}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => <CompraCard item={item} 
-            onPress = {() => navigation.navigate('DetalleCompra', { compraId: item.id })} />}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-          />
+            ) : (
+              <FlatList
+                data={compras}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => (
+                  <CompraCard
+                    item={item}
+                    onPress={() => navigation.navigate('DetalleCompra', { compraId: item.id })}
+                  />
+                )}
+                contentContainerStyle={styles.list}
+                showsVerticalScrollIndicator={false}
+              />
             )}
           </>
         )}
