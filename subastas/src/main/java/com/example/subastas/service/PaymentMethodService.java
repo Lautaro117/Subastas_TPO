@@ -54,6 +54,12 @@ public class PaymentMethodService {
                 "moneda", dto.getMoneda()
         )));
 
+        var auth = usuarioAuthRepository.findByEmail(email).orElse(null);
+        if (auth != null && "E2".equals(auth.getEstado())) {
+        auth.setEstado("E3");
+        usuarioAuthRepository.save(auth);
+        }
+
         return medioPagoRepository.save(medio);
     }
 
@@ -85,6 +91,13 @@ public class PaymentMethodService {
                 "pais_emisor", dto.getPais_emisor()
         )));
 
+
+        var auth = usuarioAuthRepository.findByEmail(email).orElse(null);
+        if (auth != null && "E2".equals(auth.getEstado())) {
+        auth.setEstado("E3");
+        usuarioAuthRepository.save(auth);
+        }
+
         return medioPagoRepository.save(medio);
     }
 
@@ -113,6 +126,12 @@ public class PaymentMethodService {
                 "moneda", dto.getMoneda(),
                 "fecha_emision", dto.getFecha_emision()
         )));
+
+        var auth = usuarioAuthRepository.findByEmail(email).orElse(null);
+        if (auth != null && "E2".equals(auth.getEstado())) {
+            auth.setEstado("E3");
+            usuarioAuthRepository.save(auth);
+        }
 
         return medioPagoRepository.save(medio);
     }
