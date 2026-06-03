@@ -95,11 +95,12 @@ function BidRow({ bid, isTop }) {
 }
 
 // ─── Fila de ítem del catálogo ────────────────────────────────────────────────
-function CatalogoRow({ item, isActivo, notificado, onBellPress }) {
+function CatalogoRow({ item, isActivo, notificado, onBellPress, onPress }) {
   const theme = useTheme();
   const subastado = item.subastado === 'si';
 
   return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
     <Surface
       elevation={0}
       style={[
@@ -146,7 +147,18 @@ function CatalogoRow({ item, isActivo, notificado, onBellPress }) {
         />
       ) : null}
     </Surface>
+    </TouchableOpacity>
   );
+}
+
+// ─── Decodifica el payload del JWT ────────────────────────────────────────────
+function decodeJwtPayload(token) {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(base64));
+  } catch {
+    return {};
+  }
 }
 
 // ─── Pantalla principal ───────────────────────────────────────────────────────
@@ -155,7 +167,7 @@ export default function SalaSubastaScreen({ navigation, route }) {
   const theme = useTheme();
   const { session } = useAppSession();
   const token = session.token;
-  const userEstado = session.estado; // E1-E4 del JWT
+  const userEstado = decodeJwtPayload(token ?? '').estado; // 'E1' | 'E2' | 'E3' | 'E4'
 
   const [auction] = useState(auctionParam ?? null);
   const [catalogo, setCatalogo] = useState([]);
@@ -425,6 +437,7 @@ export default function SalaSubastaScreen({ navigation, route }) {
               isActivo={idx === 0}
               notificado={notificadosIds.has(item.itemId)}
               onBellPress={setModalNotificar}
+              onPress={() => navigation.navigate('DetalleProductoSubasta', { auctionId, itemId: item.itemId, item })}
             />
           ))}
         </ScrollView>
@@ -559,6 +572,7 @@ export default function SalaSubastaScreen({ navigation, route }) {
             isActivo={itemActual?.itemId === item.itemId}
             notificado={notificadosIds.has(item.itemId)}
             onBellPress={setModalNotificar}
+            onPress={() => navigation.navigate('DetalleProductoSubasta', { auctionId, itemId: item.itemId, item })}
           />
         ))}
 

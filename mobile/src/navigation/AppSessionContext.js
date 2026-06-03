@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-import {
-  clearSessionSnapshot,
-  loadSessionSnapshot,
-  saveSessionSnapshot,
-} from '../services/persistence/sessionStorage';
+//import {
+//  clearSessionSnapshot,
+//  loadSessionSnapshot,
+//  saveSessionSnapshot,
+//} from '../services/persistence/sessionStorage';
 
 const AppSessionContext = createContext(undefined);
 

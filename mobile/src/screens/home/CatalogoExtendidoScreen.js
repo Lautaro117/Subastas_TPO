@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Appbar,
@@ -61,6 +61,14 @@ export default function CatalogoExtendidoScreen({ navigation, route }) {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => navigation.navigate('DetalleProductoSubasta', {
+              auctionId,
+              itemId: item.itemId,
+              item,
+            })}
+          >
           <Surface
             elevation={0}
             style={[
@@ -96,10 +104,11 @@ export default function CatalogoExtendidoScreen({ navigation, route }) {
                 icon={notificadosIds.has(item.itemId) ? 'bell' : 'bell-outline'}
                 iconColor={notificadosIds.has(item.itemId) ? theme.colors.primary : theme.colors.onSurfaceVariant}
                 size={20}
-                onPress={() => setModalNotificar(item.itemId)}
+                onPress={(e) => { e.stopPropagation?.(); setModalNotificar(item.itemId); }}
               />
             )}
           </Surface>
+          </TouchableOpacity>
         )}
       />
 
