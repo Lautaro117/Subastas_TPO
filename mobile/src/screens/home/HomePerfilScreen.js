@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -16,6 +16,7 @@ import {
 import { useAppSession } from '../../navigation/AppSessionContext';
 import { getMyProfile } from '../../services/userApi';
 import { getPaymentMethods } from '../../services/paymentApi';
+import { refreshToken } from '../../services/authApi';
 import { COLORS } from '../../theme/colors';
 
 const MENU_ITEMS = [
@@ -29,7 +30,7 @@ const MENU_ITEMS = [
 
 export default function HomePerfilScreen({ navigation }) {
   const theme = useTheme();
-  const { session, exitApp } = useAppSession();
+  const { session, exitApp, setAuthToken } = useAppSession();
 
   const isGuest = session.entryMode === 'guest-login' || session.entryMode === 'guest-register';
   const hasToken = !!session.token;
@@ -38,8 +39,14 @@ export default function HomePerfilScreen({ navigation }) {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [loading, setLoading] = useState(!isGuest);
 
-  const loadData = useCallback(async () => {
+  const lastFetchRef = useRef(null);
+  const CACHE_TTL = 30000; // 30 segundos
+
+  const loadData = useCallback(async (force = false) => {
     if (!hasToken) return;
+    const now = Date.now();
+    if (!force && lastFetchRef.current && now - lastFetchRef.current < CACHE_TTL) return;
+    lastFetchRef.current = now;
     try {
       const [profile, methods] = await Promise.all([
         getMyProfile(session.token),
@@ -54,16 +61,33 @@ export default function HomePerfilScreen({ navigation }) {
     }
   }, [session.token, hasToken]);
 
+  // Refresca el token al montar la pantalla para obtener el estado actualizado (E2→E3→E4)
+  const handleRefreshToken = useCallback(async () => {
+    if (!hasToken) return;
+    try {
+      const response = await refreshToken(session.token);
+      if (response?.token && response.token !== session.token) {
+        await setAuthToken(response.token);
+      }
+    } catch {
+      // silent
+    }
+  }, [session.token, hasToken, setAuthToken]);
+
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    handleRefreshToken();
+  }, [loadData, handleRefreshToken]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      if (hasToken) loadData();
+      if (hasToken) {
+        loadData();
+        handleRefreshToken();
+      }
     });
     return unsubscribe;
-  }, [navigation, hasToken, loadData]);
+  }, [navigation, hasToken, loadData, handleRefreshToken]);
 
   const displayName = isGuest
     ? 'Usuario invitado'
@@ -71,7 +95,7 @@ export default function HomePerfilScreen({ navigation }) {
       ? `${userProfile.nombre ?? ''} ${userProfile.apellido ?? ''}`.trim() || 'Sin nombre'
       : '—';
 
-  const displayEmail    = isGuest ? 'Invitado' : (userProfile?.email    ?? '—');
+  const displayEmail     = isGuest ? 'Invitado' : (userProfile?.email     ?? '—');
   const displayCategoria = isGuest ? 'Invitado' : (userProfile?.categoria?.toUpperCase() ?? '—');
   const guestMessage = session.entryMode === 'guest-register'
     ? 'Tu cuenta está en solicitud de aprobación. En breve se te dará respuesta.'

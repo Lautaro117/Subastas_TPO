@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -42,8 +42,11 @@ function EmptyState() {
 
 export default function HomeSubastasScreen({ navigation }) {
   const theme = useTheme();
-  const { session, unreadNotificationsCount } = useAppSession();
+  const { session } = useAppSession();
   const token = session.token;
+  const unreadNotificationsCount = 0; // TODO: conectar cuando el contexto lo exponga
+  const tokenRef = useRef(token);
+  useEffect(() => { tokenRef.current = token; }, [token]);
 
   const [auctions, setAuctions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -55,14 +58,14 @@ export default function HomeSubastasScreen({ navigation }) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getAuctions(token);
+      const data = await getAuctions(tokenRef.current);
       setAuctions(Array.isArray(data) ? data : []);
     } catch {
       setError('No se pudieron cargar las subastas. Intentá de nuevo.');
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, []); // sin dependencia de token — usa el ref siempre actualizado
 
   useEffect(() => { fetchAuctions(); }, [fetchAuctions]);
 

@@ -8,12 +8,14 @@ import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
 import { getRegisterStatus } from '../../services/authApi';
 import { registerSharedStyles } from './sharedStyles';
 
+
 export default function RegisterVerificationScreen({ navigation }) {
   const theme = useTheme();
   const { enterApp } = useAppSession();
   const { registerStatus, setRegistrationToken } = useRegisterFlow();
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [statusError, setStatusError] = useState('');
+  console.log('solicitudId:', registerStatus.solicitudId);
 
   useEffect(() => {
     let isActive = true;
@@ -96,7 +98,7 @@ export default function RegisterVerificationScreen({ navigation }) {
         <View style={styles.bottomArea}>
           <Button
             mode="contained-tonal"
-            onPress={async () => { await enterApp('guest-register'); }}
+            onPress={async () => { await enterApp('guest-login'); }}
             style={[styles.secondaryButton, { backgroundColor: theme.colors.surfaceContainerLow }]}
             labelStyle={[styles.secondaryLabel, { color: theme.colors.onSurface }]}
             contentStyle={styles.secondaryContent}

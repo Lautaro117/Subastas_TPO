@@ -3,7 +3,6 @@ import { NavigationContainer, DarkTheme as NavigationDarkTheme } from '@react-na
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ActivityIndicator, PaperProvider, Text } from 'react-native-paper';
 import { StyleSheet, View } from 'react-native';
-
 import { AppSessionProvider, useAppSession } from './src/navigation/AppSessionContext';
 import { AuthStack } from './src/navigation/AuthStack';
 import { MainTabs } from './src/navigation/MainTabs';
@@ -44,9 +43,14 @@ function AppNavigator() {
     return <AppBootstrapScreen />;
   }
 
+  // Usuario autenticado con token válido → MainTabs
+  // Usuario en guest-register (sin token, esperando aprobación) → AuthStack en RegisterVerification
+  // Usuario no autenticado → AuthStack
+const showMainTabs = session.isAuthenticated && (!!session.token || session.entryMode === 'guest-login');
+
   return (
     <NavigationContainer theme={navigationTheme}>
-      {session.isAuthenticated ? <MainTabs /> : <AuthStack />}
+      {showMainTabs ? <MainTabs /> : <AuthStack />}
     </NavigationContainer>
   );
 }

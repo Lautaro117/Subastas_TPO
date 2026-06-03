@@ -1,4 +1,5 @@
-import { buildApiUrl } from '../config/api';
+import { buildApiUrl, buildAuthHeaders } from '../config/api';
+
 
 function parseErrorBody(rawBody) {
   if (!rawBody) {
@@ -219,4 +220,18 @@ export async function resetPasswordApi({ token, password }) {
   }
 
   return true;
+}
+
+
+export async function refreshToken(token) {
+  const response = await fetch(buildApiUrl('/api/auth/refresh'), {
+    method: 'POST',
+    headers: buildAuthHeaders(token),
+  });
+ 
+  if (!response.ok) {
+    throw new Error(`Error al refrescar token: ${response.status}`);
+  }
+ 
+  return response.json(); // { token, email, estado, categoria, notificacionesPendientes }
 }

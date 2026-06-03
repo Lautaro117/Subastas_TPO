@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Chip, FAB, Icon, Text, useTheme } from 'react-native-paper';
@@ -77,25 +77,25 @@ function CompraCard({ item, onPress }) {
   const theme = useTheme();
   return (
     <TouchableOpacity onPress={onPress}>
-    <View style={[styles.card, { backgroundColor: theme.colors.surfaceContainerLow }]}>
-      <Text style={[styles.cardTitle, { color: theme.colors.onSurface }]}>
-        {item.descripcion || `Ítem #${item.itemId}`}
-      </Text>
-      <View style={styles.infoRow}>
-        <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Importe:</Text>
-        <Text style={[styles.infoValue, { color: theme.colors.primary }]}>${item.importe}</Text>
-      </View>
-      <View style={styles.infoRow}> 
-        <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Comisión:</Text>
-        <Text style={[styles.infoValue, { color: theme.colors.onSurface }]}>${item.comision}</Text>
-      </View>
-      {item.direccionEnvio ? (
+      <View style={[styles.card, { backgroundColor: theme.colors.surfaceContainerLow }]}>
+        <Text style={[styles.cardTitle, { color: theme.colors.onSurface }]}>
+          {item.descripcion || `Ítem #${item.itemId}`}
+        </Text>
         <View style={styles.infoRow}>
-          <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Envío:</Text>
-          <Text style={[styles.infoValue, { color: theme.colors.onSurface }]}>{item.direccionEnvio}</Text>
+          <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Importe:</Text>
+          <Text style={[styles.infoValue, { color: theme.colors.primary }]}>${item.importe}</Text>
         </View>
-      ) : null}
-    </View>
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Comisión:</Text>
+          <Text style={[styles.infoValue, { color: theme.colors.onSurface }]}>${item.comision}</Text>
+        </View>
+        {item.direccionEnvio ? (
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Envío:</Text>
+            <Text style={[styles.infoValue, { color: theme.colors.onSurface }]}>{item.direccionEnvio}</Text>
+          </View>
+        ) : null}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -107,6 +107,13 @@ export default function HomeProductosScreen({ navigation }) {
   const isPendingRegister = session.entryMode === 'pending-register';
   const isGuest = session.entryMode === 'guest' || isPendingRegister;
 
+  // tokenRef evita que el cambio de token (refresh) dispare re-renders innecesarios
+  const tokenRef = useRef(session.token);
+  useEffect(() => { tokenRef.current = session.token; }, [session.token]);
+
+  const lastFetchRef = useRef(null);
+  const CACHE_TTL = 30000; // 30 segundos
+
   const [activeTab, setActiveTab] = useState('publicados');
   const [productos, setProductos] = useState([]);
   const [compras, setCompras] = useState([]);
@@ -114,31 +121,34 @@ export default function HomeProductosScreen({ navigation }) {
   const [loadingCompras, setLoadingCompras] = useState(false);
   const [error, setError] = useState('');
 
-  const cargarProductos = useCallback(async () => {
+  const cargarProductos = useCallback(async (force = false) => {
     if (isGuest) return;
+    const now = Date.now();
+    if (!force && lastFetchRef.current && now - lastFetchRef.current < CACHE_TTL) return;
+    lastFetchRef.current = now;
     setLoading(true);
     setError('');
     try {
-      const data = await getMisProductos(session.token);
+      const data = await getMisProductos(tokenRef.current);
       setProductos(data || []);
     } catch (err) {
       setError(err.message || 'No se pudieron cargar los productos');
     } finally {
       setLoading(false);
     }
-  }, [session.token]);
+  }, [isGuest]); // sin session.token como dependencia
 
   const cargarCompras = useCallback(async () => {
     setLoadingCompras(true);
     try {
-      const data = await getMisCompras(session.token);
+      const data = await getMisCompras(tokenRef.current);
       setCompras(data || []);
     } catch (err) {
       setError(err.message || 'No se pudieron cargar las compras');
     } finally {
       setLoadingCompras(false);
     }
-  }, [session.token]);
+  }, []); // sin session.token como dependencia
 
   useEffect(() => {
     cargarProductos();
@@ -163,7 +173,6 @@ export default function HomeProductosScreen({ navigation }) {
       <View style={styles.container}>
         <Text style={[styles.title, { color: theme.colors.onBackground }]}>Productos</Text>
 
-        {/* Guest / pending-register access block */}
         {isGuest ? (
           <View style={styles.guestBlock}>
             <Icon

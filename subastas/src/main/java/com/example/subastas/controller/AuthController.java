@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,6 +22,7 @@ import com.example.subastas.dto.RegisterRequest;
 import com.example.subastas.dto.RegisterRequestComplete;
 import com.example.subastas.dto.RegisterResponse;
 import com.example.subastas.dto.ResetRequestDTO;
+import com.example.subastas.security.JwtUtil;
 import com.example.subastas.service.AuthService;
 
 @RestController
@@ -75,6 +77,18 @@ public class AuthController {
         authService.registerComplete(request, true);
         return ResponseEntity.noContent().build();
     }
+
+
+@Autowired
+private JwtUtil jwtUtil;
+
+    @PostMapping("/refresh")
+    public ResponseEntity<LoginResponse> refresh(@RequestHeader("Authorization") String authHeader) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        LoginResponse response = authService.refreshToken(email);
+        return ResponseEntity.ok(response);
+    }
+    
 
 }
 

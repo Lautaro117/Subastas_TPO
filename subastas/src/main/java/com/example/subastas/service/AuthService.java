@@ -337,4 +337,30 @@ public class AuthService {
         usuarioAuthRepository.save(usuario);
     }
 
+    public LoginResponse refreshToken(String email) {
+    UsuarioAuth usuario = usuarioAuthRepository.findByEmail(email)
+            .orElseThrow(() -> new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "Usuario no encontrado"));
+ 
+    Cliente cliente = clienteRepository.findById(usuario.getClienteId())
+            .orElseThrow(() -> new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "Cliente no encontrado"));
+ 
+    if ("no".equals(cliente.getAdmitido())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cuenta bloqueada");
+    }
+ 
+    String token = jwtUtil.generateToken(
+            usuario.getEmail(),
+            usuario.getEstado(),
+            cliente.getCategoria()
+    );
+ 
+    int pendientes = notificacionRepository
+            .findByClienteIdAndLeidaFalseOrderByCreatedAtDesc(usuario.getClienteId())
+            .size();
+ 
+    return new LoginResponse(token, usuario.getEmail(), usuario.getEstado(), cliente.getCategoria(), pendientes);
+}
+
 }
