@@ -2,7 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Icon } from 'react-native-paper';
 
-import { HomeProductosScreen, HomeSubastasScreen } from '../screens';
+import { HomeSubastasStack } from './HomeSubastasStack';
 import { HomeProductosStack } from './HomeProductosStack';
 import { HomePerfilStack } from './HomePerfilStack';
 import { paperTheme } from '../theme/theme';
@@ -32,20 +32,14 @@ export function MainTabs() {
         },
         tabBarIcon: ({ color, size }) => {
           let iconName = 'circle-outline';
-
-          if (route.name === 'HomeSubastas') {
-            iconName = 'currency-usd';
-          } else if (route.name === 'HomeProductos') {
-            iconName = 'cube-outline';
-          } else if (route.name === 'HomePerfil') {
-            iconName = 'account-cog-outline';
-          }
-
+          if (route.name === 'HomeSubastas') iconName = 'currency-usd';
+          else if (route.name === 'HomeProductos') iconName = 'cube-outline';
+          else if (route.name === 'HomePerfil') iconName = 'account-cog-outline';
           return <TabIcon name={iconName} color={color} size={size} />;
         },
       })}
     >
-      <Tab.Screen name="HomeSubastas" component={HomeSubastasScreen} options={{ title: 'Subastas' }} />
+      <Tab.Screen name="HomeSubastas" component={HomeSubastasStack} options={{ title: 'Subastas' }} />
       <Tab.Screen name="HomeProductos" component={HomeProductosStack} options={{ title: 'Productos' }} />
       <Tab.Screen name="HomePerfil" component={HomePerfilStack} options={{ title: 'Perfil' }} />
     </Tab.Navigator>
