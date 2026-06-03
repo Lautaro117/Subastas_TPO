@@ -16,7 +16,6 @@ import {
 
 import { useAppSession } from '../../navigation/AppSessionContext';
 import { getMyProfile } from '../../services/userApi';
-import { getPaymentMethods } from '../../services/paymentApi';
 import { COLORS } from '../../theme/colors';
 
 const MENU_ITEMS = [
@@ -37,18 +36,13 @@ export default function HomePerfilScreen({ navigation }) {
   const hasToken = !!session.token;
 
   const [userProfile, setUserProfile] = useState(null);
-  const [paymentMethods, setPaymentMethods] = useState([]);
   const [loading, setLoading] = useState(!isGuest);
 
   const loadData = useCallback(async () => {
     if (!hasToken) return;
     try {
-      const [profile, methods] = await Promise.all([
-        getMyProfile(session.token),
-        getPaymentMethods(session.token).catch(() => []),
-      ]);
+      const profile = await getMyProfile(session.token);
       setUserProfile(profile);
-      setPaymentMethods(Array.isArray(methods) ? methods : []);
     } catch {
       // silent — profile stays null, shows fallback
     } finally {
@@ -75,8 +69,9 @@ export default function HomePerfilScreen({ navigation }) {
 
   const displayEmail    = isGuest ? 'Invitado' : (userProfile?.email    ?? '—');
   const displayCategoria = isGuest ? 'Invitado' : (userProfile?.categoria?.toUpperCase() ?? '—');
-  const isPending       = !isGuest && userProfile && userProfile.estado !== 'activo';
-  const showPaymentBanner = !isGuest && hasToken && paymentMethods.length === 0;
+  const isPending             = !isGuest && userProfile?.estado === 'E1';
+  const showPaymentBanner     = !isGuest && hasToken && userProfile?.estado === 'E2';
+  const showPaymentPendingBanner = !isGuest && hasToken && userProfile?.estado === 'E3';
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: COLORS.background }]}>
@@ -179,6 +174,19 @@ export default function HomePerfilScreen({ navigation }) {
               >
                 Agregar
               </Button>
+            </Surface>
+          ) : null}
+
+          {/* Payment method under review banner (E3) */}
+          {showPaymentPendingBanner ? (
+            <Surface style={styles.pendingCard} elevation={0}>
+              <Icon source="clock-outline" size={22} color={COLORS.primary} />
+              <View style={styles.pendingTextBlock}>
+                <Text style={styles.pendingTitle}>Método de pago en revisión</Text>
+                <Text style={styles.pendingDesc}>
+                  Ya cargaste un método de pago. Nuestro equipo lo está verificando. Te notificaremos cuando sea aprobado.
+                </Text>
+              </View>
             </Surface>
           ) : null}
 
