@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, IconButton, Surface, Text, useTheme } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 
+import { useAppSession } from '../../navigation/AppSessionContext';
 import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
 import { registerRequest } from '../../services/authApi';
 import { registerSharedStyles } from './sharedStyles';
@@ -60,6 +61,7 @@ function UploadBox({ label, imageUri, onPickFromCamera, onPickFromGallery }) {
 
 export default function RegisterDniUploadScreen({ navigation }) {
   const theme = useTheme();
+  const { enterAsPendingGuest } = useAppSession();
   const { registerForm, dniData, setDniImage, setRegisterResult } = useRegisterFlow();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -69,7 +71,6 @@ export default function RegisterDniUploadScreen({ navigation }) {
   const buildImageFile = (uri, fallbackName) => {
     const extension = uri.split('.').pop()?.toLowerCase();
     const type = extension ? `image/${extension === 'jpg' ? 'jpeg' : extension}` : 'image/jpeg';
-
     return {
       uri,
       name: `${fallbackName}.${extension || 'jpg'}`,
@@ -79,10 +80,7 @@ export default function RegisterDniUploadScreen({ navigation }) {
 
   const pickFromGallery = async (side) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      return;
-    }
+    if (!permission.granted) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -99,10 +97,7 @@ export default function RegisterDniUploadScreen({ navigation }) {
 
   const pickFromCamera = async (side) => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
-
-    if (!permission.granted) {
-      return;
-    }
+    if (!permission.granted) return;
 
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -118,9 +113,7 @@ export default function RegisterDniUploadScreen({ navigation }) {
   };
 
   const handleNext = async () => {
-    if (!canContinue || isSubmitting) {
-      return;
-    }
+    if (!canContinue || isSubmitting) return;
 
     const missingBasicFields = [];
     if (!registerForm.firstName?.trim()) missingBasicFields.push('nombre');
@@ -151,6 +144,11 @@ export default function RegisterDniUploadScreen({ navigation }) {
 
       const response = await registerRequest(formData);
       setRegisterResult(response);
+
+      if (response?.solicitudId) {
+        await enterAsPendingGuest(response.solicitudId);
+      }
+
       navigation.navigate('RegisterVerification');
     } catch (error) {
       setSubmitError(error.message || 'No se pudo completar el registro');
@@ -160,7 +158,7 @@ export default function RegisterDniUploadScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[registerSharedStyles.safeArea, { backgroundColor: theme.colors.background }]}> 
+    <SafeAreaView style={[registerSharedStyles.safeArea, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView
         style={registerSharedStyles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -234,9 +232,7 @@ export default function RegisterDniUploadScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  boxesWrapper: {
-    gap: 16,
-  },
+  boxesWrapper: { gap: 16 },
   uploadBox: {
     borderWidth: 1,
     borderRadius: 12,
@@ -249,43 +245,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  placeholderText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  previewImage: {
-    width: '100%',
-    height: 88,
-    borderRadius: 10,
-  },
-  uploadActions: {
-    marginTop: 12,
-    flexDirection: 'row',
-    gap: 10,
-  },
-  sourceButton: {
-    flex: 1,
-    borderRadius: 999,
-  },
-  sourceButtonLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  bottomButton: {
-    minWidth: 130,
-    borderRadius: 999,
-  },
-  bottomButtonContent: {
-    height: 50,
-    paddingHorizontal: 12,
-  },
-  bottomButtonLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  submitErrorText: {
-    marginTop: 10,
-    fontSize: 13,
-    lineHeight: 18,
-  },
+  placeholderText: { fontSize: 14, lineHeight: 20 },
+  previewImage: { width: '100%', height: 88, borderRadius: 10 },
+  uploadActions: { marginTop: 12, flexDirection: 'row', gap: 10 },
+  sourceButton: { flex: 1, borderRadius: 999 },
+  sourceButtonLabel: { fontSize: 13, fontWeight: '500' },
+  bottomButton: { minWidth: 130, borderRadius: 999 },
+  bottomButtonContent: { height: 50, paddingHorizontal: 12 },
+  bottomButtonLabel: { fontSize: 15, fontWeight: '600' },
+  submitErrorText: { marginTop: 10, fontSize: 13, lineHeight: 18 },
 });

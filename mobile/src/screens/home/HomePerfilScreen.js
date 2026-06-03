@@ -30,8 +30,7 @@ const MENU_ITEMS = [
 
 export default function HomePerfilScreen({ navigation }) {
   const theme = useTheme();
-  const { session, exitApp, setAuthToken } = useAppSession();
-
+const { session, exitApp, setAuthToken, localNotifications, markLocalNotificationRead, initiateRegistrationCompletion, unreadNotificationsCount } = useAppSession();
   const isGuest = session.entryMode === 'guest-login' || session.entryMode === 'guest-register';
   const hasToken = !!session.token;
 

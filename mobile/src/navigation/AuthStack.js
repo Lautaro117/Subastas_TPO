@@ -22,8 +22,8 @@ const Stack = createNativeStackNavigator();
 export function AuthStack() {
   const { session } = useAppSession();
   const initialRoute =
-    session.entryMode === 'finalizing'        ? 'RegisterFinalizePassword' :
-    session.entryMode === 'pending-register'  ? 'RegisterVerification' :
+    session.entryMode === 'finalizing'       ? 'RegisterFinalizePassword' :
+    session.entryMode === 'pending-register' ? 'RegisterVerification' :
     'Login';
 
   return (

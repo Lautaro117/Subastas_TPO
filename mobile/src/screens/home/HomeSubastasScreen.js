@@ -42,11 +42,12 @@ function EmptyState() {
 
 export default function HomeSubastasScreen({ navigation }) {
   const theme = useTheme();
-  const { session } = useAppSession();
+  const { session, unreadNotificationsCount } = useAppSession();
   const token = session.token;
-  const unreadNotificationsCount = 0; // TODO: conectar cuando el contexto lo exponga
   const tokenRef = useRef(token);
   useEffect(() => { tokenRef.current = token; }, [token]);
+// Si no hay token (usuario invitado) no intentar cargar
+const isGuest = !token;
 
   const [auctions, setAuctions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -54,18 +55,22 @@ export default function HomeSubastasScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('active');
 
+
   const fetchAuctions = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await getAuctions(tokenRef.current);
-      setAuctions(Array.isArray(data) ? data : []);
-    } catch {
-      setError('No se pudieron cargar las subastas. Intentá de nuevo.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []); // sin dependencia de token — usa el ref siempre actualizado
+    console.log('fetchAuctions llamado, token:', tokenRef.current);
+
+    if (!tokenRef.current) return;
+  setIsLoading(true);
+  setError(null);
+  try {
+    const data = await getAuctions(tokenRef.current);
+    setAuctions(Array.isArray(data) ? data : []);
+  } catch {
+    setError('No se pudieron cargar las subastas. Intentá de nuevo.');
+  } finally {
+    setIsLoading(false);
+  }
+}, []);
 
   useEffect(() => { fetchAuctions(); }, [fetchAuctions]);
 
@@ -130,29 +135,38 @@ export default function HomeSubastasScreen({ navigation }) {
           />
         </View>
 
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-          </View>
-        ) : (
-          <FlatList
-            data={data}
-            keyExtractor={(item) => String(item.identificador)}
-            renderItem={({ item }) => (
-              <AuctionCard
-                item={item}
-                onPress={() =>
-                  navigation.navigate('SalaSubasta', { auctionId: item.identificador, auction: item })
-                }
-              />
-            )}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={EmptyState}
-            onRefresh={fetchAuctions}
-            refreshing={isLoading}
-          />
-        )}
+        {isGuest ? (
+  <View style={styles.emptyContainer}>
+    <IconButton icon="lock-outline" iconColor={theme.colors.onSurfaceVariant} size={34} />
+    <Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
+      Iniciá sesión para ver las subastas disponibles
+    </Text>
+  </View>
+) : isLoading ? (
+  <View style={styles.loadingContainer}>
+    <ActivityIndicator size="large" color={theme.colors.primary} />
+  </View>
+) : (
+  <FlatList
+    data={data}
+    keyExtractor={(item) => String(item.identificador)}
+    renderItem={({ item }) => (
+      <AuctionCard
+        item={item}
+        onPress={() =>
+          navigation.navigate('SalaSubasta', { auctionId: item.identificador, auction: item })
+        }
+      />
+    )}
+    showsVerticalScrollIndicator={false}
+    contentContainerStyle={styles.listContent}
+    ListEmptyComponent={EmptyState}
+    onRefresh={fetchAuctions}
+    refreshing={isLoading}
+  />
+)}
+
+
       </View>
 
       <Snackbar

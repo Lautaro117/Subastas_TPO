@@ -138,18 +138,18 @@ export function AppSessionProvider({ children }) {
   };
 
   // Llamar después del registro — guarda solicitudId y activa el polling
-  const enterAsPendingGuest = async (solicitudId) => {
-    const next = {
-      ...initialSession,
-      isAuthenticated: true,
-      entryMode: 'guest-login',
-      token: null,
-      solicitudId,
-      bootstrapped: true,
-    };
-    try { await saveSessionSnapshot(next); } catch {}
-    setSession(next);
+const enterAsPendingGuest = async (solicitudId) => {
+  const next = {
+    ...initialSession,
+    isAuthenticated: false,
+    entryMode: 'pending-register',
+    token: null,
+    solicitudId,
+    bootstrapped: true,
   };
+  try { await saveSessionSnapshot(next); } catch {}
+  setSession(next);
+};
 
   const setAuthToken = async (token) => {
     if (token === session.token) return;

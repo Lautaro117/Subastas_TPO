@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Chip, FAB, Icon, Text, useTheme } from 'react-native-paper';
+import { ActivityIndicator, Badge, Chip, FAB, Icon, IconButton, Text, useTheme } from 'react-native-paper';
 
 import { useAppSession } from '../../navigation/AppSessionContext';
 import { getMisProductos, getMisCompras } from '../../services/itemsApi';
@@ -102,7 +102,7 @@ function CompraCard({ item, onPress }) {
 
 export default function HomeProductosScreen({ navigation }) {
   const theme = useTheme();
-  const { session } = useAppSession();
+  const { session, unreadNotificationsCount } = useAppSession();
 
   const isPendingRegister = session.entryMode === 'pending-register';
   const isGuest = session.entryMode === 'guest' || isPendingRegister;
@@ -171,7 +171,25 @@ export default function HomeProductosScreen({ navigation }) {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <View style={styles.container}>
-        <Text style={[styles.title, { color: theme.colors.onBackground }]}>Productos</Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.title, { color: theme.colors.onBackground }]}>Productos</Text>
+          <View style={styles.bellWrap}>
+            <IconButton
+              icon="bell-outline"
+              iconColor={theme.colors.primary}
+              size={20}
+              style={[styles.bellButton, { backgroundColor: theme.colors.surfaceContainerLow }]}
+              onPress={() => navigation.navigate('HomePerfil', { screen: 'Notificaciones' })}
+            />
+            <Badge
+              visible={unreadNotificationsCount > 0}
+              size={16}
+              style={styles.bellBadge}
+            >
+              {unreadNotificationsCount}
+            </Badge>
+          </View>
+        </View>
 
         {isGuest ? (
           <View style={styles.guestBlock}>
@@ -284,7 +302,16 @@ export default function HomeProductosScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   container: { flex: 1, paddingHorizontal: 24, paddingTop: 16 },
-  title: { fontSize: 28, fontWeight: '700', marginBottom: 16 },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: { fontSize: 28, fontWeight: '700' },
+  bellButton: { margin: 0, borderRadius: 999 },
+  bellWrap: { position: 'relative' },
+  bellBadge: { position: 'absolute', top: 2, right: 2 },
   tabRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   tab: { flex: 1, paddingVertical: 8, borderRadius: 999, alignItems: 'center' },
   tabText: { fontSize: 13, fontWeight: '600' },
