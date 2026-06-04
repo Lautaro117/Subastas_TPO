@@ -105,7 +105,7 @@ export default function HomeProductosScreen({ navigation }) {
   const { session, unreadNotificationsCount } = useAppSession();
 
   const isPendingRegister = session.entryMode === 'pending-register';
-  const isGuest = session.entryMode === 'guest' || isPendingRegister;
+  const isGuest = session.entryMode === 'guest-login' || isPendingRegister;
 
   // tokenRef evita que el cambio de token (refresh) dispare re-renders innecesarios
   const tokenRef = useRef(session.token);
