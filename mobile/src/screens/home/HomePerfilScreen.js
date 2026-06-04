@@ -109,7 +109,8 @@ const { session, exitApp, setAuthToken, localNotifications, markLocalNotificatio
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Perfil</Text>
-            <IconButton icon="bell-outline" iconColor={COLORS.primary} size={24} style={styles.bellButton} onPress={() => {}} />
+            <IconButton icon="bell-outline" iconColor={COLORS.primary} size={24} 
+              style={styles.bellButton} onPress={() => navigation.navigate('Notificaciones')} />
           </View>
 
           {/* User card */}
