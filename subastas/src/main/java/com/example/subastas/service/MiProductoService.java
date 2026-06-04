@@ -13,14 +13,18 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.subastas.dto.CustodiaDTO;
 import com.example.subastas.dto.MiProductoDTO;
 import com.example.subastas.model.AdminProducto;
+import com.example.subastas.model.Cliente;
 import com.example.subastas.model.CustodiaProductos;
 import com.example.subastas.model.Depositos;
+import com.example.subastas.model.Duenio;
 import com.example.subastas.model.FotoProducto;
 import com.example.subastas.model.Producto;
 import com.example.subastas.model.Seguro;
 import com.example.subastas.repository.AdminProductoRepository;
+import com.example.subastas.repository.ClienteRepository;
 import com.example.subastas.repository.CustodiaProductoRepository;
 import com.example.subastas.repository.DepositoRepository;
+import com.example.subastas.repository.DuenioRepository;
 import com.example.subastas.repository.FotoProductoRepository;
 import com.example.subastas.repository.ProductoRepository;
 import com.example.subastas.repository.SeguroRepository;
@@ -50,6 +54,12 @@ public class MiProductoService {
     @Autowired
     private FotoProductoRepository fotoProductoRepository;
 
+    @Autowired
+    private DuenioRepository duenioRepository;
+
+    @Autowired
+    private ClienteRepository clienteRepository;
+
     private Integer getClienteId(String email) {
         return usuarioAuthRepository.findByEmail(email)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED))
@@ -73,33 +83,48 @@ public class MiProductoService {
     }
 
     public Producto agregarProducto(String email, String descripcionCatalogo, String descripcionCompleta, List<MultipartFile> fotos) {
-        if (fotos == null || fotos.size() < 6) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Se requieren al menos 6 fotos");
-        }
-
-        Integer clienteId = getClienteId(email);
-
-        Producto producto = new Producto();
-        producto.setDuenio(clienteId);
-        producto.setDescripcionCatalogo(descripcionCatalogo);
-        producto.setDescripcionCompleta(descripcionCompleta);
-        producto.setEstadoAdmin("pendiente");
-        producto.setRevisor(1);
-        productoRepository.save(producto);
-
-        for (MultipartFile foto : fotos) {
-            try {
-                FotoProducto fp = new FotoProducto();
-                fp.setProducto(producto.getIdentificador());
-                fp.setFoto(foto.getBytes());
-                fotoProductoRepository.save(fp);
-            } catch (Exception e) {
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error al guardar foto");
-            }
-        }
-
-        return producto;
+    if (fotos == null || fotos.size() < 6) {
+        throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Se requieren al menos 6 fotos");
     }
+ 
+    Integer clienteId = getClienteId(email);
+ 
+    // Si el usuario no existe en duenios, lo creamos con valores por defecto
+    if (!duenioRepository.existsById(clienteId)) {
+        Cliente cliente = clienteRepository.findById(clienteId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
+ 
+        Duenio duenio = new Duenio();
+        duenio.setIdentificador(clienteId);
+        duenio.setNumeroPais(cliente.getNumeroPais());
+        duenio.setVerificacionFinanciera("no");
+        duenio.setVerificacionJudicial("no");
+        duenio.setCalificacionRiesgo(1);
+        duenio.setVerificador(1);
+        duenioRepository.save(duenio);
+    }
+ 
+    Producto producto = new Producto();
+    producto.setDuenio(clienteId);
+    producto.setDescripcionCatalogo(descripcionCatalogo);
+    producto.setDescripcionCompleta(descripcionCompleta);
+    producto.setEstadoAdmin("pendiente");
+    producto.setRevisor(1);
+    productoRepository.save(producto);
+ 
+    for (MultipartFile foto : fotos) {
+        try {
+            FotoProducto fp = new FotoProducto();
+            fp.setProducto(producto.getIdentificador());
+            fp.setFoto(foto.getBytes());
+            fotoProductoRepository.save(fp);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error al guardar foto");
+        }
+    }
+ 
+    return producto;
+}
 
     public void aceptarPropuesta(String email, Integer productoId) {
         Integer clienteId = getClienteId(email);
