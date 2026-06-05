@@ -15,7 +15,6 @@ import {
 
 import { useAppSession } from '../../navigation/AppSessionContext';
 import { getMyProfile } from '../../services/userApi';
-import { getPaymentMethods } from '../../services/paymentApi';
 import { refreshToken } from '../../services/authApi';
 import { COLORS } from '../../theme/colors';
 
@@ -35,7 +34,6 @@ const { session, exitApp, setAuthToken, localNotifications, markLocalNotificatio
   const hasToken = !!session.token;
 
   const [userProfile, setUserProfile] = useState(null);
-  const [paymentMethods, setPaymentMethods] = useState([]);
   const [loading, setLoading] = useState(!isGuest);
 
   const lastFetchRef = useRef(null);
@@ -47,12 +45,8 @@ const { session, exitApp, setAuthToken, localNotifications, markLocalNotificatio
     if (!force && lastFetchRef.current && now - lastFetchRef.current < CACHE_TTL) return;
     lastFetchRef.current = now;
     try {
-      const [profile, methods] = await Promise.all([
-        getMyProfile(session.token),
-        getPaymentMethods(session.token).catch(() => []),
-      ]);
+      const profile = await getMyProfile(session.token);
       setUserProfile(profile);
-      setPaymentMethods(Array.isArray(methods) ? methods : []);
     } catch {
       // silent — profile stays null, shows fallback
     } finally {
@@ -99,7 +93,9 @@ const { session, exitApp, setAuthToken, localNotifications, markLocalNotificatio
   const guestMessage = session.entryMode === 'guest-register'
     ? 'Tu cuenta está en solicitud de aprobación. En breve se te dará respuesta.'
     : 'Para visualizar esta sección tenés que iniciar sesión o registrarte en la aplicación.';
-  const showPaymentBanner = !isGuest && hasToken && paymentMethods.length === 0;
+  const isPendingE1          = !isGuest && userProfile?.estado === 'E1';
+  const showPaymentBanner    = !isGuest && hasToken && userProfile?.estado === 'E2';
+  const showPaymentPending   = !isGuest && hasToken && userProfile?.estado === 'E3';
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: COLORS.background }]}>
@@ -145,7 +141,20 @@ const { session, exitApp, setAuthToken, localNotifications, markLocalNotificatio
             </Surface>
           ) : null}
 
-          {/* Payment methods pending banner */}
+          {/* E1 — cuenta pendiente de aprobación */}
+          {isPendingE1 ? (
+            <Surface style={styles.pendingCard} elevation={0}>
+              <Icon source="clock-outline" size={22} color={COLORS.primary} />
+              <View style={styles.pendingTextBlock}>
+                <Text style={styles.pendingTitle}>Cuenta pendiente de aprobación</Text>
+                <Text style={styles.pendingDesc}>
+                  Nuestro equipo está verificando tus datos. Te notificaremos cuando puedas continuar.
+                </Text>
+              </View>
+            </Surface>
+          ) : null}
+
+          {/* E2 — sin método de pago */}
           {showPaymentBanner ? (
             <Surface style={styles.paymentBanner} elevation={0}>
               <View style={styles.paymentBannerRow}>
@@ -166,6 +175,19 @@ const { session, exitApp, setAuthToken, localNotifications, markLocalNotificatio
               >
                 Agregar
               </Button>
+            </Surface>
+          ) : null}
+
+          {/* E3 — método de pago pendiente de aprobación */}
+          {showPaymentPending ? (
+            <Surface style={styles.pendingCard} elevation={0}>
+              <Icon source="clock-outline" size={22} color={COLORS.primary} />
+              <View style={styles.pendingTextBlock}>
+                <Text style={styles.pendingTitle}>Método de pago en revisión</Text>
+                <Text style={styles.pendingDesc}>
+                  Ya cargaste un método de pago. Nuestro equipo lo está verificando. Te notificaremos cuando sea aprobado.
+                </Text>
+              </View>
             </Surface>
           ) : null}
 
@@ -274,6 +296,15 @@ const styles = StyleSheet.create({
   paymentBannerDesc: { fontSize: 13, lineHeight: 19, color: COLORS.onSurfaceVariant },
   paymentBannerButton: { borderRadius: 999, alignSelf: 'flex-start', backgroundColor: COLORS.primary },
   paymentBannerButtonLabel: { color: COLORS.onPrimary, fontSize: 14, fontWeight: '600' },
+
+  pendingCard: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+    borderRadius: 18, borderWidth: 1, borderColor: COLORS.primary,
+    padding: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16,
+  },
+  pendingTextBlock: { flex: 1 },
+  pendingTitle: { fontSize: 15, fontWeight: '600', color: COLORS.onSurface, marginBottom: 4 },
+  pendingDesc: { fontSize: 13, lineHeight: 19, color: COLORS.onSurfaceVariant },
 
   sectionHeader: { marginBottom: 14, marginTop: 8 },
   sectionTitle: { fontSize: 18, fontWeight: '600', color: COLORS.primary, letterSpacing: 0.1 },
