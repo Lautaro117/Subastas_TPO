@@ -12,11 +12,16 @@ import { useAppSession } from '../../navigation/AppSessionContext';
 export default function RegisterFinalizePasswordScreen({ navigation }) {
   const theme = useTheme();
   const { registerStatus, registerForm } = useRegisterFlow();
-  const { setAuthToken } = useAppSession();
+  const { session, setAuthToken } = useAppSession();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [touched, setTouched] = useState({ password: false, confirmPassword: false });
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Camino 1: token viene de RegisterFlowContext (seteado en RegisterVerificationScreen)
+  // Camino 2: token viene de AppSessionContext (seteado por el polling al detectar aprobación)
+  const effectiveToken = registerStatus.token || session.registroToken;
 
   const passwordStrength = useMemo(() => {
     const trimmed = password.trim();
@@ -65,10 +70,11 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
   const handleFinish = async () => {
     setSubmitted(true);
 
-    if (!isValid || !registerStatus.token) return;
+    if (!isValid || !effectiveToken) return;
 
+    setIsSubmitting(true);
     try {
-      await resetPasswordApi({ token: registerStatus.token, password });
+      await resetPasswordApi({ token: effectiveToken, password });
 
       try {
         const loginResult = await loginRequest({ email: registerForm.email, password });
@@ -76,12 +82,16 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
           await setAuthToken(loginResult.token);
         }
       } catch (_loginError) {
-        // auto-login fallido: el usuario podrá hacer login manual después
+        // auto-login fallido — redirigir al login para que el usuario ingrese manualmente
+        navigation.replace('Login');
+        return;
       }
 
       navigation.navigate('RegisterEntering');
     } catch (error) {
-      // error al establecer contraseña — silent por ahora, la navegación no avanza
+      // error al establecer contraseña — silent, la navegación no avanza
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -154,7 +164,8 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
                 mode="contained"
                 compact
                 onPress={handleFinish}
-                disabled={!isValid || !registerStatus.token}
+                loading={isSubmitting}
+                disabled={!isValid || !effectiveToken || isSubmitting}
                 style={[styles.finishButton, { backgroundColor: theme.colors.primary }]}
                 contentStyle={styles.finishContent}
                 labelStyle={[styles.finishLabel, { color: theme.colors.onPrimary }]}
