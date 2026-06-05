@@ -51,7 +51,9 @@ export function AppSessionProvider({ children }) {
   useEffect(() => {
     const sid = session.solicitudId;
     const isPending =
-      (session.entryMode === 'pending-register' || session.entryMode === 'guest-login') && sid;
+      session.isAuthenticated &&
+      (session.entryMode === 'pending-register' || session.entryMode === 'guest-login') &&
+      sid;
 
     if (!isPending || session.registroAprobado) {
       if (pollingRef.current) {
@@ -122,11 +124,16 @@ export function AppSessionProvider({ children }) {
 
   // ─── Acciones ──────────────────────────────────────────────────────────────
   const enterApp = async (entryMode, token) => {
+    // Siempre limpia cualquier estado de registro pendiente al transicionar
+    // a un modo autenticado, para evitar que solicitudId residual active el polling.
     const next = {
       ...session,
       isAuthenticated: true,
       entryMode,
       token: token ?? session.token,
+      solicitudId: null,
+      registroAprobado: false,
+      registroToken: null,
     };
     try { await saveSessionSnapshot(next); } catch {}
     setSession((prev) => ({
@@ -134,11 +141,14 @@ export function AppSessionProvider({ children }) {
       isAuthenticated: true,
       entryMode,
       token: token ?? prev.token,
+      solicitudId: null,
+      registroAprobado: false,
+      registroToken: null,
     }));
   };
 
   // Llamar después del registro — guarda solicitudId y activa el polling
-const enterAsPendingGuest = async (solicitudId) => {
+  const enterAsPendingGuest = async (solicitudId) => {
   const next = {
     ...initialSession,
     isAuthenticated: false,
@@ -147,9 +157,26 @@ const enterAsPendingGuest = async (solicitudId) => {
     solicitudId,
     bootstrapped: true,
   };
-  try { await saveSessionSnapshot(next); } catch {}
-  setSession(next);
-};
+    try { await saveSessionSnapshot(next); } catch {}
+    setSession(next);
+  };
+
+  // Camino 2 del flujo de registro: el usuario presiona "Continuar como invitado"
+  // desde RegisterVerificationScreen sabiendo que tiene un registro pendiente.
+  // A diferencia de enterApp, esta función establece solicitudId explícitamente
+  // para que el polling del contexto se active y entregue la notificación de aprobación.
+  const enterAsGuestLoginWithPending = async (solicitudId) => {
+    const next = {
+      ...initialSession,
+      isAuthenticated: true,
+      entryMode: 'guest-login',
+      token: null,
+      solicitudId,
+      bootstrapped: true,
+    };
+    try { await saveSessionSnapshot(next); } catch {}
+    setSession(next);
+  };
 
   const setAuthToken = async (token) => {
     if (token === session.token) return;
@@ -162,6 +189,7 @@ const enterAsPendingGuest = async (solicitudId) => {
 
   // Transiciona a AuthStack → RegisterFinalizePassword
   const initiateRegistrationCompletion = () => {
+    setLocalNotifications([]);
     setSession((prev) => ({
       ...prev,
       isAuthenticated: false,
@@ -194,6 +222,7 @@ const enterAsPendingGuest = async (solicitudId) => {
       unreadNotificationsCount,
       enterApp,
       enterAsPendingGuest,
+      enterAsGuestLoginWithPending,
       setAuthToken,
       initiateRegistrationCompletion,
       exitApp,

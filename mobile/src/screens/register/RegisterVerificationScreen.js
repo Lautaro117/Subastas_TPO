@@ -11,7 +11,7 @@ import { registerSharedStyles } from './sharedStyles';
 
 export default function RegisterVerificationScreen({ navigation }) {
   const theme = useTheme();
-  const { enterApp } = useAppSession();
+  const { enterAsGuestLoginWithPending } = useAppSession();
   const { registerStatus, setRegistrationToken } = useRegisterFlow();
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [statusError, setStatusError] = useState('');
@@ -98,7 +98,7 @@ export default function RegisterVerificationScreen({ navigation }) {
         <View style={styles.bottomArea}>
           <Button
             mode="contained-tonal"
-            onPress={async () => { await enterApp('guest-login'); }}
+            onPress={async () => { await enterAsGuestLoginWithPending(registerStatus.solicitudId); }}
             style={[styles.secondaryButton, { backgroundColor: theme.colors.surfaceContainerLow }]}
             labelStyle={[styles.secondaryLabel, { color: theme.colors.onSurface }]}
             contentStyle={styles.secondaryContent}
