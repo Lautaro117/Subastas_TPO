@@ -1,5 +1,6 @@
 package com.example.subastas.service;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -64,6 +65,11 @@ public class AuthService {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private EmailService emailService;
+
+    private final SecureRandom secureRandom = new SecureRandom();
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -275,18 +281,19 @@ public class AuthService {
         return msg;
     }
 
-    public String resetRequest(String email) {
+    public boolean resetRequest(String email) {
         Optional<UsuarioAuth> usuario = usuarioAuthRepository.findByEmail(email);
-        
+
         if (usuario.isPresent()) {
-            String token = UUID.randomUUID().toString().replace("-", "").substring(0, 32);
-            usuario.get().setTokenRegistro(token);
+            String code = String.format("%06d", secureRandom.nextInt(1_000_000));
+            usuario.get().setTokenRegistro(code);
             usuarioAuthRepository.save(usuario.get());
-            return token;
+            emailService.sendResetCode(email, code);
+            return true;
         }
-        
-        return null; // Si no hay mail vuelve vacio, por seguridad no se muestra ningun mensaje 
-}
+
+        return false;
+    }
 
     public AuthStatusResponse getRegisterStatus(Integer solicitudId) {
         if (solicitudId == null) {

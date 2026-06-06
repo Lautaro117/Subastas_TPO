@@ -194,16 +194,14 @@ export async function resetRequestApi({ email }) {
     body: JSON.stringify({ email }),
   });
 
-  const rawBody = await response.text();
-
   if (!response.ok) {
     if (response.status === 404) throw new Error('El email no está registrado');
-    if (response.status === 422) throw new Error('Formato de email inválido');
     if (response.status === 400) throw new Error('El email es requerido');
+    if (response.status === 422) throw new Error('Formato de email inválido');
     throw new Error('No se pudo procesar la solicitud');
   }
 
-  return rawBody?.trim() || null;
+  return true;
 }
 
 export async function resetPasswordApi({ token, password }) {
