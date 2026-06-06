@@ -192,32 +192,30 @@ public class MiProductoService {
             custodia.getEstado(), nroPoliza, compania);
     }
 
+    public MiProductoDTO getDetalle(String email, Integer productoId) {
+        Integer clienteId = getClienteId(email);
 
+        Producto producto = productoRepository.findById(productoId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
 
-public MiProductoDTO getDetalle(String email, Integer productoId) {
-    Integer clienteId = getClienteId(email);
+        if (!producto.getDuenio().equals(clienteId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
 
-    Producto producto = productoRepository.findById(productoId)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+        AdminProducto ap = adminProductoRepository.findByProductoId(productoId).orElse(null);
 
-    if (!producto.getDuenio().equals(clienteId)) {
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        List<String> fotosBase64 = fotoProductoRepository.findByProducto(productoId).stream()        
+        .map(f -> Base64.getEncoder().encodeToString(f.getFoto()))
+            .collect(Collectors.toList());
+
+        return new MiProductoDTO(
+            producto.getIdentificador(),
+            producto.getDescripcionCatalogo(),
+            producto.getDescripcionCompleta(),
+            producto.getEstadoAdmin(),
+            ap != null ? ap.getEstadoPropuesta() : null,
+            ap != null ? ap.getPrecioPropuesto() : null,
+            fotosBase64
+        );
     }
-
-    AdminProducto ap = adminProductoRepository.findByProductoId(productoId).orElse(null);
-
-    List<String> fotosBase64 = fotoProductoRepository.findByProducto(productoId).stream()        
-    .map(f -> Base64.getEncoder().encodeToString(f.getFoto()))
-        .collect(Collectors.toList());
-
-    return new MiProductoDTO(
-        producto.getIdentificador(),
-        producto.getDescripcionCatalogo(),
-        producto.getDescripcionCompleta(),
-        producto.getEstadoAdmin(),
-        ap != null ? ap.getEstadoPropuesta() : null,
-        ap != null ? ap.getPrecioPropuesto() : null,
-        fotosBase64
-    );
-}
 }
