@@ -97,19 +97,36 @@ public class SubastaService {
     }
 
     public List<CatalogoDTO> obtenerCatalogo(Integer subastaId, String estado) {
-        Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Catálogo no encontrado"));
-        List<ItemCatalogo> items = itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador());
-        return items.stream().map(item -> new CatalogoDTO(
+    Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId)
+            .orElseThrow(() -> new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "Catálogo no encontrado"));
+ 
+    List<ItemCatalogo> items = itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador());
+ 
+    return items.stream().map(item -> {
+        // Traer descripción del producto
+        String descripcion = productoRepository.findById(item.getProductoId())
+                .map(p -> p.getDescripcionCatalogo())
+                .orElse(null);
+ 
+        // Traer primera foto del producto
+        String fotoPrincipal = fotoProductoRepository.findByProducto(item.getProductoId())
+                .stream()
+                .findFirst()
+                .map(f -> Base64.getEncoder().encodeToString(f.getFoto()))
+                .orElse(null);
+ 
+        return new CatalogoDTO(
                 item.getIdentificador(),
                 item.getProductoId(),
                 estado.equals("E2") ? null : item.getPrecioBase(),
                 item.getComision(),
-                item.getSubastado()
-        )).toList();
-    }
-
+                item.getSubastado(),
+                descripcion,
+                fotoPrincipal
+        );
+    }).toList();
+}
     public CatalogoDTO obtenerItem(Integer subastaId, Integer itemId, String estado) {
         ItemCatalogo item = itemCatalogoRepository.findById(itemId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -119,7 +136,9 @@ public class SubastaService {
                 item.getProductoId(),
                 estado.equals("E2") ? null : item.getPrecioBase(),
                 item.getComision(),
-                item.getSubastado()
+                item.getSubastado(),
+                null,
+                null
         );
     }
 
@@ -309,7 +328,9 @@ public class SubastaService {
                         item.getProductoId(),
                         item.getPrecioBase(),
                         item.getComision(),
-                        item.getSubastado()
+                        item.getSubastado(),
+                        null,
+                        null
                 ));
                 pujoRepository.findTopByItemIdOrderByImporteDesc(item.getIdentificador())
                         .ifPresent(p -> {
