@@ -53,7 +53,7 @@ export async function addBankAccount(data, token) {
 
   if (!response.ok) {
     if (response.status === 401) throw new Error('Sesión expirada. Volvé a iniciar sesión.');
-    if (response.status === 422) throw new Error('CBU/IBAN con formato inválido');
+    if (response.status === 422) throw new Error(backendMessage || 'Datos con formato inválido');
     if (response.status === 400) throw new Error(backendMessage || 'Campos obligatorios faltantes');
     throw new Error(backendMessage || 'No se pudo registrar la cuenta bancaria');
   }
@@ -81,7 +81,7 @@ export async function addCreditCard(data, token) {
 
   if (!response.ok) {
     if (response.status === 401) throw new Error('Sesión expirada. Volvé a iniciar sesión.');
-    if (response.status === 422) throw new Error('Número de tarjeta o vencimiento inválido');
+    if (response.status === 422) throw new Error(backendMessage || 'Número de tarjeta o vencimiento inválido');
     if (response.status === 400) throw new Error(backendMessage || 'Campos obligatorios faltantes');
     throw new Error(backendMessage || 'No se pudo registrar la tarjeta');
   }
@@ -109,7 +109,7 @@ export async function addCertifiedCheck(data, token) {
 
   if (!response.ok) {
     if (response.status === 401) throw new Error('Sesión expirada. Volvé a iniciar sesión.');
-    if (response.status === 422) throw new Error('Monto inválido o fecha mal formada');
+    if (response.status === 422) throw new Error(backendMessage || 'Monto inválido o fecha mal formada');
     if (response.status === 400) throw new Error(backendMessage || 'Campos obligatorios faltantes');
     throw new Error(backendMessage || 'No se pudo registrar el cheque');
   }
