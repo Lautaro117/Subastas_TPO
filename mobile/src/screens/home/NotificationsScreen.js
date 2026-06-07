@@ -74,7 +74,7 @@ export default function NotificationsScreen({ navigation }) {
             iconColor={COLORS.onSurface}
             size={22}
             style={styles.backButton}
-            onPress={() => navigation.navigate('HomePerfil')}
+            onPress={() => navigation.goBack()}
           />
           <Text style={styles.title}>Notificaciones</Text>
         </View>

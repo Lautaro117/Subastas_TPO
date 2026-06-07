@@ -11,12 +11,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Appbar,
+  Button,
   Chip,
+  Dialog,
+  IconButton,
+  Portal,
   Snackbar,
   Surface,
   Text,
   useTheme,
 } from 'react-native-paper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAppSession } from '../../navigation/AppSessionContext';
 import { getItemDetail } from '../../services/auctionsApi';
@@ -37,13 +42,29 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
   const theme = useTheme();
   const { session } = useAppSession();
   const token = session.token;
-  const userEstado = decodeJwtPayload(token ?? '').estado; // 'E1' | 'E2' | 'E3' | 'E4'
+  const userEstado = decodeJwtPayload(token ?? '').estado;
+
+  const STORAGE_KEY = `@subastas:notificados:${auctionId}`;
 
   const [detalle, setDetalle] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [fotoIndex, setFotoIndex] = useState(0);
   const [snackbar, setSnackbar] = useState(null);
+  const [notificado, setNotificado] = useState(false);
+  const [modalNotificar, setModalNotificar] = useState(false);
 
+  // ─── Cargar estado de notificación desde AsyncStorage ──────────────────────
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((stored) => {
+        if (stored) {
+          const ids = new Set(JSON.parse(stored));
+          setNotificado(ids.has(itemId));
+        }
+      })
+      .catch(() => {});
+  }, [STORAGE_KEY, itemId]);
+
+  // ─── Fetch detalle ─────────────────────────────────────────────────────────
   const fetchDetalle = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -58,8 +79,23 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
 
   useEffect(() => { fetchDetalle(); }, [fetchDetalle]);
 
+  // ─── Confirmar notificación ────────────────────────────────────────────────
+  const handleConfirmarNotificar = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      const ids = new Set(stored ? JSON.parse(stored) : []);
+      ids.add(itemId);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
+      setNotificado(true);
+    } catch {}
+    setModalNotificar(false);
+    setSnackbar('Te notificaremos cuando comience.');
+  };
+
   const titulo = detalle?.descripcionCatalogo ?? `Producto #${detalle?.productoId ?? itemParam?.productoId}`;
   const fotos = detalle?.fotos ?? [];
+  const primeraFoto = fotos.length > 0 ? fotos[0] : null;
+  const subastado = detalle?.subastado === 'si' || itemParam?.subastado === 'si';
 
   if (isLoading) {
     return (
@@ -80,50 +116,26 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
       <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title={titulo} titleStyle={styles.appbarTitle} numberOfLines={1} />
+        {/* Campana de notificación */}
+        {!subastado && (
+          <IconButton
+            icon={notificado ? 'bell' : 'bell-outline'}
+            iconColor={notificado ? theme.colors.primary : theme.colors.onSurfaceVariant}
+            size={22}
+            onPress={() => setModalNotificar(true)}
+          />
+        )}
       </Appbar.Header>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Fotos */}
-        {fotos.length > 0 ? (
-          <View>
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onMomentumScrollEnd={(e) => {
-                const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-                setFotoIndex(index);
-              }}
-            >
-              {fotos.map((foto, idx) => (
-                <Image
-                  key={idx}
-                  source={{ uri: `data:image/jpeg;base64,${foto}` }}
-                  style={styles.foto}
-                  resizeMode="cover"
-                />
-              ))}
-            </ScrollView>
-            {/* Indicador de fotos */}
-            {fotos.length > 1 && (
-              <View style={styles.dotsRow}>
-                {fotos.map((_, idx) => (
-                  <View
-                    key={idx}
-                    style={[
-                      styles.dot,
-                      {
-                        backgroundColor: idx === fotoIndex
-                          ? theme.colors.primary
-                          : theme.colors.surfaceContainerHigh,
-                      },
-                    ]}
-                  />
-                ))}
-              </View>
-            )}
-          </View>
+        {/* Foto principal */}
+        {primeraFoto ? (
+          <Image
+            source={{ uri: `data:image/jpeg;base64,${primeraFoto}` }}
+            style={styles.foto}
+            resizeMode="cover"
+          />
         ) : (
           <View style={[styles.fotoPlaceholder, { backgroundColor: theme.colors.surfaceContainerLow }]}>
             <Text style={{ fontSize: 48 }}>📦</Text>
@@ -133,7 +145,7 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
         <View style={styles.body}>
           {/* Chips de estado */}
           <View style={styles.chipsRow}>
-            {detalle?.subastado === 'si' && (
+            {subastado && (
               <Chip
                 compact
                 style={{ backgroundColor: theme.colors.surfaceContainerHigh }}
@@ -179,7 +191,6 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
             elevation={0}
             style={[styles.infoCard, { backgroundColor: theme.colors.surfaceContainerLow }]}
           >
-            {/* Precio base — censurado si el usuario es E2 */}
             {userEstado === 'E2' ? (
               <TouchableOpacity
                 onPress={() => navigation.navigate('HomePerfil', { screen: 'PaymentMethods' })}
@@ -209,6 +220,7 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
                 </Text>
               </View>
             ) : null}
+
             {detalle?.comision != null && (
               <View style={styles.infoRow}>
                 <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>
@@ -220,8 +232,50 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
               </View>
             )}
           </Surface>
+
+          {/* Botón ingresar a la subasta */}
+          {!subastado && auctionId && (
+            <Button
+              mode="contained"
+              onPress={() => navigation.navigate('SalaSubasta', {
+                auctionId,
+                auction: { identificador: auctionId },
+              })}
+              style={styles.ingresarButton}
+              contentStyle={styles.ingresarButtonContent}
+            >
+              Ingresar a la Subasta
+            </Button>
+          )}
         </View>
       </ScrollView>
+
+      {/* Modal notificación */}
+      <Portal>
+        <Dialog
+          visible={modalNotificar}
+          onDismiss={() => setModalNotificar(false)}
+          style={{ backgroundColor: theme.colors.surfaceContainerHigh, borderRadius: 24 }}
+        >
+          <Dialog.Icon icon="bell-outline" color={theme.colors.primary} />
+          <Dialog.Title style={{ textAlign: 'center', color: theme.colors.onSurface }}>
+            Notificar producto
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
+              ¿Querés recibir una notificación cuando esté por comenzar la subasta de este producto?
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions style={{ justifyContent: 'center', gap: 16 }}>
+            <Button onPress={() => setModalNotificar(false)} textColor={theme.colors.onSurfaceVariant}>
+              Cancelar
+            </Button>
+            <Button onPress={handleConfirmarNotificar} textColor={theme.colors.primary}>
+              Confirmar
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
       <Snackbar visible={!!snackbar} onDismiss={() => setSnackbar(null)} duration={4000}>
         {snackbar}
@@ -235,37 +289,18 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   appbarTitle: { fontSize: 16, fontWeight: '600' },
 
-  foto: {
-    width: SCREEN_WIDTH,
-    height: 280,
-  },
+  foto: { width: SCREEN_WIDTH, height: 280 },
   fotoPlaceholder: {
     width: '100%',
     height: 280,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dotsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 999,
-  },
 
   content: { paddingBottom: 40 },
   body: { paddingHorizontal: 20, paddingTop: 20 },
 
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   fecha: {
     fontSize: 12,
     fontWeight: '600',
@@ -285,11 +320,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  infoCard: {
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
-  },
+  infoCard: { borderRadius: 12, padding: 16, gap: 12 },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -308,13 +339,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  precioBaseBloqueado: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 2,
+  precioBaseBloqueado: { fontSize: 14, fontWeight: '600', letterSpacing: 2 },
+  precioBaseMsg: { fontSize: 12, fontWeight: '500' },
+
+  ingresarButton: {
+    borderRadius: 28,
+    marginTop: 24,
   },
-  precioBaseMsg: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
+  ingresarButtonContent: { paddingVertical: 6 },
 });

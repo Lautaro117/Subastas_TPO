@@ -116,9 +116,19 @@ function CatalogoRow({ item, isActivo, notificado, onBellPress, onPress }) {
         },
       ]}
     >
+      {/* Thumb: foto o emoji */}
       <View style={[styles.catalogoThumb, { backgroundColor: theme.colors.surfaceContainerHigh }]}>
-        <Text style={{ fontSize: 18 }}>📦</Text>
+        {item.fotoPrincipal ? (
+          <Image
+            source={{ uri: `data:image/jpeg;base64,${item.fotoPrincipal}` }}
+            style={{ width: 48, height: 48, borderRadius: 10 }}
+            resizeMode="cover"
+          />
+        ) : (
+          <Text style={{ fontSize: 18 }}>📦</Text>
+        )}
       </View>
+
       <View style={styles.catalogoRowText}>
         <Text
           style={[styles.catalogoRowTitle, {
@@ -126,7 +136,7 @@ function CatalogoRow({ item, isActivo, notificado, onBellPress, onPress }) {
           }]}
           numberOfLines={1}
         >
-          Producto #{item.productoId}
+          {item.descripcionCatalogo ?? `Producto #${item.productoId}`}
         </Text>
         {item.precioBase != null && (
           <Text style={[styles.catalogoRowSub, {
