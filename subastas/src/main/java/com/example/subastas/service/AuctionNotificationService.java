@@ -1,11 +1,12 @@
 package com.example.subastas.service;
 
-import com.example.subastas.dto.AuctionEventDTO;
+import java.math.BigDecimal;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
+import com.example.subastas.dto.AuctionEventDTO;
 
 @Service
 public class AuctionNotificationService {
@@ -30,4 +31,11 @@ public class AuctionNotificationService {
         String destination = "/topic/auction/" + subastaId;
         messagingTemplate.convertAndSend(destination, new AuctionEventDTO("item.next", itemData));
     }
+
+    public void notificarCierre(Integer subastaId) {
+        String destination = "/topic/auction/" + subastaId;
+        messagingTemplate.convertAndSend(destination, new AuctionEventDTO("auction.closed", null));
+    }
+ 
+
 }

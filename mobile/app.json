@@ -1,4 +1,6 @@
+
 {
+  "import": "text-encoding",
   "expo": {
     "name": "mobile",
     "slug": "mobile",

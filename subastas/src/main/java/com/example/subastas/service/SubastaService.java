@@ -346,4 +346,8 @@ public class SubastaService {
         response.setWebsocketUrl("/ws/auction/" + subastaId);
         return response;
     }
+
+    public void notificarCierre(Integer subastaId) {
+    auctionNotificationService.notificarCierre(subastaId);
+}
 }

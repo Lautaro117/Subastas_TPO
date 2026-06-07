@@ -144,4 +144,6 @@ public class SubastaController {
         ProductoDetalleDTO dto = subastaService.obtenerDetalleProducto(id, itemId, estado);
         return ResponseEntity.ok(dto);
     }
+
+
 }

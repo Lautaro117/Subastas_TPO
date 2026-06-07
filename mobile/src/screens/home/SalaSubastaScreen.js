@@ -26,7 +26,9 @@ import {
 import Svg, { Circle } from 'react-native-svg';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Client } from '@stomp/stompjs';
 import { useAppSession } from '../../navigation/AppSessionContext';
+import { API_BASE_URL } from '../../config/api';
 import {
   getAuctionCatalog,
   getAuctionLive,
@@ -273,11 +275,68 @@ export default function SalaSubastaScreen({ navigation, route }) {
         if (prev <= 1) {
           clearInterval(countdownRef.current);
           setFase('sala');
+          connectWebSocket();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
+  }
+
+  // ─── WebSocket STOMP ─────────────────────────────────────────────────────────
+  function connectWebSocket() {
+    const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + '/ws';
+
+    const client = new Client({
+      brokerURL: wsUrl,
+      connectHeaders: { Authorization: `Bearer ${token}` },
+      reconnectDelay: 3000,
+      onConnect: () => {
+        client.subscribe(`/topic/auction/${auctionId}`, (msg) => {
+          try {
+            const event = JSON.parse(msg.body);
+            handleWebSocketEvent(event);
+          } catch {}
+        });
+      },
+      onStompError: () => setSnackbar('Error en la conexión en tiempo real.'),
+    });
+
+    client.activate();
+    stompClientRef.current = client;
+  }
+
+  // ─── Manejo de eventos WebSocket ─────────────────────────────────────────────
+  function handleWebSocketEvent(event) {
+    switch (event.tipo) {
+      case 'bid.new':
+        // Nueva puja — refrescar estado via REST
+        getAuctionLive(token, auctionId)
+          .then((live) => { if (live) setSalaData(live); })
+          .catch(() => {});
+        break;
+
+      case 'item.next':
+        // Siguiente ítem — refrescar catálogo y sala
+        Promise.all([
+          getAuctionCatalog(token, auctionId),
+          getAuctionLive(token, auctionId),
+        ]).then(([cat, live]) => {
+          if (cat) setCatalogo(Array.isArray(cat) ? cat : []);
+          if (live) setSalaData(live);
+        }).catch(() => {});
+        break;
+
+      case 'auction.closed':
+        // Subasta cerrada — ir a pantalla de resultado
+        stompClientRef.current?.deactivate?.();
+        clearInterval(countdownRef.current);
+        navigation.replace('ResultadoSubasta', { auctionId });
+        break;
+
+      default:
+        break;
+    }
   }
 
   // ─── Salir ──────────────────────────────────────────────────────────────────
@@ -560,10 +619,18 @@ export default function SalaSubastaScreen({ navigation, route }) {
       </Appbar.Header>
 
       <ScrollView contentContainerStyle={styles.previewContent}>
-        {/* Foto placeholder */}
-        <View style={[styles.fotoPlaceholder, { backgroundColor: theme.colors.surfaceContainerLow }]}>
-          <Text style={{ color: theme.colors.onSurfaceVariant, fontSize: 40 }}>📦</Text>
-        </View>
+        {/* Foto del primer ítem del catálogo */}
+        {catalogo[0]?.fotoPrincipal ? (
+          <Image
+            source={{ uri: `data:image/jpeg;base64,${catalogo[0].fotoPrincipal}` }}
+            style={styles.fotoProducto}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.fotoPlaceholder, { backgroundColor: theme.colors.surfaceContainerLow }]}>
+            <Text style={{ color: theme.colors.onSurfaceVariant, fontSize: 40 }}>📦</Text>
+          </View>
+        )}
 
         {/* Header catálogo */}
         <View style={styles.catalogoHeader}>
