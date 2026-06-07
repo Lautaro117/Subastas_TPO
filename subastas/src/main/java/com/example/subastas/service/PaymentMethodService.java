@@ -39,6 +39,21 @@ public class PaymentMethodService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Campos obligatorios faltantes");
         }
 
+        // Validación de fondos positivos
+        if (dto.getFondos_reservados().doubleValue() <= 0) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Los fondos reservados deben ser mayores a cero");
+        }
+
+        // Validación de longitud de CBU/IBAN
+        String cbuLimpio = dto.getCbu_iban().replaceAll("\\s", "");
+        if (dto.getPais_banco().equalsIgnoreCase("Argentina") || dto.getPais_banco().equalsIgnoreCase("AR")) {
+            if (cbuLimpio.length() != 22 || !cbuLimpio.matches("\\d+")) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "El CBU debe tener exactamente 22 dígitos");
+            }
+        } else if (cbuLimpio.length() < 15) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "El IBAN/Cuenta es demasiado corto");
+        }
+
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
@@ -108,10 +123,19 @@ public class PaymentMethodService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Campos faltantes o confirmación es false");
         }
 
+        LocalDate fechaEmision;
         try {
-            LocalDate.parse(dto.getFecha_emision());
+            fechaEmision = LocalDate.parse(dto.getFecha_emision());
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Fecha mal formada");
+        }
+
+        LocalDate hoy = LocalDate.now();
+        if (fechaEmision.isAfter(hoy)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "La fecha de emisión no puede ser futura");
+        }
+        if (fechaEmision.isBefore(hoy.minusDays(30))) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "El cheque tiene más de 30 días de antigüedad");
         }
 
         var usuario = usuarioAuthRepository.findByEmail(email)
