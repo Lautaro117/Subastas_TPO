@@ -5,18 +5,18 @@ import { Button, HelperText, IconButton, Text, useTheme } from 'react-native-pap
 
 import { AuthTextInput } from '../../components';
 import { registerSharedStyles } from './sharedStyles';
-import { loginRequest, resetPasswordApi } from '../../services/authApi';
+import { loginRequest, registerCompleteApi } from '../../services/authApi';
 import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
 import { useAppSession } from '../../navigation/AppSessionContext';
 
 export default function RegisterFinalizePasswordScreen({ navigation, route }) {
   const theme = useTheme();
-  const { registerForm } = useRegisterFlow();
+  const { registerForm, registerStatus } = useRegisterFlow();
   const { setAuthToken, enterApp } = useAppSession();
 
-  // Token y email pueden venir como params (desde LoginScreen)
-  // o el token puede venir del contexto (flujo legacy)
-  const tokenParam = route?.params?.tokenRegistro ?? null;
+  // Token viene como param (desde LoginScreen con contraseña de un solo uso)
+  // o del contexto (desde RegisterVerificationScreen al detectar aprobación)
+  const tokenParam = route?.params?.tokenRegistro ?? registerStatus.token ?? null;
   const emailParam = route?.params?.email ?? registerForm.email ?? '';
 
   const [password, setPassword] = useState('');
@@ -66,7 +66,7 @@ export default function RegisterFinalizePasswordScreen({ navigation, route }) {
 
     setIsSubmitting(true);
     try {
-      await resetPasswordApi({ token: tokenParam, password });
+      await registerCompleteApi({ token: tokenParam, password });
 
       // Auto-login después de setear la contraseña
       try {
