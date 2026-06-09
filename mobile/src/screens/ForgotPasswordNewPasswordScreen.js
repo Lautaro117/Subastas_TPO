@@ -7,16 +7,22 @@ import { AuthPrimaryButton, AuthTextInput } from '../components';
 import { registerSharedStyles } from './register/sharedStyles';
 import { resetPasswordApi } from '../services/authApi';
 
-export default function ForgotPasswordNewPasswordScreen({ navigation, route }) {
+export default function ForgotPasswordNewPasswordScreen({ navigation }) {
   const theme = useTheme();
-  const { token } = route.params ?? {};
 
+  const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [touched, setTouched] = useState({ password: false, confirmPassword: false });
+  const [touched, setTouched] = useState({ code: false, password: false, confirmPassword: false });
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+
+  const codeError = useMemo(() => {
+    if (!code.trim()) return 'El código es requerido';
+    if (!/^\d{6}$/.test(code.trim())) return 'El código debe tener 6 dígitos';
+    return '';
+  }, [code]);
 
   const passwordStrength = useMemo(() => {
     const trimmed = password.trim();
@@ -46,7 +52,8 @@ export default function ForgotPasswordNewPasswordScreen({ navigation, route }) {
     return '';
   }, [password, confirmPassword]);
 
-  const isValid = !passwordError && !confirmError;
+  const isValid = !codeError && !passwordError && !confirmError;
+  const showCodeError = (touched.code || submitted) && !!codeError;
   const showPasswordError = (touched.password || submitted) && !!passwordError;
   const showConfirmError = (touched.confirmPassword || submitted) && !!confirmError;
 
@@ -55,11 +62,11 @@ export default function ForgotPasswordNewPasswordScreen({ navigation, route }) {
     setSubmitted(true);
     setSubmitError('');
 
-    if (!isValid || !token) return;
+    if (!isValid) return;
 
     setIsSubmitting(true);
     try {
-      await resetPasswordApi({ token, password });
+      await resetPasswordApi({ token: code.trim(), password });
       navigation.navigate('Login');
     } catch (error) {
       setSubmitError(error.message || 'No se pudo restablecer la contraseña');
@@ -93,8 +100,25 @@ export default function ForgotPasswordNewPasswordScreen({ navigation, route }) {
             </View>
 
             <Text style={[registerSharedStyles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
-              Elegí una contraseña segura para tu cuenta.
+              Ingresá el código de 6 dígitos que recibiste por email y elegí una nueva contraseña.
             </Text>
+
+            <View style={styles.inputBlock}>
+              <AuthTextInput
+                value={code}
+                onChangeText={(v) => { setCode(v); setSubmitError(''); }}
+                onBlur={() => setTouched((prev) => ({ ...prev, code: true }))}
+                label="Código de verificación"
+                placeholder="123456"
+                icon="shield-key-outline"
+                keyboardType="numeric"
+                maxLength={6}
+                error={showCodeError}
+              />
+              <HelperText type="error" visible={showCodeError} style={{ color: theme.colors.error }}>
+                {codeError}
+              </HelperText>
+            </View>
 
             <View style={styles.inputBlock}>
               <AuthTextInput
@@ -141,7 +165,7 @@ export default function ForgotPasswordNewPasswordScreen({ navigation, route }) {
             <View style={registerSharedStyles.bottomRow}>
               <AuthPrimaryButton
                 loading={isSubmitting}
-                disabled={!isValid || isSubmitting || !token}
+                disabled={!isValid || isSubmitting}
                 onPress={handleSubmit}
               >
                 Confirmar

@@ -62,14 +62,12 @@ public class AuthController {
     }
 
     @PostMapping("/password/reset-request")
-    public ResponseEntity<String> resetRequest(@RequestBody ResetRequestDTO request) {
-        String token = authService.resetRequest(request.getEmail());
-
-        if (token == null || token.isBlank()) {
+    public ResponseEntity<Void> resetRequest(@RequestBody ResetRequestDTO request) {
+        boolean encontrado = authService.resetRequest(request.getEmail());
+        if (!encontrado) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
-
-        return ResponseEntity.ok(token);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/password/reset")
