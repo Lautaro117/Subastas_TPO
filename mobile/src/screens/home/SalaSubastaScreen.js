@@ -212,6 +212,7 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
   const [modalSalir, setModalSalir] = useState(false);
   const [modalSinMedioPago, setModalSinMedioPago] = useState(false);
+  const [modalCategoriaInsuficiente, setModalCategoriaInsuficiente] = useState(false);
   const [modalNotificar, setModalNotificar] = useState(null);
   const [snackbar, setSnackbar] = useState(null);
 
@@ -259,8 +260,11 @@ export default function SalaSubastaScreen({ navigation, route }) {
       startWarmup();
     } catch (err) {
       if (err.status === 409) setSnackbar('Ya estás en otra sala. Salí primero.');
-      else if (err.status === 403) setSnackbar('No tenés acceso a esta subasta.');
-      else setSnackbar('No se pudo unir a la sala.');
+      else if (err.status === 403) {
+        const msg = err.message ?? '';
+        if (msg.toLowerCase().includes('categoría')) setModalCategoriaInsuficiente(true);
+        else setSnackbar('No tenés acceso a esta subasta.');
+      } else setSnackbar('No se pudo unir a la sala.');
     } finally {
       setJoining(false);
     }
@@ -432,6 +436,25 @@ export default function SalaSubastaScreen({ navigation, route }) {
             >
               Registrarse
             </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog
+          visible={modalCategoriaInsuficiente}
+          onDismiss={() => setModalCategoriaInsuficiente(false)}
+          style={{ backgroundColor: theme.colors.surfaceContainerHigh, borderRadius: 24 }}
+        >
+          <Dialog.Icon icon="lock-outline" color={theme.colors.error} />
+          <Dialog.Title style={{ textAlign: 'center', color: theme.colors.onSurface }}>
+            Categoría Insuficiente
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
+              Tu categoría de usuario no cumple el requisito mínimo para participar en esta subasta.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions style={{ justifyContent: 'center' }}>
+            <Button onPress={() => setModalCategoriaInsuficiente(false)} textColor={theme.colors.primary}>Entendido</Button>
           </Dialog.Actions>
         </Dialog>
 

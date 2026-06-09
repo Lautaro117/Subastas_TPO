@@ -9,8 +9,9 @@ export async function getMultaActiva(token) {
     method: 'GET',
     headers: buildAuthHeaders(token),
   });
+  if (response.status === 404) return null;
   if (!response.ok) throw new Error(`Error al obtener multa: ${response.status}`);
-  return response.json(); // puede ser null
+  return response.json();
 }
 
 

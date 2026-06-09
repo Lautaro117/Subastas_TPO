@@ -8,6 +8,8 @@ import { getMisProductos, getMisCompras } from '../../services/itemsApi';
 
 const ESTADO_LABEL = {
   pendiente: 'Pendiente',
+  enviar_deposito: 'Enviar al depósito',
+  en_deposito: 'En depósito',
   aprobado: 'Aprobado',
   rechazado: 'Rechazado',
 };
@@ -31,6 +33,8 @@ function ProductoCard({ item, onPress }) {
 
   const estadoColor = {
     pendiente: theme.colors.onSurfaceVariant,
+    enviar_deposito: '#FFA726',
+    en_deposito: '#42A5F5',
     aprobado: '#4CAF50',
     rechazado: theme.colors.error,
   }[item.estadoAdmin] || theme.colors.onSurfaceVariant;

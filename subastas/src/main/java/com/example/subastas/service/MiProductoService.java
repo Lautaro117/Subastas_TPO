@@ -71,14 +71,16 @@ public class MiProductoService {
         return productoRepository.findByDuenio(clienteId).stream().map(p -> {
             AdminProducto ap = adminProductoRepository.findByProductoId(p.getIdentificador()).orElse(null);
             return new MiProductoDTO(
-            p.getIdentificador(),
-            p.getDescripcionCatalogo(),
-            p.getDescripcionCompleta(),
-            p.getEstadoAdmin(),
-            ap != null ? ap.getEstadoPropuesta() : null,
-            ap != null ? ap.getPrecioPropuesto() : null,
-            null
-        );
+                p.getIdentificador(),
+                p.getDescripcionCatalogo(),
+                p.getDescripcionCompleta(),
+                p.getEstadoAdmin(),
+                ap != null ? ap.getEstadoPropuesta() : null,
+                ap != null ? ap.getPrecioPropuesto() : null,
+                ap != null ? ap.getComision() : null,
+                ap != null ? ap.getFechaSubasta() : null,
+                null
+            );
         }).collect(Collectors.toList());
     }
 
@@ -159,6 +161,9 @@ public class MiProductoService {
 
         ap.setEstadoPropuesta("propuesta_rechazada");
         adminProductoRepository.save(ap);
+
+        producto.setEstadoAdmin("rechazado");
+        productoRepository.save(producto);
     }
 
     public CustodiaDTO getCustodia(String email, Integer productoId) {
@@ -215,6 +220,8 @@ public class MiProductoService {
             producto.getEstadoAdmin(),
             ap != null ? ap.getEstadoPropuesta() : null,
             ap != null ? ap.getPrecioPropuesto() : null,
+            ap != null ? ap.getComision() : null,
+            ap != null ? ap.getFechaSubasta() : null,
             fotosBase64
         );
     }

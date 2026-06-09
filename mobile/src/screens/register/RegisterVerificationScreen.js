@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, Button, IconButton, Text, useTheme } from 'react-native-paper';
+import { ActivityIndicator, Button, Icon, IconButton, Surface, Text, useTheme } from 'react-native-paper';
 
 import { useAppSession } from '../../navigation/AppSessionContext';
 import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
@@ -15,6 +15,7 @@ export default function RegisterVerificationScreen({ navigation }) {
   const { registerStatus, setRegistrationToken } = useRegisterFlow();
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [statusError, setStatusError] = useState('');
+  const [aprobado, setAprobado] = useState(false);
   console.log('solicitudId:', registerStatus.solicitudId);
 
   useEffect(() => {
@@ -41,7 +42,8 @@ export default function RegisterVerificationScreen({ navigation }) {
           if (response?.tokenRegistro) {
             setRegistrationToken(response.tokenRegistro);
           }
-          navigation.replace('RegisterFinalizePassword');
+          clearInterval(intervalId);
+          setAprobado(true);
         }
       } catch (_error) {
         if (isActive) {
@@ -64,7 +66,7 @@ export default function RegisterVerificationScreen({ navigation }) {
         clearInterval(intervalId);
       }
     };
-  }, [navigation, registerStatus.solicitudId]);
+  }, [registerStatus.solicitudId]);
 
   return (
     <SafeAreaView style={[registerSharedStyles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -85,26 +87,55 @@ export default function RegisterVerificationScreen({ navigation }) {
             revision manual.
           </Text>
 
-          <View style={styles.statusRow}>
-            {isCheckingStatus ? <ActivityIndicator size="small" color={theme.colors.primary} /> : null}
-            <Text style={[styles.statusText, { color: theme.colors.onSurfaceVariant }]}> 
-              Verificando estado cada 30 segundos...
-            </Text>
-          </View>
+          {aprobado ? (
+            <Surface
+              elevation={0}
+              style={[styles.approvalBanner, { backgroundColor: theme.colors.primaryContainer }]}
+            >
+              <Icon source="check-circle-outline" size={28} color={theme.colors.primary} />
+              <View style={styles.approvalText}>
+                <Text style={[styles.approvalTitle, { color: theme.colors.onPrimaryContainer }]}>
+                  ¡Tu cuenta fue aprobada!
+                </Text>
+                <Text style={[styles.approvalSub, { color: theme.colors.onPrimaryContainer }]}>
+                  Aceptá para finalizar el registro y activar tu cuenta.
+                </Text>
+              </View>
+            </Surface>
+          ) : (
+            <View style={styles.statusRow}>
+              {isCheckingStatus ? <ActivityIndicator size="small" color={theme.colors.primary} /> : null}
+              <Text style={[styles.statusText, { color: theme.colors.onSurfaceVariant }]}>
+                Verificando estado cada 30 segundos...
+              </Text>
+            </View>
+          )}
 
           {statusError ? <Text style={[styles.statusError, { color: theme.colors.error }]}>{statusError}</Text> : null}
         </View>
 
         <View style={styles.bottomArea}>
-          <Button
-            mode="contained-tonal"
-            onPress={async () => { await enterAsGuestLoginWithPending(registerStatus.solicitudId); }}
-            style={[styles.secondaryButton, { backgroundColor: theme.colors.surfaceContainerLow }]}
-            labelStyle={[styles.secondaryLabel, { color: theme.colors.onSurface }]}
-            contentStyle={styles.secondaryContent}
-          >
-            Continuar como invitado
-          </Button>
+          {aprobado ? (
+            <Button
+              mode="contained"
+              onPress={() => navigation.replace('RegisterFinalizePassword')}
+              style={styles.primaryButton}
+              labelStyle={[styles.primaryLabel, { color: theme.colors.onPrimary }]}
+              contentStyle={styles.secondaryContent}
+            >
+              Aceptar y finalizar registro
+            </Button>
+          ) : (
+            <Button
+              mode="contained-tonal"
+              onPress={async () => { await enterAsGuestLoginWithPending(registerStatus.solicitudId); }}
+              style={[styles.secondaryButton, { backgroundColor: theme.colors.surfaceContainerLow }]}
+              labelStyle={[styles.secondaryLabel, { color: theme.colors.onSurface }]}
+              contentStyle={styles.secondaryContent}
+            >
+              Continuar como invitado
+            </Button>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -160,5 +191,34 @@ const styles = StyleSheet.create({
   secondaryLabel: {
     fontSize: 15,
     fontWeight: '500',
+  },
+  primaryButton: {
+    borderRadius: 999,
+  },
+  primaryLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  approvalBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 28,
+    width: '100%',
+  },
+  approvalText: {
+    flex: 1,
+    gap: 4,
+  },
+  approvalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  approvalSub: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

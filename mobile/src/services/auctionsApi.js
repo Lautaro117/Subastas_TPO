@@ -2,13 +2,15 @@ import { buildApiUrl, buildAuthHeaders } from '../config/api';
 
 /**
  * GET /api/auctions
- * Devuelve todas las subastas accesibles según la categoría del usuario.
- * El backend filtra por categoría usando los claims del JWT.
+ * Endpoint público — devuelve todas las subastas. Token opcional.
  */
 export async function getAuctions(token) {
+  const headers = { Accept: 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   const response = await fetch(buildApiUrl('/api/auctions'), {
     method: 'GET',
-    headers: buildAuthHeaders(token),
+    headers,
   });
 
   if (!response.ok) {
@@ -65,7 +67,7 @@ export async function joinAuction(token, id) {
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    const error = new Error(body.message || `Error al unirse a la subasta: ${response.status}`);
+    const error = new Error(body.detail || body.message || `Error al unirse a la subasta: ${response.status}`);
     error.status = response.status;
     throw error;
   }

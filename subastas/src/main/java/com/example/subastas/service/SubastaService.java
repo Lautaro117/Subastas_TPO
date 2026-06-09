@@ -82,12 +82,8 @@ public class SubastaService {
             "comun", "especial", "plata", "oro", "platino"
     );
 
-    public List<Subasta> listarPorCategoria(String categoriaUsuario) {
-        List<Subasta> todas = subastaRepository.findAll();
-        int nivelUsuario = ORDEN_CATEGORIAS.indexOf(categoriaUsuario);
-        return todas.stream()
-                .filter(s -> ORDEN_CATEGORIAS.indexOf(s.getCategoria()) <= nivelUsuario)
-                .toList();
+    public List<Subasta> listarTodas() {
+        return subastaRepository.findAll();
     }
 
     public Subasta buscarPorId(Integer id) {
@@ -181,10 +177,15 @@ public class SubastaService {
     }
 
     @Transactional
-    public SalaResponse unirseASala(Integer subastaId, String email) {
+    public SalaResponse unirseASala(Integer subastaId, String email, String categoriaUsuario) {
         Subasta subasta = buscarPorId(subastaId);
         if (!"abierta".equalsIgnoreCase(subasta.getEstado())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La subasta no está activa o ya finalizó");
+        }
+        int nivelUsuario = ORDEN_CATEGORIAS.indexOf(categoriaUsuario);
+        int nivelSubasta = ORDEN_CATEGORIAS.indexOf(subasta.getCategoria());
+        if (nivelUsuario < 0 || nivelUsuario < nivelSubasta) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tu categoría no permite participar en esta subasta");
         }
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));

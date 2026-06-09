@@ -87,6 +87,10 @@ export async function rechazarPropuesta(token, productoId) {
   });
 }
 
+export async function getCustodia(token, productoId) {
+  return authedRequest(`/api/my-items/${productoId}/custody`, token);
+}
+
 export async function getMisCompras(token) {
   return authedRequest('/api/my-purchases', token);
 }

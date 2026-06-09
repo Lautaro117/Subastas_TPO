@@ -34,12 +34,8 @@ public class SubastaController {
     private JwtUtil jwtUtil;
 
     @GetMapping
-    public ResponseEntity<List<Subasta>> listarSubastas(
-            @RequestHeader("Authorization") String authHeader) {
-        String token = authHeader.substring(7);
-        String categoria = jwtUtil.extractCategoria(token);
-        List<Subasta> subastas = subastaService.listarPorCategoria(categoria);
-        return ResponseEntity.ok(subastas);
+    public ResponseEntity<List<Subasta>> listarSubastas() {
+        return ResponseEntity.ok(subastaService.listarTodas());
     }
 
     @GetMapping("/{id}")
@@ -74,7 +70,8 @@ public class SubastaController {
             @RequestHeader("Authorization") String authHeader) {
         String token = authHeader.substring(7);
         String email = jwtUtil.extractEmail(token);
-        SalaResponse response = subastaService.unirseASala(id, email);
+        String categoria = jwtUtil.extractCategoria(token);
+        SalaResponse response = subastaService.unirseASala(id, email, categoria);
         return ResponseEntity.ok(response);
     }
 

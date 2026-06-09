@@ -1,6 +1,7 @@
 package com.example.subastas.model;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,6 +24,12 @@ public class AdminProducto {
     @Column(name = "estado_propuesta")
     private String estadoPropuesta;
 
+    @Column(name = "comision")
+    private BigDecimal comision;
+
+    @Column(name = "fecha_subasta")
+    private LocalDate fechaSubasta;
+
     // getters y setters
     public Integer getProductoId() { return productoId; }
     public void setProductoId(Integer productoId) { this.productoId = productoId; }
@@ -35,4 +42,10 @@ public class AdminProducto {
 
     public String getEstadoPropuesta() { return estadoPropuesta; }
     public void setEstadoPropuesta(String estadoPropuesta) { this.estadoPropuesta = estadoPropuesta; }
+
+    public BigDecimal getComision() { return comision; }
+    public void setComision(BigDecimal comision) { this.comision = comision; }
+
+    public LocalDate getFechaSubasta() { return fechaSubasta; }
+    public void setFechaSubasta(LocalDate fechaSubasta) { this.fechaSubasta = fechaSubasta; }
 }
