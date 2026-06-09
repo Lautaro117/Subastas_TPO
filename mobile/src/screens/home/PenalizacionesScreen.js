@@ -86,6 +86,20 @@ export default function PenalizacionesScreen({ navigation }) {
       })
     : null;
 
+    if (isLoading || multa === undefined) {
+      return (
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+          <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
+            <Appbar.BackAction onPress={() => navigation.goBack()} />
+            <Appbar.Content title="Penalizaciones" />
+          </Appbar.Header>
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </View>
+        </SafeAreaView>
+      );
+    }
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
@@ -117,7 +131,7 @@ export default function PenalizacionesScreen({ navigation }) {
               styles.multaCard,
               {
                 backgroundColor: theme.colors.surfaceContainerLowest,
-                borderColor: multa.estado === 'pendiente' ? '#FF6B6B' : theme.colors.outline,
+                borderColor: multa?.estado === 'pendiente' ? '#FF6B6B' : theme.colors.outline,
               },
             ]}
           >
