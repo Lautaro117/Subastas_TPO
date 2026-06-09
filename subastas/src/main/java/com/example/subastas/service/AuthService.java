@@ -75,34 +75,55 @@ public class AuthService {
     private EntityManager entityManager;
 
     public LoginResponse login(LoginRequest request) {
-        UsuarioAuth usuario = usuarioAuthRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED, "Credenciales incorrectas"));
-
-        if (!passwordEncoder.matches(request.getPassword(), usuario.getPasswordHash())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas");
+    UsuarioAuth usuario = usuarioAuthRepository.findByEmail(request.getEmail())
+            .orElseThrow(() -> new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "Credenciales incorrectas"));
+ 
+    Cliente cliente = clienteRepository.findById(usuario.getClienteId())
+            .orElseThrow(() -> new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "Cliente no encontrado"));
+ 
+    // Caso 1: el usuario ingresó el token de registro en lugar de la contraseña
+    // → redirigir al flujo de finalizar registro
+    if (usuario.getTokenRegistro() != null
+            && usuario.getTokenRegistro().equals(request.getPassword())) {
+ 
+        if (!"si".equals(cliente.getAdmitido())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tu cuenta aún no fue aprobada");
         }
-
-        Cliente cliente = clienteRepository.findById(usuario.getClienteId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED, "Cliente no encontrado"));
-
-        if ("no".equals(cliente.getAdmitido())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cuenta bloqueada");
-        }
-
-        String token = jwtUtil.generateToken(
+ 
+        // Devolvemos una respuesta especial con estado "PENDING_PASSWORD"
+        // El frontend detecta este estado y navega a RegisterFinalizePasswordScreen
+        return new LoginResponse(
+                usuario.getTokenRegistro(), // token de registro como JWT temporario
                 usuario.getEmail(),
-                usuario.getEstado(),
-                cliente.getCategoria()
+                "PENDING_PASSWORD",         // estado especial
+                cliente.getCategoria(),
+                0
         );
-
-        int pendientes = notificacionRepository
-                .findByClienteIdAndLeidaFalseOrderByCreatedAtDesc(usuario.getClienteId())
-                .size();
-
-        return new LoginResponse(token, usuario.getEmail(), usuario.getEstado(), cliente.getCategoria(), pendientes);
     }
+ 
+    // Caso 2: login normal con contraseña
+    if (!passwordEncoder.matches(request.getPassword(), usuario.getPasswordHash())) {
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas");
+    }
+ 
+    if ("no".equals(cliente.getAdmitido())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cuenta bloqueada");
+    }
+ 
+    String token = jwtUtil.generateToken(
+            usuario.getEmail(),
+            usuario.getEstado(),
+            cliente.getCategoria()
+    );
+ 
+    int pendientes = notificacionRepository
+            .findByClienteIdAndLeidaFalseOrderByCreatedAtDesc(usuario.getClienteId())
+            .size();
+ 
+    return new LoginResponse(token, usuario.getEmail(), usuario.getEstado(), cliente.getCategoria(), pendientes);
+}
 
     public List<RegisterCountryDTO> getRegisterCountries() {
         return jdbcTemplate.query(

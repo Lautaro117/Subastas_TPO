@@ -9,94 +9,89 @@ import { loginRequest, resetPasswordApi } from '../../services/authApi';
 import { useRegisterFlow } from '../../navigation/RegisterFlowContext';
 import { useAppSession } from '../../navigation/AppSessionContext';
 
-export default function RegisterFinalizePasswordScreen({ navigation }) {
+export default function RegisterFinalizePasswordScreen({ navigation, route }) {
   const theme = useTheme();
-  const { registerStatus, registerForm } = useRegisterFlow();
-  const { session, setAuthToken } = useAppSession();
+  const { registerForm } = useRegisterFlow();
+  const { setAuthToken, enterApp } = useAppSession();
+
+  // Token y email pueden venir como params (desde LoginScreen)
+  // o el token puede venir del contexto (flujo legacy)
+  const tokenParam = route?.params?.tokenRegistro ?? null;
+  const emailParam = route?.params?.email ?? registerForm.email ?? '';
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [touched, setTouched] = useState({ password: false, confirmPassword: false });
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Camino 1: token viene de RegisterFlowContext (seteado en RegisterVerificationScreen)
-  // Camino 2: token viene de AppSessionContext (seteado por el polling al detectar aprobación)
-  const effectiveToken = registerStatus.token || session.registroToken;
+  const [submitError, setSubmitError] = useState('');
 
   const passwordStrength = useMemo(() => {
     const trimmed = password.trim();
-
     if (!trimmed) return '';
     if (trimmed.length < 8) return 'Baja';
     if (trimmed.length < 12) return 'Media';
     return 'Alta';
   }, [password]);
 
+  const strengthColor = useMemo(() => {
+    if (passwordStrength === 'Baja') return theme.colors.error;
+    if (passwordStrength === 'Media') return '#F4B942';
+    return '#4CAF50';
+  }, [passwordStrength, theme.colors.error]);
+
   const passwordError = useMemo(() => {
-    if (!password.trim()) {
-      return 'La contrasena es requerida';
-    }
-
-    if (password.trim().length < 8) {
-      return 'Minimo 8 caracteres';
-    }
-    if (!/[A-Z]/.test(password)) {
-    return 'Debe tener al menos una mayuscula';
-  }
-  if (!/[0-9]/.test(password)) {
-    return 'Debe tener al menos un numero';
-  }
-
+    if (!password.trim()) return 'La contraseña es requerida';
+    if (password.trim().length < 8) return 'Mínimo 8 caracteres';
+    if (!/[A-Z]/.test(password)) return 'Debe tener al menos una mayúscula';
+    if (!/[0-9]/.test(password)) return 'Debe tener al menos un número';
     return '';
   }, [password]);
 
   const confirmError = useMemo(() => {
-    if (!confirmPassword.trim()) {
-      return 'Confirma tu contrasena';
-    }
-
-    if (password !== confirmPassword) {
-      return 'Las contrasenas no coinciden';
-    }
-
+    if (!confirmPassword.trim()) return 'Confirmá tu contraseña';
+    if (password !== confirmPassword) return 'Las contraseñas no coinciden';
     return '';
   }, [password, confirmPassword]);
 
   const isValid = !passwordError && !confirmError;
-
   const showPasswordError = (touched.password || submitted) && !!passwordError;
   const showConfirmError = (touched.confirmPassword || submitted) && !!confirmError;
 
   const handleFinish = async () => {
     setSubmitted(true);
+    setSubmitError('');
 
-    if (!isValid || !effectiveToken) return;
+    if (!isValid || !tokenParam) return;
 
     setIsSubmitting(true);
     try {
-      await resetPasswordApi({ token: effectiveToken, password });
+      await resetPasswordApi({ token: tokenParam, password });
 
+      // Auto-login después de setear la contraseña
       try {
-        const loginResult = await loginRequest({ email: registerForm.email, password });
+        const loginResult = await loginRequest({ email: emailParam, password });
         if (loginResult?.token) {
-          await setAuthToken(loginResult.token);
+          await enterApp('auth', loginResult.token);
+          navigation.navigate('RegisterEntering');
+          return;
         }
-      } catch (_loginError) {
-        // auto-login fallido — redirigir al login para que el usuario ingrese manualmente
+      } catch {
+        // Auto-login fallido — ir al login manual
         navigation.replace('Login');
         return;
       }
 
       navigation.navigate('RegisterEntering');
     } catch (error) {
-      // error al establecer contraseña — silent, la navegación no avanza
+      setSubmitError(error.message || 'Token inválido o expirado.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <SafeAreaView style={[registerSharedStyles.safeArea, { backgroundColor: theme.colors.background }]}> 
+    <SafeAreaView style={[registerSharedStyles.safeArea, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView
         style={registerSharedStyles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -114,20 +109,22 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
                 size={22}
                 onPress={() => navigation.goBack()}
               />
-              <Text style={[registerSharedStyles.title, { color: theme.colors.onBackground }]}>Finalizar</Text>
+              <Text style={[registerSharedStyles.title, { color: theme.colors.onBackground }]}>
+                Finalizar
+              </Text>
             </View>
 
-            <Text style={[registerSharedStyles.subtitle, { color: theme.colors.onSurfaceVariant }]}> 
-              Ultimo paso para activar tu cuenta y continuar a la app.
+            <Text style={[registerSharedStyles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
+              Último paso para activar tu cuenta. Elegí una contraseña segura.
             </Text>
 
             <View style={styles.inputBlock}>
               <AuthTextInput
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(v) => { setPassword(v); setSubmitError(''); }}
                 onBlur={() => setTouched((prev) => ({ ...prev, password: true }))}
-                label="Contrasena"
-                placeholder="Ingresa tu contrasena"
+                label="Contraseña"
+                placeholder="Ingresá tu contraseña"
                 icon="lock-outline"
                 secureTextEntry
                 error={showPasswordError}
@@ -140,10 +137,10 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
             <View style={styles.inputBlock}>
               <AuthTextInput
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={(v) => { setConfirmPassword(v); setSubmitError(''); }}
                 onBlur={() => setTouched((prev) => ({ ...prev, confirmPassword: true }))}
-                label="Confirmar contrasena"
-                placeholder="Repite tu contrasena"
+                label="Confirmar contraseña"
+                placeholder="Repetí tu contraseña"
                 icon="lock-outline"
                 secureTextEntry
                 error={showConfirmError}
@@ -154,8 +151,14 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
             </View>
 
             {passwordStrength ? (
-              <Text style={[styles.strength, { color: theme.colors.onSurfaceVariant }]}>
+              <Text style={[styles.strength, { color: strengthColor }]}>
                 Fortaleza: {passwordStrength}
+              </Text>
+            ) : null}
+
+            {submitError ? (
+              <Text style={[styles.submitError, { color: theme.colors.error }]}>
+                {submitError}
               </Text>
             ) : null}
 
@@ -165,7 +168,7 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
                 compact
                 onPress={handleFinish}
                 loading={isSubmitting}
-                disabled={!isValid || !effectiveToken || isSubmitting}
+                disabled={!isValid || !tokenParam || isSubmitting}
                 style={[styles.finishButton, { backgroundColor: theme.colors.primary }]}
                 contentStyle={styles.finishContent}
                 labelStyle={[styles.finishLabel, { color: theme.colors.onPrimary }]}
@@ -181,29 +184,16 @@ export default function RegisterFinalizePasswordScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  inputBlock: {
-    marginBottom: 14,
-  },
-  strength: {
-    marginTop: 4,
-    fontSize: 14,
-    lineHeight: 20,
-  },
+  inputBlock: { marginBottom: 14 },
+  strength: { fontSize: 14, lineHeight: 20, marginBottom: 6 },
+  submitError: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
   bottomAction: {
     marginTop: 'auto',
     flexDirection: 'row',
     justifyContent: 'flex-end',
     paddingTop: 24,
   },
-  finishButton: {
-    borderRadius: 999,
-  },
-  finishContent: {
-    height: 48,
-    paddingHorizontal: 20,
-  },
-  finishLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  finishButton: { borderRadius: 999 },
+  finishContent: { height: 48, paddingHorizontal: 20 },
+  finishLabel: { fontSize: 16, fontWeight: '600' },
 });

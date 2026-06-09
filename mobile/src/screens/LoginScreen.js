@@ -24,25 +24,14 @@ export default function LoginScreen({ navigation }) {
 
   const validateEmail = (value) => {
     const normalized = value.trim();
-
-    if (!normalized) {
-      return 'El email es requerido';
-    }
-
+    if (!normalized) return 'El email es requerido';
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailRegex.test(normalized)) {
-      return 'Ingresa un email valido';
-    }
-
+    if (!emailRegex.test(normalized)) return 'Ingresa un email valido';
     return '';
   };
 
   const validatePassword = (value) => {
-    if (!value.trim()) {
-      return 'La contrasena es requerida';
-    }
-
+    if (!value.trim()) return 'La contrasena es requerida';
     return '';
   };
 
@@ -54,28 +43,13 @@ export default function LoginScreen({ navigation }) {
 
   const isFormValid = useMemo(() => !emailError && !passwordError, [emailError, passwordError]);
 
-  const handleEmailChange = (value) => {
-    setEmail(value);
-    setSubmitError('');
-  };
-
-  const handlePasswordChange = (value) => {
-    setPassword(value);
-    setSubmitError('');
-  };
-
-  const handleEmailBlur = () => {
-    setTouched((prev) => ({ ...prev, email: true }));
-  };
-
-  const handlePasswordBlur = () => {
-    setTouched((prev) => ({ ...prev, password: true }));
-  };
+  const handleEmailChange = (value) => { setEmail(value); setSubmitError(''); };
+  const handlePasswordChange = (value) => { setPassword(value); setSubmitError(''); };
+  const handleEmailBlur = () => setTouched((prev) => ({ ...prev, email: true }));
+  const handlePasswordBlur = () => setTouched((prev) => ({ ...prev, password: true }));
 
   const handleSubmit = async () => {
-    if (isSubmitting) {
-      return;
-    }
+    if (isSubmitting) return;
 
     setSubmitted(true);
     setSubmitError('');
@@ -92,6 +66,15 @@ export default function LoginScreen({ navigation }) {
         email: email.trim().toLowerCase(),
         password,
       });
+
+      // El usuario ingresó su token de registro — debe setear su contraseña
+      if (result?.estado === 'PENDING_PASSWORD') {
+        navigation.navigate('RegisterFinalizePassword', {
+          tokenRegistro: result.token,
+          email: email.trim().toLowerCase(),
+        });
+        return;
+      }
 
       await enterApp('auth', result?.token ?? null);
     } catch (error) {
@@ -121,7 +104,6 @@ export default function LoginScreen({ navigation }) {
               keyboardType="email-address"
               returnKeyType="next"
             />
-
             {shouldShowEmailError ? (
               <Text style={[styles.errorText, { color: theme.colors.error }]}>{emailError}</Text>
             ) : null}
@@ -133,13 +115,12 @@ export default function LoginScreen({ navigation }) {
               onChangeText={handlePasswordChange}
               onBlur={handlePasswordBlur}
               label="Contraseña"
-              placeholder="Ingresa tu contraseña"
+              placeholder="Ingresa tu contraseña o token"
               icon="lock-outline"
               secureTextEntry
               error={shouldShowPasswordError}
               returnKeyType="done"
             />
-
             {shouldShowPasswordError ? (
               <Text style={[styles.errorText, { color: theme.colors.error }]}>{passwordError}</Text>
             ) : null}
@@ -159,9 +140,7 @@ export default function LoginScreen({ navigation }) {
 
           <View style={styles.linksSection}>
             <AuthLinkText onPress={() => navigation.navigate('ForgotPasswordEmail')}>Olvide mi contrasena</AuthLinkText>
-            <AuthLinkText onPress={() => navigation.navigate('RegisterPersonalData')}>
-              Crear cuenta
-            </AuthLinkText>
+            <AuthLinkText onPress={() => navigation.navigate('RegisterPersonalData')}>Crear cuenta</AuthLinkText>
           </View>
         </View>
 
@@ -171,15 +150,12 @@ export default function LoginScreen({ navigation }) {
           </AuthGhostButton>
         </View>
       </View>
-
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
   container: {
     flex: 1,
     paddingHorizontal: 24,
@@ -187,40 +163,13 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     justifyContent: 'space-between',
   },
-  title: {
-    fontSize: 34,
-    lineHeight: 40,
-    fontWeight: '700',
-    marginBottom: 40,
-    letterSpacing: 0.2,
-  },
-  inputsSection: {
-    width: '100%',
-  },
-  inputGap: {
-    height: 16,
-  },
-  errorText: {
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 6,
-    marginBottom: 2,
-  },
-  primaryButtonGap: {
-    height: 24,
-  },
-  submitErrorText: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 10,
-  },
-  linksGap: {
-    height: 20,
-  },
-  linksSection: {
-    gap: 10,
-  },
-  guestButtonSection: {
-    marginTop: 72,
-  },
+  title: { fontSize: 34, lineHeight: 40, fontWeight: '700', marginBottom: 40, letterSpacing: 0.2 },
+  inputsSection: { width: '100%' },
+  inputGap: { height: 16 },
+  errorText: { fontSize: 12, lineHeight: 16, marginTop: 6, marginBottom: 2 },
+  primaryButtonGap: { height: 24 },
+  submitErrorText: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
+  linksGap: { height: 20 },
+  linksSection: { gap: 10 },
+  guestButtonSection: { marginTop: 72 },
 });
