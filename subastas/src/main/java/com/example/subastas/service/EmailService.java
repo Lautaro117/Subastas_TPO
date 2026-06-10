@@ -15,6 +15,21 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromAddress;
 
+    public void sendTokenRegistro(String toEmail, String token) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(fromAddress);
+        message.setTo(toEmail);
+        message.setSubject("Tu código de activación — Subastas");
+        message.setText(
+            "Hola,\n\n" +
+            "Tu solicitud de registro fue recibida. Tu código de activación es:\n\n" +
+            "    " + token + "\n\n" +
+            "Usá este código para finalizar el registro una vez que tu cuenta sea aprobada.\n\n" +
+            "Si no realizaste este registro, ignorá este email."
+        );
+        mailSender.send(message);
+    }
+
     public void sendResetCode(String toEmail, String code) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromAddress);

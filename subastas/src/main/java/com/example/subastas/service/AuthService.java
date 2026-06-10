@@ -4,7 +4,6 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -220,7 +219,8 @@ public class AuthService {
             auth.setClienteId(savedPersona.getIdentificador());
             auth.setEstado("E1");
             auth.setPasswordHash("PENDIENTE");
-            auth.setTokenRegistro(UUID.randomUUID().toString().replace("-", "").substring(0, 32));
+            String tokenRegistro = String.format("%06d", secureRandom.nextInt(1_000_000));
+            auth.setTokenRegistro(tokenRegistro);
             usuarioAuthRepository.save(auth);
 
             // 4. INSERT en fotos_dni
