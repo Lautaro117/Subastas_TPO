@@ -555,16 +555,24 @@ export default function SalaSubastaScreen({ navigation, route }) {
           <ScrollView contentContainerStyle={styles.salaContent} keyboardShouldPersistTaps="handled">
             {/* Foto ítem */}
             <View style={styles.fotoWrap}>
-              <View style={[styles.fotoPlaceholder, { backgroundColor: theme.colors.surfaceContainerLow }]}>
-                <Text style={{ color: theme.colors.onSurfaceVariant, fontSize: 40 }}>📦</Text>
-              </View>
+              {itemActual?.fotoPrincipal ? (
+                <Image
+                  source={{ uri: `data:image/jpeg;base64,${itemActual.fotoPrincipal}` }}
+                  style={styles.fotoProducto}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.fotoPlaceholder, { backgroundColor: theme.colors.surfaceContainerLow }]}>
+                  <Text style={{ color: theme.colors.onSurfaceVariant, fontSize: 40 }}>📦</Text>
+                </View>
+              )}
               <View style={styles.fotoChips}>
                 <Chip compact style={{ backgroundColor: 'rgba(0,0,0,0.55)' }} textStyle={{ color: '#fff', fontSize: 11 }}>
-                  Producto #{itemActual?.productoId ?? '—'}
+                  {itemActual?.descripcionCatalogo ?? `Producto #${itemActual?.productoId ?? '—'}`}
                 </Chip>
                 {precioBase != null && (
                   <Chip compact style={{ backgroundColor: 'rgba(0,0,0,0.55)' }} textStyle={{ color: '#fff', fontSize: 11 }}>
-                    Base {moneda} {precioBase?.toLocaleString('es-AR')}
+                    Base {moneda} {Number(precioBase).toLocaleString('es-AR')}
                   </Chip>
                 )}
               </View>
@@ -614,12 +622,13 @@ export default function SalaSubastaScreen({ navigation, route }) {
             </Button>
           </View>
           <View style={[styles.pujaHint, { backgroundColor: theme.colors.background }]}>
-            <Text style={[styles.pujaHintText, { color: theme.colors.onSurfaceVariant }]}>
-              Min = última oferta + 1% del precio base
-            </Text>
-            <Text style={[styles.pujaHintText, { color: theme.colors.onSurfaceVariant }]}>
-              Max = última oferta + 20% del precio base
-            </Text>
+            {salaData?.minPuja != null && (
+              <Text style={[styles.pujaHintText, { color: theme.colors.onSurfaceVariant }]}>
+                Mín: {moneda} {Number(salaData.minPuja).toLocaleString('es-AR')}
+                {'  '}
+                Máx: {moneda} {Number(salaData.maxPuja).toLocaleString('es-AR')}
+              </Text>
+            )}
           </View>
         </KeyboardAvoidingView>
 

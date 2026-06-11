@@ -1,6 +1,7 @@
 package com.example.subastas.model;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -28,6 +29,9 @@ public class Pujo {
 
     private String ganador = "no";
 
+    @Column(name = "created_at")
+    private Instant createdAt;
+
     public Integer getIdentificador() { return identificador; }
     public void setIdentificador(Integer identificador) { this.identificador = identificador; }
 
@@ -42,4 +46,7 @@ public class Pujo {
 
     public String getGanador() { return ganador; }
     public void setGanador(String ganador) { this.ganador = ganador; }
+
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }

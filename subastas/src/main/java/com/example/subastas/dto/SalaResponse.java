@@ -4,60 +4,82 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public class SalaResponse {
-    private CatalogoDTO articuloActual;
+
+    private CatalogoDTO itemActual;
+    private String moneda;
     private MejorOferta mejorOferta;
-    private List<PujoDTO> historialReciente;
-    private String websocketUrl;
+    private List<PujoDisplay> pujas;
+    private BigDecimal minPuja;
+    private BigDecimal maxPuja;
 
     public SalaResponse() {}
 
-    public CatalogoDTO getArticuloActual() { return articuloActual; }
-    public void setArticuloActual(CatalogoDTO articuloActual) { this.articuloActual = articuloActual; }
+    public CatalogoDTO getItemActual() { return itemActual; }
+    public void setItemActual(CatalogoDTO itemActual) { this.itemActual = itemActual; }
+
+    public String getMoneda() { return moneda; }
+    public void setMoneda(String moneda) { this.moneda = moneda; }
 
     public MejorOferta getMejorOferta() { return mejorOferta; }
     public void setMejorOferta(MejorOferta mejorOferta) { this.mejorOferta = mejorOferta; }
 
-    public List<PujoDTO> getHistorialReciente() { return historialReciente; }
-    public void setHistorialReciente(List<PujoDTO> historialReciente) { this.historialReciente = historialReciente; }
+    public List<PujoDisplay> getPujas() { return pujas; }
+    public void setPujas(List<PujoDisplay> pujas) { this.pujas = pujas; }
 
-    public String getWebsocketUrl() { return websocketUrl; }
-    public void setWebsocketUrl(String websocketUrl) { this.websocketUrl = websocketUrl; }
+    public BigDecimal getMinPuja() { return minPuja; }
+    public void setMinPuja(BigDecimal minPuja) { this.minPuja = minPuja; }
 
+    public BigDecimal getMaxPuja() { return maxPuja; }
+    public void setMaxPuja(BigDecimal maxPuja) { this.maxPuja = maxPuja; }
+
+    // ── Mejor oferta actual ────────────────────────────────────────────────────
     public static class MejorOferta {
-        private BigDecimal monto;
+        private BigDecimal importe;
+        private String postor;
+        private String hace;
         private String moneda;
-        private Long haceSegundos;
 
         public MejorOferta() {}
 
-        public BigDecimal getMonto() { return monto; }
-        public void setMonto(BigDecimal monto) { this.monto = monto; }
+        public BigDecimal getImporte() { return importe; }
+        public void setImporte(BigDecimal importe) { this.importe = importe; }
+
+        public String getPostor() { return postor; }
+        public void setPostor(String postor) { this.postor = postor; }
+
+        public String getHace() { return hace; }
+        public void setHace(String hace) { this.hace = hace; }
 
         public String getMoneda() { return moneda; }
         public void setMoneda(String moneda) { this.moneda = moneda; }
-
-        public Long getHaceSegundos() { return haceSegundos; }
-        public void setHaceSegundos(Long haceSegundos) { this.haceSegundos = haceSegundos; }
     }
 
-    public static class PujoDTO {
-        private Integer id;
-        private BigDecimal monto;
-        private String timestamp;
-        private String estado;
+    // ── Fila de historial ──────────────────────────────────────────────────────
+    public static class PujoDisplay {
+        private BigDecimal importe;
+        private String postor;
+        private String hace;
+        private String moneda;
 
-        public PujoDTO() {}
+        public PujoDisplay() {}
 
-        public Integer getId() { return id; }
-        public void setId(Integer id) { this.id = id; }
+        public PujoDisplay(BigDecimal importe, String postor, String hace, String moneda) {
+            this.importe = importe;
+            this.postor = postor;
+            this.hace = hace;
+            this.moneda = moneda;
+        }
 
-        public BigDecimal getMonto() { return monto; }
-        public void setMonto(BigDecimal monto) { this.monto = monto; }
+        public BigDecimal getImporte() { return importe; }
+        public void setImporte(BigDecimal importe) { this.importe = importe; }
 
-        public String getTimestamp() { return timestamp; }
-        public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
+        public String getPostor() { return postor; }
+        public void setPostor(String postor) { this.postor = postor; }
 
-        public String getEstado() { return estado; }
-        public void setEstado(String estado) { this.estado = estado; }
+        public String getHace() { return hace; }
+        public void setHace(String hace) { this.hace = hace; }
+
+        public String getMoneda() { return moneda; }
+        public void setMoneda(String moneda) { this.moneda = moneda; }
     }
 }

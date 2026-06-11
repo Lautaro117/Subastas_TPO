@@ -123,7 +123,7 @@ export async function sendBid(token, id, bid) {
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    const error = new Error(body.message || `Error al enviar puja: ${response.status}`);
+    const error = new Error(body.detail || body.message || `Error al enviar puja: ${response.status}`);
     error.status = response.status;
     throw error;
   }
@@ -148,6 +148,19 @@ export async function getItemBids(token, auctionId, itemId) {
     throw new Error(`Error al obtener historial de pujas: ${response.status}`);
   }
 
+  return response.json();
+}
+
+/**
+ * GET /api/auctions/:id/items/:itemId/result
+ * Resultado del ítem para el usuario autenticado.
+ */
+export async function getResultadoItem(token, auctionId, itemId) {
+  const response = await fetch(
+    buildApiUrl(`/api/auctions/${auctionId}/items/${itemId}/result`),
+    { method: 'GET', headers: buildAuthHeaders(token) }
+  );
+  if (!response.ok) throw new Error(`Error: ${response.status}`);
   return response.json();
 }
 

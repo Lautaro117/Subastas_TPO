@@ -1,10 +1,14 @@
 package com.example.subastas.service;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -42,45 +46,25 @@ import jakarta.transaction.Transactional;
 @Service
 public class SubastaService {
 
-    @Autowired
-    private AuctionNotificationService auctionNotificationService;
-
-    @Autowired
-    private SubastaRepository subastaRepository;
-
-    @Autowired
-    private CatalogoRepository catalogoRepository;
-
-    @Autowired
-    private ItemCatalogoRepository itemCatalogoRepository;
-
-    @Autowired
-    private AsistenteRepository asistenteRepository;
-
-    @Autowired
-    private UsuarioAuthRepository usuarioAuthRepository;
-
-    @Autowired
-    private PujoRepository pujoRepository;
-
-    @Autowired
-    private PujoExtRepository pujoExtRepository;
-
-    @Autowired
-    private MedioPagoRepository medioPagoRepository;
-
-    @Autowired
-    private AdjudicacionesRepository adjudicacionesRepository;
-
-    @Autowired
-    private ProductoRepository productoRepository;
-
-    @Autowired
-    private FotoProductoRepository fotoProductoRepository;
+    @Autowired private AuctionNotificationService auctionNotificationService;
+    @Autowired private SubastaRepository subastaRepository;
+    @Autowired private CatalogoRepository catalogoRepository;
+    @Autowired private ItemCatalogoRepository itemCatalogoRepository;
+    @Autowired private AsistenteRepository asistenteRepository;
+    @Autowired private UsuarioAuthRepository usuarioAuthRepository;
+    @Autowired private PujoRepository pujoRepository;
+    @Autowired private PujoExtRepository pujoExtRepository;
+    @Autowired private MedioPagoRepository medioPagoRepository;
+    @Autowired private AdjudicacionesRepository adjudicacionesRepository;
+    @Autowired private ProductoRepository productoRepository;
+    @Autowired private FotoProductoRepository fotoProductoRepository;
 
     private static final List<String> ORDEN_CATEGORIAS = Arrays.asList(
-            "comun", "especial", "plata", "oro", "platino"
-    );
+            "comun", "especial", "plata", "oro", "platino");
+
+    private static final String MONEDA = "ARS";
+
+    // ── Listado ────────────────────────────────────────────────────────────────
 
     public List<Subasta> listarTodas() {
         return subastaRepository.findAll();
@@ -88,83 +72,52 @@ public class SubastaService {
 
     public Subasta buscarPorId(Integer id) {
         return subastaRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Subasta no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Subasta no encontrada"));
     }
 
+    // ── Catálogo ───────────────────────────────────────────────────────────────
+
     public List<CatalogoDTO> obtenerCatalogo(Integer subastaId, String estado) {
-    Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId)
-            .orElseThrow(() -> new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, "Catálogo no encontrado"));
- 
-    List<ItemCatalogo> items = itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador());
- 
-    return items.stream().map(item -> {
-        // Traer descripción del producto
-        String descripcion = productoRepository.findById(item.getProductoId())
-                .map(p -> p.getDescripcionCatalogo())
-                .orElse(null);
- 
-        // Traer primera foto del producto
-        String fotoPrincipal = fotoProductoRepository.findByProducto(item.getProductoId())
-                .stream()
-                .findFirst()
-                .map(f -> Base64.getEncoder().encodeToString(f.getFoto()))
-                .orElse(null);
- 
-        return new CatalogoDTO(
-                item.getIdentificador(),
-                item.getProductoId(),
-                estado.equals("E2") ? null : item.getPrecioBase(),
-                item.getComision(),
-                item.getSubastado(),
-                descripcion,
-                fotoPrincipal
-        );
-    }).toList();
-}
+        Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Catálogo no encontrado"));
+
+        return itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador()).stream().map(item -> {
+            String descripcion = productoRepository.findById(item.getProductoId())
+                    .map(Producto::getDescripcionCatalogo).orElse(null);
+            String foto = fotoProductoRepository.findByProducto(item.getProductoId())
+                    .stream().findFirst()
+                    .map(f -> Base64.getEncoder().encodeToString(f.getFoto()))
+                    .orElse(null);
+            return new CatalogoDTO(
+                    item.getIdentificador(), item.getProductoId(),
+                    "E2".equals(estado) ? null : item.getPrecioBase(),
+                    item.getComision(), item.getSubastado(), descripcion, foto);
+        }).toList();
+    }
+
     public CatalogoDTO obtenerItem(Integer subastaId, Integer itemId, String estado) {
         ItemCatalogo item = itemCatalogoRepository.findById(itemId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Item no encontrado"));
-        return new CatalogoDTO(
-                item.getIdentificador(),
-                item.getProductoId(),
-                estado.equals("E2") ? null : item.getPrecioBase(),
-                item.getComision(),
-                item.getSubastado(),
-                null,
-                null
-        );
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
+        return new CatalogoDTO(item.getIdentificador(), item.getProductoId(),
+                "E2".equals(estado) ? null : item.getPrecioBase(),
+                item.getComision(), item.getSubastado(), null, null);
     }
 
     public ProductoDetalleDTO obtenerDetalleProducto(Integer subastaId, Integer itemId, String estado) {
-        // 1. Validar que el catálogo existe para esta subasta
         catalogoRepository.findBySubastaId(subastaId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Catálogo no encontrado"));
-
-        // 2. Traer el ítem
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Catálogo no encontrado"));
         ItemCatalogo item = itemCatalogoRepository.findById(itemId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Item no encontrado"));
-
-        // 3. Traer el producto
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
         Producto producto = productoRepository.findById(item.getProductoId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Producto no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
 
-        // 4. Traer las fotos y convertirlas a base64
-        List<FotoProducto> fotos = fotoProductoRepository.findByProducto(producto.getIdentificador());
-        List<String> fotosBase64 = fotos.stream()
-                .map(f -> Base64.getEncoder().encodeToString(f.getFoto()))
-                .toList();
+        List<String> fotosBase64 = fotoProductoRepository.findByProducto(producto.getIdentificador())
+                .stream().map(f -> Base64.getEncoder().encodeToString(f.getFoto())).toList();
 
-        // 5. Armar el DTO
         ProductoDetalleDTO dto = new ProductoDetalleDTO();
         dto.setItemId(item.getIdentificador());
         dto.setProductoId(item.getProductoId());
-        dto.setPrecioBase(item.getPrecioBase());
+        dto.setPrecioBase("E2".equals(estado) ? null : item.getPrecioBase());
         dto.setComision(item.getComision());
         dto.setSubastado(item.getSubastado());
         dto.setDescripcionCatalogo(producto.getDescripcionCatalogo());
@@ -172,9 +125,10 @@ public class SubastaService {
         dto.setFecha(producto.getFecha());
         dto.setDisponible(producto.getDisponible());
         dto.setFotos(fotosBase64);
-
         return dto;
     }
+
+    // ── Join / Leave ───────────────────────────────────────────────────────────
 
     @Transactional
     public SalaResponse unirseASala(Integer subastaId, String email, String categoriaUsuario) {
@@ -190,17 +144,17 @@ public class SubastaService {
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         Integer clienteId = usuario.getClienteId();
+
         Optional<Asistente> actual = asistenteRepository.findByClienteId(clienteId);
         if (actual.isPresent()) {
-            if (actual.get().getSubastaId().equals(subastaId)) {
-                return construirSalaResponse(subastaId);
-            }
+            if (actual.get().getSubastaId().equals(subastaId)) return construirSalaResponse(subastaId);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ya estás conectado a otra subasta");
         }
+
         Asistente asistente = new Asistente();
         asistente.setClienteId(clienteId);
         asistente.setSubastaId(subastaId);
-        asistente.setNumeroPostor((int) (Math.random() * 1000));
+        asistente.setNumeroPostor((int) (Math.random() * 9000) + 1000);
         asistenteRepository.save(asistente);
         return construirSalaResponse(subastaId);
     }
@@ -209,15 +163,11 @@ public class SubastaService {
     public void salirDeSala(Integer subastaId, String email) {
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-
         Asistente asistente = asistenteRepository
                 .findByClienteIdAndSubastaId(usuario.getClienteId(), subastaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No estás en esta subasta"));
-
         boolean tienePujas = !pujoRepository.findByAsistenteId(asistente.getIdentificador()).isEmpty();
-        if (!tienePujas) {
-            asistenteRepository.delete(asistente);
-        }
+        if (!tienePujas) asistenteRepository.delete(asistente);
     }
 
     public SalaResponse obtenerEstadoVivo(Integer subastaId, String email) {
@@ -229,126 +179,249 @@ public class SubastaService {
         return construirSalaResponse(subastaId);
     }
 
+    // ── Pujas ──────────────────────────────────────────────────────────────────
+
     @Transactional
     public Pujo enviarPuja(Integer subastaId, String email, BidRequest request) {
-        // 1. Validar que la subasta existe y está abierta
         Subasta subasta = buscarPorId(subastaId);
         if (!"abierta".equalsIgnoreCase(subasta.getEstado())) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "La subasta no está activa");
         }
 
-        // 2. Validar que el artículo existe y no está adjudicado
         ItemCatalogo item = itemCatalogoRepository.findById(request.getItem_id())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Artículo no encontrado"));
         if ("si".equalsIgnoreCase(item.getSubastado())) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "El artículo ya fue adjudicado");
         }
 
-        // 3. Obtener usuario y validar que está en la sala
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         Asistente asistente = asistenteRepository.findByClienteIdAndSubastaId(usuario.getClienteId(), subastaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No estás unido a esta sala"));
 
-        // 4. Validar medio de pago verificado
-        MedioPago medio = medioPagoRepository.findById(request.getPayment_method_id())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Medio de pago no encontrado"));
-        if (!medio.getClienteId().equals(usuario.getClienteId()) || !Boolean.TRUE.equals(medio.getVerificado())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El medio de pago no está verificado");
+        // Medio de pago: opcional para el demo
+        Integer medioPagoId = null;
+        if (request.getPayment_method_id() != null) {
+            MedioPago medio = medioPagoRepository.findById(request.getPayment_method_id())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Medio de pago no encontrado"));
+            if (!medio.getClienteId().equals(usuario.getClienteId()) || !Boolean.TRUE.equals(medio.getVerificado())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El medio de pago no está verificado");
+            }
+            medioPagoId = medio.getId();
         }
 
-        // 5. Validar que no hay una puja en proceso
-        boolean tienePujaEnProceso = pujoExtRepository.existsByPujoIdAndEstado(
-                asistente.getIdentificador(), "en_proceso");
-        if (tienePujaEnProceso) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ya tenés una puja en proceso");
+        // Validar min/max
+        BigDecimal base = item.getPrecioBase();
+        if (base != null) {
+            Optional<Pujo> mejorActual = pujoRepository.findTopByItemIdOrderByImporteDesc(item.getIdentificador());
+            BigDecimal ultima = mejorActual.map(Pujo::getImporte).orElse(base);
+            BigDecimal incremento1pct  = base.multiply(new BigDecimal("0.01"));
+            BigDecimal incremento20pct = base.multiply(new BigDecimal("0.20"));
+            BigDecimal minPuja = ultima.add(incremento1pct);
+            BigDecimal maxPuja = ultima.add(incremento20pct);
+
+            // Si no hay pujas previas, mínimo es el precio base
+            if (mejorActual.isEmpty()) {
+                minPuja = base;
+                maxPuja = base.add(incremento20pct);
+            }
+
+            if (request.getMonto().compareTo(minPuja) < 0) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "La puja mínima es " + minPuja.toPlainString());
+            }
+            if (request.getMonto().compareTo(maxPuja) > 0) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "La puja máxima es " + maxPuja.toPlainString());
+            }
         }
 
-        // 6. Guardar en pujos
         Pujo pujo = new Pujo();
         pujo.setAsistenteId(asistente.getIdentificador());
         pujo.setItemId(item.getIdentificador());
         pujo.setImporte(request.getMonto());
+        pujo.setCreatedAt(Instant.now());
         Pujo savedPujo = pujoRepository.save(pujo);
 
-        // 7. Guardar campos extra en pujos_ext
         PujoExt pujoExt = new PujoExt();
         pujoExt.setPujoId(savedPujo.getIdentificador());
-        pujoExt.setMoneda(request.getMoneda());
+        pujoExt.setMoneda(request.getMoneda() != null ? request.getMoneda() : MONEDA);
         pujoExt.setEstado("confirmada");
-        pujoExt.setMedioPagoId(medio.getId());
+        pujoExt.setMedioPagoId(medioPagoId);
         pujoExtRepository.save(pujoExt);
 
-        // 8. Notificar por WebSocket
-        auctionNotificationService.notificarNuevaPuja(subastaId, savedPujo.getImporte(), request.getMoneda(), savedPujo.getIdentificador());
+        String postor = "Postor #" + asistente.getNumeroPostor();
+        auctionNotificationService.notificarNuevaPuja(subastaId, savedPujo.getImporte(), MONEDA, postor);
 
         return savedPujo;
     }
 
     public List<Pujo> obtenerPujaPorItem(Integer subastaId, Integer itemId) {
         ItemCatalogo item = itemCatalogoRepository.findById(itemId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Item no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
         return pujoRepository.findByItemId(item.getIdentificador());
     }
+
+    // ── Adjudicación ───────────────────────────────────────────────────────────
+
+    @Transactional
+    public SalaResponse adjudicarItem(Integer subastaId, Integer itemId) {
+        Subasta subasta = buscarPorId(subastaId);
+        if (!"abierta".equalsIgnoreCase(subasta.getEstado())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "La subasta no está activa");
+        }
+
+        ItemCatalogo item = itemCatalogoRepository.findById(itemId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
+        if ("si".equalsIgnoreCase(item.getSubastado())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El ítem ya fue adjudicado");
+        }
+
+        // Marcar puja ganadora
+        pujoRepository.findTopByItemIdOrderByImporteDesc(itemId).ifPresent(p -> {
+            p.setGanador("si");
+            pujoRepository.save(p);
+        });
+
+        // Marcar ítem como vendido
+        item.setSubastado("si");
+        itemCatalogoRepository.save(item);
+
+        // Determinar si hay más ítems
+        Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId).orElse(null);
+        boolean hayMas = false;
+        if (catalogo != null) {
+            List<ItemCatalogo> todos = itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador());
+            hayMas = todos.stream().anyMatch(i ->
+                    !"si".equalsIgnoreCase(i.getSubastado()) && !i.getIdentificador().equals(itemId));
+        }
+
+        if (hayMas) {
+            SalaResponse nextState = construirSalaResponse(subastaId);
+            auctionNotificationService.notificarSiguienteItem(subastaId, nextState);
+            return nextState;
+        } else {
+            subasta.setEstado("cerrada");
+            subastaRepository.save(subasta);
+            auctionNotificationService.notificarCierre(subastaId);
+            return construirSalaResponse(subastaId);
+        }
+    }
+
+    // ── Resultado ──────────────────────────────────────────────────────────────
 
     public ResultadoItemDTO obtenerResultadoItem(Integer subastaId, Integer itemId, String email) {
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-
         Asistente asistente = asistenteRepository.findByClienteIdAndSubastaId(usuario.getClienteId(), subastaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No participaste en esta subasta"));
 
         ResultadoItemDTO resultado = new ResultadoItemDTO();
+        Optional<Pujo> ganadora = pujoRepository.findByAsistenteIdAndItemIdAndGanador(
+                asistente.getIdentificador(), itemId, "si");
 
-        Optional<Pujo> pujaGanadora = pujoRepository.findByAsistenteIdAndItemIdAndGanador(asistente.getIdentificador(), itemId, "si");
-
-        if (pujaGanadora.isPresent()) {
+        if (ganadora.isPresent()) {
             resultado.setGano(true);
-            resultado.setMontoPujado(pujaGanadora.get().getImporte());
+            resultado.setMontoPujado(ganadora.get().getImporte());
         } else {
             resultado.setGano(false);
             pujoRepository.findTopByAsistenteIdAndItemIdOrderByImporteDesc(
-                    asistente.getIdentificador(), itemId).ifPresent(p -> resultado.setMontoPujado(p.getImporte()));
+                    asistente.getIdentificador(), itemId)
+                    .ifPresent(p -> resultado.setMontoPujado(p.getImporte()));
         }
-
         return resultado;
     }
 
+    public void notificarCierre(Integer subastaId) {
+        auctionNotificationService.notificarCierre(subastaId);
+    }
+
+    // ── Construcción de sala ───────────────────────────────────────────────────
+
     private SalaResponse construirSalaResponse(Integer subastaId) {
         SalaResponse response = new SalaResponse();
+        response.setMoneda(MONEDA);
+        response.setPujas(new ArrayList<>());
+
         Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId).orElse(null);
-        if (catalogo != null) {
-            List<ItemCatalogo> items = itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador());
-            Optional<ItemCatalogo> actual = items.stream()
-                    .filter(i -> !"si".equalsIgnoreCase(i.getSubastado()))
-                    .findFirst();
-            actual.ifPresent(item -> {
-                response.setArticuloActual(new CatalogoDTO(
-                        item.getIdentificador(),
-                        item.getProductoId(),
-                        item.getPrecioBase(),
-                        item.getComision(),
-                        item.getSubastado(),
-                        null,
-                        null
-                ));
-                pujoRepository.findTopByItemIdOrderByImporteDesc(item.getIdentificador())
-                        .ifPresent(p -> {
-                            SalaResponse.MejorOferta mo = new SalaResponse.MejorOferta();
-                            mo.setMonto(p.getImporte());
-                            mo.setMoneda("ARS");
-                            mo.setHaceSegundos(0L);
-                            response.setMejorOferta(mo);
-                        });
-            });
+        if (catalogo == null) return response;
+
+        List<ItemCatalogo> items = itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador());
+        Optional<ItemCatalogo> actualOpt = items.stream()
+                .filter(i -> !"si".equalsIgnoreCase(i.getSubastado()))
+                .findFirst();
+
+        if (actualOpt.isEmpty()) return response;
+
+        ItemCatalogo item = actualOpt.get();
+
+        String descripcion = productoRepository.findById(item.getProductoId())
+                .map(Producto::getDescripcionCatalogo).orElse(null);
+        String foto = fotoProductoRepository.findByProducto(item.getProductoId())
+                .stream().findFirst()
+                .map(f -> Base64.getEncoder().encodeToString(f.getFoto()))
+                .orElse(null);
+
+        response.setItemActual(new CatalogoDTO(
+                item.getIdentificador(), item.getProductoId(),
+                item.getPrecioBase(), item.getComision(),
+                item.getSubastado(), descripcion, foto));
+
+        // Pujas del ítem ordenadas desc por importe
+        List<Pujo> pujas = pujoRepository.findByItemId(item.getIdentificador());
+        pujas.sort(Comparator.comparing(Pujo::getImporte).reversed());
+
+        // Pre-cargar asistentes para evitar N+1
+        List<Integer> asistenteIds = pujas.stream()
+                .map(Pujo::getAsistenteId).distinct().collect(Collectors.toList());
+        var asistenteMap = asistenteRepository.findAllById(asistenteIds).stream()
+                .collect(Collectors.toMap(Asistente::getIdentificador, a -> a));
+
+        List<SalaResponse.PujoDisplay> pujaDisplay = pujas.stream().map(p -> {
+            String postor = asistenteMap.containsKey(p.getAsistenteId())
+                    ? "Postor #" + asistenteMap.get(p.getAsistenteId()).getNumeroPostor()
+                    : "Postor";
+            return new SalaResponse.PujoDisplay(p.getImporte(), postor, calcularHace(p.getCreatedAt()), MONEDA);
+        }).collect(Collectors.toList());
+
+        response.setPujas(pujaDisplay);
+
+        if (!pujaDisplay.isEmpty()) {
+            SalaResponse.PujoDisplay top = pujaDisplay.get(0);
+            SalaResponse.MejorOferta mo = new SalaResponse.MejorOferta();
+            mo.setImporte(top.getImporte());
+            mo.setPostor(top.getPostor());
+            mo.setHace(top.getHace());
+            mo.setMoneda(MONEDA);
+            response.setMejorOferta(mo);
         }
-        response.setHistorialReciente(new ArrayList<>());
-        response.setWebsocketUrl("/ws/auction/" + subastaId);
+
+        // Calcular min/max puja
+        BigDecimal base = item.getPrecioBase();
+        if (base != null) {
+            BigDecimal ultima = response.getMejorOferta() != null
+                    ? response.getMejorOferta().getImporte()
+                    : base;
+            BigDecimal inc1  = base.multiply(new BigDecimal("0.01"));
+            BigDecimal inc20 = base.multiply(new BigDecimal("0.20"));
+            if (response.getMejorOferta() == null) {
+                response.setMinPuja(base);
+                response.setMaxPuja(base.add(inc20));
+            } else {
+                response.setMinPuja(ultima.add(inc1));
+                response.setMaxPuja(ultima.add(inc20));
+            }
+        }
+
         return response;
     }
 
-    public void notificarCierre(Integer subastaId) {
-    auctionNotificationService.notificarCierre(subastaId);
-}
+    private String calcularHace(Instant createdAt) {
+        if (createdAt == null) return "hace un momento";
+        long seg = Instant.now().getEpochSecond() - createdAt.getEpochSecond();
+        if (seg < 5)    return "ahora";
+        if (seg < 60)   return "hace " + seg + "s";
+        if (seg < 3600) return "hace " + (seg / 60) + " min";
+        return "hace " + (seg / 3600) + "h";
+    }
 }

@@ -2,7 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SESSION_KEY = '@subastas:session';
 
+const GUEST_MODES = ['guest-login', 'pending-register'];
+
 export async function saveSessionSnapshot(session) {
+  if (GUEST_MODES.includes(session.entryMode)) return;
   const snapshot = {
     isAuthenticated: session.isAuthenticated,
     entryMode: session.entryMode,

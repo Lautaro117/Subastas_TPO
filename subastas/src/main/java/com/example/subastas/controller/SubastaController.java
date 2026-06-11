@@ -131,6 +131,14 @@ public class SubastaController {
     }
 
 
+    @PostMapping("/{id}/items/{itemId}/adjudicate")
+    public ResponseEntity<SalaResponse> adjudicar(
+            @PathVariable Integer id,
+            @PathVariable Integer itemId) {
+        SalaResponse response = subastaService.adjudicarItem(id, itemId);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/{id}/catalog/{itemId}/product")
     public ResponseEntity<ProductoDetalleDTO> detalleProducto(
             @PathVariable Integer id,

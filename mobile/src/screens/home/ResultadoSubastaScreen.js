@@ -14,20 +14,7 @@ import {
 } from 'react-native-paper';
 
 import { useAppSession } from '../../navigation/AppSessionContext';
-import { getAuctionCatalog } from '../../services/auctionsApi';
-
-// GET /api/auctions/{id}/items/{itemId}/result
-async function getResultadoItem(token, auctionId, itemId, baseUrl) {
-  const response = await fetch(`${baseUrl}/api/auctions/${auctionId}/items/${itemId}/result`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-    },
-  });
-  if (!response.ok) throw new Error(`Error: ${response.status}`);
-  return response.json();
-}
+import { getAuctionCatalog, getResultadoItem } from '../../services/auctionsApi';
 
 export default function ResultadoSubastaScreen({ navigation, route }) {
   const { auctionId } = route.params ?? {};
@@ -42,16 +29,13 @@ export default function ResultadoSubastaScreen({ navigation, route }) {
   const fetchResultados = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Traer el catálogo para obtener los itemIds
       const catalogo = await getAuctionCatalog(token, auctionId);
       const items = Array.isArray(catalogo) ? catalogo : [];
 
-      // Traer resultado de cada ítem
-      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.0.184:8080';
       const resultadosData = await Promise.all(
         items.map(async (item) => {
           try {
-            const resultado = await getResultadoItem(token, auctionId, item.itemId, baseUrl);
+            const resultado = await getResultadoItem(token, auctionId, item.itemId);
             return { ...resultado, item };
           } catch {
             return null;
@@ -69,7 +53,8 @@ export default function ResultadoSubastaScreen({ navigation, route }) {
 
   useEffect(() => { fetchResultados(); }, [fetchResultados]);
 
-  const gano = resultados.some((r) => r.gano === true);
+  const itemsGanados = resultados.filter((r) => r.gano === true);
+  const gano = itemsGanados.length > 0;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -90,9 +75,7 @@ export default function ResultadoSubastaScreen({ navigation, route }) {
             style={[
               styles.banner,
               {
-                backgroundColor: gano
-                  ? theme.colors.primaryContainer
-                  : theme.colors.surfaceContainerLow,
+                backgroundColor: gano ? theme.colors.primaryContainer : theme.colors.surfaceContainerLow,
                 borderColor: gano ? theme.colors.primary : theme.colors.outline,
               },
             ]}
@@ -102,15 +85,37 @@ export default function ResultadoSubastaScreen({ navigation, route }) {
               size={48}
               color={gano ? theme.colors.primary : theme.colors.onSurfaceVariant}
             />
-            <Text style={[styles.bannerTitle, { color: gano ? theme.colors.onPrimaryContainer : theme.colors.onSurface }]}>
+            <Text style={[styles.bannerTitle, {
+              color: gano ? theme.colors.onPrimaryContainer : theme.colors.onSurface,
+            }]}>
               {gano ? '¡Felicitaciones!' : 'Subasta finalizada'}
             </Text>
-            <Text style={[styles.bannerDesc, { color: gano ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant }]}>
+            <Text style={[styles.bannerDesc, {
+              color: gano ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant,
+            }]}>
               {gano
-                ? 'Ganaste uno o más ítems en esta subasta.'
+                ? `Ganaste ${itemsGanados.length} ítem${itemsGanados.length > 1 ? 's' : ''} en esta subasta.`
                 : 'No ganaste ítems en esta subasta.'}
             </Text>
           </Surface>
+
+          {/* Resumen solo si ganó */}
+          {gano && (
+            <Surface elevation={0} style={[styles.resumenCard, {
+              backgroundColor: theme.colors.surfaceContainerLowest,
+              borderColor: theme.colors.outlineVariant,
+            }]}>
+              <Text style={[styles.resumenTitle, { color: theme.colors.onSurface }]}>Resumen</Text>
+              <View style={styles.infoRow}>
+                <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Total pujado</Text>
+                <Text style={[styles.infoValue, { color: theme.colors.primary }]}>
+                  $ {itemsGanados
+                    .reduce((sum, r) => sum + (r.montoPujado ?? 0), 0)
+                    .toLocaleString('es-AR')}
+                </Text>
+              </View>
+            </Surface>
+          )}
 
           {/* Resultados por ítem */}
           {resultados.map((resultado, idx) => (
@@ -121,12 +126,12 @@ export default function ResultadoSubastaScreen({ navigation, route }) {
                 styles.itemCard,
                 {
                   backgroundColor: theme.colors.surfaceContainerLowest,
-                  borderColor: resultado.gano ? theme.colors.primary : theme.colors.outline,
+                  borderColor: resultado.gano ? theme.colors.primary : theme.colors.outlineVariant,
                 },
               ]}
             >
               <View style={styles.itemCardHeader}>
-                <Text style={[styles.itemNombre, { color: theme.colors.onSurface }]} numberOfLines={1}>
+                <Text style={[styles.itemNombre, { color: theme.colors.onSurface }]} numberOfLines={2}>
                   {resultado.item?.descripcionCatalogo ?? `Producto #${resultado.item?.productoId}`}
                 </Text>
                 <Chip
@@ -143,17 +148,28 @@ export default function ResultadoSubastaScreen({ navigation, route }) {
                     fontSize: 11,
                   }}
                 >
-                  {resultado.gano ? 'Ganado' : 'No ganado'}
+                  {resultado.gano ? 'Ganado ✓' : 'No ganado'}
                 </Chip>
               </View>
 
               {resultado.montoPujado != null && (
                 <View style={styles.infoRow}>
                   <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>
-                    Tu puja
+                    {resultado.gano ? 'Monto final' : 'Tu mayor puja'}
                   </Text>
-                  <Text style={[styles.infoValue, { color: theme.colors.onSurface }]}>
-                    $ {resultado.montoPujado?.toLocaleString('es-AR')}
+                  <Text style={[styles.infoValue, {
+                    color: resultado.gano ? theme.colors.primary : theme.colors.onSurface,
+                  }]}>
+                    $ {Number(resultado.montoPujado).toLocaleString('es-AR')}
+                  </Text>
+                </View>
+              )}
+
+              {resultado.gano && resultado.item?.precioBase != null && (
+                <View style={styles.infoRow}>
+                  <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Precio base</Text>
+                  <Text style={[styles.infoValue, { color: theme.colors.onSurfaceVariant }]}>
+                    $ {Number(resultado.item.precioBase).toLocaleString('es-AR')}
                   </Text>
                 </View>
               )}
@@ -166,7 +182,6 @@ export default function ResultadoSubastaScreen({ navigation, route }) {
             </Text>
           )}
 
-          {/* Botón volver */}
           <Button
             mode="contained"
             onPress={() => navigation.navigate('HomeSubastasMain')}
@@ -190,39 +205,22 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 20, gap: 16 },
 
-  banner: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 24,
-    alignItems: 'center',
-    gap: 10,
-  },
+  banner: { borderRadius: 20, borderWidth: 1, padding: 24, alignItems: 'center', gap: 10 },
   bannerTitle: { fontSize: 24, fontWeight: '700', textAlign: 'center' },
   bannerDesc: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
 
-  itemCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    gap: 10,
-  },
-  itemCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-  },
+  resumenCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 10 },
+  resumenTitle: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
+
+  itemCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 10 },
+  itemCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
   itemNombre: { flex: 1, fontSize: 15, fontWeight: '600' },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   infoLabel: { fontSize: 13 },
   infoValue: { fontSize: 14, fontWeight: '600' },
 
   emptyText: { fontSize: 14, textAlign: 'center', marginTop: 20 },
-
   volverButton: { borderRadius: 28, marginTop: 8 },
   volverButtonContent: { paddingVertical: 6 },
 });

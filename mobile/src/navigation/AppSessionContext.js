@@ -34,8 +34,12 @@ export function AppSessionProvider({ children }) {
         const snapshot = await loadSessionSnapshot();
         if (!isActive) return;
         if (snapshot) {
-          setSession({ ...initialSession, ...snapshot, bootstrapped: true });
-          return;
+          if (snapshot.entryMode === 'guest-login' || snapshot.entryMode === 'pending-register') {
+            await clearSessionSnapshot();
+          } else {
+            setSession({ ...initialSession, ...snapshot, bootstrapped: true });
+            return;
+          }
         }
         setSession((prev) => ({ ...prev, bootstrapped: true }));
       } catch {
