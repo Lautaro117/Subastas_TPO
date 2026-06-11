@@ -239,11 +239,19 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Limpiar intervalo y WebSocket solo al desmontar
   useEffect(() => {
     return () => {
       clearInterval(countdownRef.current);
-      if (joined) leaveAuction(token, auctionId).catch(() => {});
       stompClientRef.current?.deactivate?.();
+    };
+  }, []);
+
+  // Salir de la sala cuando joined cambia a false (o al desmontar si joined es true)
+  useEffect(() => {
+    if (!joined) return;
+    return () => {
+      leaveAuction(token, auctionId).catch(() => {});
     };
   }, [joined, token, auctionId]);
 
@@ -255,7 +263,8 @@ export default function SalaSubastaScreen({ navigation, route }) {
     }
     setJoining(true);
     try {
-      await joinAuction(token, auctionId);
+      const salaResponse = await joinAuction(token, auctionId);
+      if (salaResponse) setSalaData(salaResponse);
       setJoined(true);
       startWarmup();
     } catch (err) {
@@ -302,6 +311,10 @@ export default function SalaSubastaScreen({ navigation, route }) {
             handleWebSocketEvent(event);
           } catch {}
         });
+        // Obtener estado actual al conectar
+        getAuctionLive(token, auctionId)
+          .then((live) => { if (live) setSalaData(live); })
+          .catch(() => {});
       },
       onStompError: () => setSnackbar('Error en la conexión en tiempo real.'),
     });

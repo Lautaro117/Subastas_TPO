@@ -145,10 +145,19 @@ public class SubastaService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         Integer clienteId = usuario.getClienteId();
 
-        Optional<Asistente> actual = asistenteRepository.findByClienteId(clienteId);
-        if (actual.isPresent()) {
-            if (actual.get().getSubastaId().equals(subastaId)) return construirSalaResponse(subastaId);
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ya estás conectado a otra subasta");
+        // Ya está en esta subasta → devolver estado actual
+        if (asistenteRepository.findByClienteIdAndSubastaId(clienteId, subastaId).isPresent()) {
+            return construirSalaResponse(subastaId);
+        }
+
+        // Limpiar registros de subastas cerradas; bloquear si hay una subasta abierta diferente
+        List<Asistente> otros = asistenteRepository.findAllByClienteId(clienteId);
+        for (Asistente a : otros) {
+            Subasta otraSubasta = subastaRepository.findById(a.getSubastaId()).orElse(null);
+            if (otraSubasta != null && "abierta".equalsIgnoreCase(otraSubasta.getEstado())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ya estás conectado a otra subasta activa");
+            }
+            asistenteRepository.delete(a);
         }
 
         Asistente asistente = new Asistente();
@@ -330,6 +339,11 @@ public class SubastaService {
                     .ifPresent(p -> resultado.setMontoPujado(p.getImporte()));
         }
         return resultado;
+    }
+
+    public SalaResponse obtenerEstadoAdmin(Integer subastaId) {
+        buscarPorId(subastaId);
+        return construirSalaResponse(subastaId);
     }
 
     public void notificarCierre(Integer subastaId) {
