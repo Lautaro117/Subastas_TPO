@@ -1,8 +1,5 @@
 package com.example.subastas.service;
 
-import java.math.BigDecimal;
-
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -11,13 +8,15 @@ import com.example.subastas.dto.AuctionEventDTO;
 @Service
 public class AuctionNotificationService {
 
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public void notificarNuevaPuja(Integer subastaId, BigDecimal monto, String moneda, String postor) {
+    public AuctionNotificationService(SimpMessagingTemplate messagingTemplate) {
+        this.messagingTemplate = messagingTemplate;
+    }
+
+    public void notificarNuevaPuja(Integer subastaId, Object salaActualizada) {
         String destination = "/topic/auction/" + subastaId;
-        AuctionEventDTO.BidNewPayload payload = new AuctionEventDTO.BidNewPayload(monto, moneda, false);
-        messagingTemplate.convertAndSend(destination, new AuctionEventDTO("bid.new", payload));
+        messagingTemplate.convertAndSend(destination, new AuctionEventDTO("bid.new", salaActualizada));
     }
 
     public void notificarSiguienteItem(Integer subastaId, Object itemData) {

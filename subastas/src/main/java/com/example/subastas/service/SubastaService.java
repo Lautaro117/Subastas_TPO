@@ -259,8 +259,9 @@ public class SubastaService {
         pujoExt.setMedioPagoId(medioPagoId);
         pujoExtRepository.save(pujoExt);
 
-        String postor = "Postor #" + asistente.getNumeroPostor();
-        auctionNotificationService.notificarNuevaPuja(subastaId, savedPujo.getImporte(), MONEDA, postor);
+        // Construir sala actualizada y notificar a todos los dispositivos con el estado completo
+        SalaResponse salaActualizada = construirSalaResponse(subastaId);
+        auctionNotificationService.notificarNuevaPuja(subastaId, salaActualizada);
 
         return savedPujo;
     }
@@ -292,8 +293,9 @@ public class SubastaService {
             pujoRepository.save(p);
         });
 
-        // Marcar ítem como vendido
+        // Marcar ítem como vendido y quitar en_vivo
         item.setSubastado("si");
+        item.setEnVivo("no");
         itemCatalogoRepository.save(item);
 
         // Determinar si hay más ítems
@@ -341,6 +343,32 @@ public class SubastaService {
         return resultado;
     }
 
+    @Transactional
+    public SalaResponse activarItem(Integer subastaId, Integer itemId) {
+        buscarPorId(subastaId);
+        Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Catálogo no encontrado"));
+
+        // Quitar en_vivo de todos los ítems del catálogo
+        List<ItemCatalogo> todos = itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador());
+        todos.forEach(i -> { i.setEnVivo("no"); itemCatalogoRepository.save(i); });
+
+        // Activar el ítem elegido
+        ItemCatalogo target = todos.stream()
+                .filter(i -> i.getIdentificador().equals(itemId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ítem no encontrado en este catálogo"));
+        if ("si".equalsIgnoreCase(target.getSubastado())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El ítem ya fue adjudicado");
+        }
+        target.setEnVivo("si");
+        itemCatalogoRepository.save(target);
+
+        SalaResponse estado = construirSalaResponse(subastaId);
+        auctionNotificationService.notificarSiguienteItem(subastaId, estado);
+        return estado;
+    }
+
     public SalaResponse obtenerEstadoAdmin(Integer subastaId) {
         buscarPorId(subastaId);
         return construirSalaResponse(subastaId);
@@ -361,9 +389,13 @@ public class SubastaService {
         if (catalogo == null) return response;
 
         List<ItemCatalogo> items = itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador());
+        // Preferir el ítem marcado explícitamente como en_vivo; si no hay ninguno, usar el primero no subastado
         Optional<ItemCatalogo> actualOpt = items.stream()
-                .filter(i -> !"si".equalsIgnoreCase(i.getSubastado()))
-                .findFirst();
+                .filter(i -> "si".equalsIgnoreCase(i.getEnVivo()) && !"si".equalsIgnoreCase(i.getSubastado()))
+                .findFirst()
+                .or(() -> items.stream()
+                        .filter(i -> !"si".equalsIgnoreCase(i.getSubastado()))
+                        .findFirst());
 
         if (actualOpt.isEmpty()) return response;
 

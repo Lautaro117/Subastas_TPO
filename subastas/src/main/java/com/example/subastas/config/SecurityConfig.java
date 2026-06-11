@@ -45,6 +45,7 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/auctions").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET,  "/api/auctions/*/admin-live").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auctions/*/items/*/adjudicate").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auctions/*/items/*/activate").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

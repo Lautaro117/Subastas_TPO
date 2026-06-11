@@ -136,6 +136,13 @@ public class SubastaController {
         return ResponseEntity.ok(subastaService.obtenerEstadoAdmin(id));
     }
 
+    @PostMapping("/{id}/items/{itemId}/activate")
+    public ResponseEntity<SalaResponse> activar(
+            @PathVariable Integer id,
+            @PathVariable Integer itemId) {
+        return ResponseEntity.ok(subastaService.activarItem(id, itemId));
+    }
+
     @PostMapping("/{id}/items/{itemId}/adjudicate")
     public ResponseEntity<SalaResponse> adjudicar(
             @PathVariable Integer id,

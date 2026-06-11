@@ -218,6 +218,7 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
   const stompClientRef = useRef(null);
   const countdownRef = useRef(null);
+  const pollingRef = useRef(null);
 
   // ─── Carga inicial ──────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -239,10 +240,11 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Limpiar intervalo y WebSocket solo al desmontar
+  // Limpiar intervalos y WebSocket solo al desmontar
   useEffect(() => {
     return () => {
       clearInterval(countdownRef.current);
+      clearInterval(pollingRef.current);
       stompClientRef.current?.deactivate?.();
     };
   }, []);
@@ -311,10 +313,17 @@ export default function SalaSubastaScreen({ navigation, route }) {
             handleWebSocketEvent(event);
           } catch {}
         });
-        // Obtener estado actual al conectar
+        // Estado inicial al conectar
         getAuctionLive(token, auctionId)
           .then((live) => { if (live) setSalaData(live); })
           .catch(() => {});
+        // Polling de respaldo cada 5 s — cubre eventos WebSocket perdidos
+        clearInterval(pollingRef.current);
+        pollingRef.current = setInterval(() => {
+          getAuctionLive(token, auctionId)
+            .then((live) => { if (live) setSalaData(live); })
+            .catch(() => {});
+        }, 5000);
       },
       onStompError: () => setSnackbar('Error en la conexión en tiempo real.'),
     });
@@ -327,27 +336,31 @@ export default function SalaSubastaScreen({ navigation, route }) {
   function handleWebSocketEvent(event) {
     switch (event.tipo) {
       case 'bid.new':
-        // Nueva puja — refrescar estado via REST
-        getAuctionLive(token, auctionId)
-          .then((live) => { if (live) setSalaData(live); })
-          .catch(() => {});
+        // El payload ES el SalaResponse completo — usarlo directo, sin REST extra
+        if (event.payload?.itemActual !== undefined) {
+          setSalaData(event.payload);
+        } else {
+          // Fallback por compatibilidad
+          getAuctionLive(token, auctionId)
+            .then((live) => { if (live) setSalaData(live); })
+            .catch(() => {});
+        }
         break;
 
       case 'item.next':
-        // Siguiente ítem — refrescar catálogo y sala
-        Promise.all([
-          getAuctionCatalog(token, auctionId),
-          getAuctionLive(token, auctionId),
-        ]).then(([cat, live]) => {
-          if (cat) setCatalogo(Array.isArray(cat) ? cat : []);
-          if (live) setSalaData(live);
-        }).catch(() => {});
+        // Siguiente ítem — el payload es el SalaResponse nuevo
+        if (event.payload?.itemActual !== undefined) {
+          setSalaData(event.payload);
+        }
+        getAuctionCatalog(token, auctionId)
+          .then((cat) => { if (cat) setCatalogo(Array.isArray(cat) ? cat : []); })
+          .catch(() => {});
         break;
 
       case 'auction.closed':
-        // Subasta cerrada — ir a pantalla de resultado
         stompClientRef.current?.deactivate?.();
         clearInterval(countdownRef.current);
+        clearInterval(pollingRef.current);
         navigation.replace('ResultadoSubasta', { auctionId });
         break;
 
@@ -362,6 +375,7 @@ export default function SalaSubastaScreen({ navigation, route }) {
     try { await leaveAuction(token, auctionId); } catch {}
     setJoined(false);
     clearInterval(countdownRef.current);
+    clearInterval(pollingRef.current);
     stompClientRef.current?.deactivate?.();
     navigation.goBack();
   }, [token, auctionId, navigation]);

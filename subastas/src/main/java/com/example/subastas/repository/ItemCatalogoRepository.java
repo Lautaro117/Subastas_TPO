@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface ItemCatalogoRepository extends JpaRepository<ItemCatalogo, Integer> {
     List<ItemCatalogo> findByCatalogoId(Integer catalogoId);
+    java.util.Optional<ItemCatalogo> findByCatalogoIdAndEnVivo(Integer catalogoId, String enVivo);
 }

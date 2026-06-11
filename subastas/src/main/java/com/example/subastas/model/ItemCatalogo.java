@@ -25,6 +25,9 @@ public class ItemCatalogo {
 
     private String subastado;
 
+    @Column(name = "en_vivo")
+    private String enVivo;
+
     // Getters y Setters
     public Integer getIdentificador() { return identificador; }
     public void setIdentificador(Integer identificador) { this.identificador = identificador; }
@@ -43,4 +46,7 @@ public class ItemCatalogo {
 
     public String getSubastado() { return subastado; }
     public void setSubastado(String subastado) { this.subastado = subastado; }
+
+    public String getEnVivo() { return enVivo; }
+    public void setEnVivo(String enVivo) { this.enVivo = enVivo; }
 }
