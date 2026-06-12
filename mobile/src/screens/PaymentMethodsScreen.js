@@ -60,7 +60,7 @@ export default function PaymentMethodsScreen({ navigation, route }) {
   const { session, enterApp } = useAppSession();
 
   const isOnboarding = route?.params?.isOnboarding ?? false;
-  const [activeTab, setActiveTab] = useState('mis');
+  const [activeTab, setActiveTab] = useState('agregar');
   const [methods, setMethods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

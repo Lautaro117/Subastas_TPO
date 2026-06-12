@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -27,6 +27,108 @@ import { useAppSession } from '../../navigation/AppSessionContext';
 import { getItemDetail } from '../../services/auctionsApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CAROUSEL_HEIGHT = 300;
+
+// ─── Carrusel de fotos ────────────────────────────────────────────────────────
+function PhotoCarousel({ fotos, theme }) {
+  const [page, setPage] = useState(0);
+  const scrollRef = useRef(null);
+
+  if (!fotos || fotos.length === 0) {
+    return (
+      <View style={[carouselStyles.placeholder, { backgroundColor: theme.colors.surfaceContainerLow }]}>
+        <Text style={{ fontSize: 48 }}>📦</Text>
+      </View>
+    );
+  }
+
+  const handleScroll = (e) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    setPage(idx);
+  };
+
+  return (
+    <View>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        decelerationRate="fast"
+      >
+        {fotos.map((foto, idx) => (
+          <Image
+            key={idx}
+            source={{ uri: `data:image/jpeg;base64,${foto}` }}
+            style={carouselStyles.image}
+            resizeMode="cover"
+          />
+        ))}
+      </ScrollView>
+
+      {/* Indicadores de página */}
+      {fotos.length > 1 && (
+        <View style={carouselStyles.dots}>
+          {fotos.map((_, idx) => (
+            <View
+              key={idx}
+              style={[
+                carouselStyles.dot,
+                idx === page
+                  ? { backgroundColor: '#fff', width: 16 }
+                  : { backgroundColor: 'rgba(255,255,255,0.45)' },
+              ]}
+            />
+          ))}
+        </View>
+      )}
+
+      {/* Contador de fotos */}
+      {fotos.length > 1 && (
+        <View style={carouselStyles.counter}>
+          <Text style={carouselStyles.counterText}>{page + 1} / {fotos.length}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const carouselStyles = StyleSheet.create({
+  image: { width: SCREEN_WIDTH, height: CAROUSEL_HEIGHT },
+  placeholder: {
+    width: SCREEN_WIDTH,
+    height: CAROUSEL_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dots: {
+    position: 'absolute',
+    bottom: 12,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dot: {
+    height: 6,
+    borderRadius: 3,
+    width: 6,
+  },
+  counter: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  counterText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+});
 
 function decodeJwtPayload(token) {
   try {
@@ -94,7 +196,6 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
 
   const titulo = detalle?.descripcionCatalogo ?? `Producto #${detalle?.productoId ?? itemParam?.productoId}`;
   const fotos = detalle?.fotos ?? [];
-  const primeraFoto = fotos.length > 0 ? fotos[0] : null;
   const subastado = detalle?.subastado === 'si' || itemParam?.subastado === 'si';
 
   if (isLoading) {
@@ -129,18 +230,8 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Foto principal */}
-        {primeraFoto ? (
-          <Image
-            source={{ uri: `data:image/jpeg;base64,${primeraFoto}` }}
-            style={styles.foto}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.fotoPlaceholder, { backgroundColor: theme.colors.surfaceContainerLow }]}>
-            <Text style={{ fontSize: 48 }}>📦</Text>
-          </View>
-        )}
+        {/* Carrusel de fotos */}
+        <PhotoCarousel fotos={fotos} theme={theme} />
 
         <View style={styles.body}>
           {/* Chips de estado */}
@@ -288,14 +379,6 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   appbarTitle: { fontSize: 16, fontWeight: '600' },
-
-  foto: { width: SCREEN_WIDTH, height: 280 },
-  fotoPlaceholder: {
-    width: '100%',
-    height: 280,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
   content: { paddingBottom: 40 },
   body: { paddingHorizontal: 20, paddingTop: 20 },
