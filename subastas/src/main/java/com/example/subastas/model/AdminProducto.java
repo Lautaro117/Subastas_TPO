@@ -30,6 +30,12 @@ public class AdminProducto {
     @Column(name = "fecha_subasta")
     private LocalDate fechaSubasta;
 
+    @Column(name = "motivo_rechazo")
+    private String motivoRechazo;
+
+    @Column(name = "etapa_rechazo")
+    private String etapaRechazo;
+
     // getters y setters
     public Integer getProductoId() { return productoId; }
     public void setProductoId(Integer productoId) { this.productoId = productoId; }
@@ -48,4 +54,10 @@ public class AdminProducto {
 
     public LocalDate getFechaSubasta() { return fechaSubasta; }
     public void setFechaSubasta(LocalDate fechaSubasta) { this.fechaSubasta = fechaSubasta; }
+
+    public String getMotivoRechazo() { return motivoRechazo; }
+    public void setMotivoRechazo(String motivoRechazo) { this.motivoRechazo = motivoRechazo; }
+
+    public String getEtapaRechazo() { return etapaRechazo; }
+    public void setEtapaRechazo(String etapaRechazo) { this.etapaRechazo = etapaRechazo; }
 }

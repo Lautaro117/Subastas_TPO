@@ -63,6 +63,15 @@ public class MiProductoController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/{id}/shipped")
+    public ResponseEntity<Void> marcarEnviado(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable Integer id) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        miProductoService.marcarEnviado(email, id);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/{id}/reject")
     public ResponseEntity<Void> rechazarPropuesta(
             @RequestHeader("Authorization") String authHeader,

@@ -1,4 +1,4 @@
-const defaultBaseUrl = 'http://192.168.0.186:8080';
+const defaultBaseUrl = 'http://172.20.10.2:8080';
 
 export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || defaultBaseUrl).replace(/\/$/, '');
 

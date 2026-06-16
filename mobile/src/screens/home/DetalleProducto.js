@@ -5,7 +5,7 @@ import { ActivityIndicator, Button, Icon, IconButton, Surface, Text } from 'reac
 
 import { COLORS } from '../../theme/colors';
 import { useAppSession } from '../../navigation/AppSessionContext';
-import { aceptarPropuesta, rechazarPropuesta, getCustodia } from '../../services/itemsApi';
+import { aceptarPropuesta, rechazarPropuesta, getCustodia, marcarEnviado } from '../../services/itemsApi';
 import { buildApiUrl } from '../../config/api';
 
 const { width } = Dimensions.get('window');
@@ -91,6 +91,18 @@ export default function DetalleProducto({ navigation, route }) {
     }
   };
 
+  const handleMarcarEnviado = async () => {
+    setAccionando(true);
+    try {
+      await marcarEnviado(session.token, productoId);
+      await cargar();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setAccionando(false);
+    }
+  };
+
   const handleRechazar = async () => {
     setAccionando(true);
     try {
@@ -157,46 +169,76 @@ export default function DetalleProducto({ navigation, route }) {
 
               {/* Banner: enviar al depósito */}
               {producto.estadoAdmin === 'enviar_deposito' && (
-                <Surface elevation={0} style={[styles.banner, { backgroundColor: '#FFA72622', borderColor: '#FFA726' }]}>
-                  <Icon source="truck-delivery-outline" size={24} color="#FFA726" />
-                  <View style={styles.bannerText}>
-                    <Text style={[styles.bannerTitle, { color: '#FFA726' }]}>Tu producto fue seleccionado</Text>
-                    <Text style={[styles.bannerDesc, { color: COLORS.onSurfaceVariant }]}>
-                      Debés enviar el producto al depósito para su revisión.
-                    </Text>
-                    {custodia ? (
-                      <>
-                        <Text style={[styles.bannerField, { color: COLORS.onSurface }]}>
-                          Depósito: {custodia.nombreDeposito}
+                <Surface elevation={0} style={[styles.banner, { backgroundColor: '#FFA72622', borderColor: '#FFA726', flexDirection: 'column', gap: 12 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+                    <Icon source="truck-delivery-outline" size={24} color="#FFA726" />
+                    <View style={styles.bannerText}>
+                      <Text style={[styles.bannerTitle, { color: '#FFA726' }]}>Enviá tu producto al depósito</Text>
+                      {custodia ? (
+                        <>
+                          <Text style={[styles.bannerField, { color: COLORS.onSurface }]}>
+                            {custodia.nombreDeposito}
+                          </Text>
+                          <Text style={[styles.bannerField, { color: COLORS.onSurface }]}>
+                            {custodia.direccionDeposito}
+                          </Text>
+                        </>
+                      ) : (
+                        <Text style={[styles.bannerDesc, { color: COLORS.onSurfaceVariant }]}>
+                          La empresa se pondrá en contacto con las instrucciones de envío.
                         </Text>
-                        <Text style={[styles.bannerField, { color: COLORS.onSurface }]}>
-                          Dirección: {custodia.direccionDeposito}
-                        </Text>
-                      </>
-                    ) : (
-                      <Text style={[styles.bannerDesc, { color: COLORS.onSurfaceVariant }]}>
-                        La empresa se pondrá en contacto con las instrucciones de envío.
-                      </Text>
-                    )}
+                      )}
+                    </View>
                   </View>
+                  <View style={[styles.aviso, { backgroundColor: '#FFA72615' }]}>
+                    <Icon source="information-outline" size={16} color="#FFA726" />
+                    <Text style={[styles.avisoText, { color: '#92400e' }]}>
+                      El costo del envío al depósito corre por tu cuenta.
+                    </Text>
+                  </View>
+                  <Button
+                    mode="contained"
+                    onPress={handleMarcarEnviado}
+                    disabled={accionando}
+                    style={{ borderRadius: 999, backgroundColor: '#FFA726' }}
+                    labelStyle={{ fontSize: 14, fontWeight: '700' }}
+                  >
+                    Marcar como enviado
+                  </Button>
                 </Surface>
               )}
 
               {/* Banner: producto rechazado */}
               {producto.estadoAdmin === 'rechazado' && (
-                <Surface elevation={0} style={[styles.banner, { backgroundColor: COLORS.error + '22', borderColor: COLORS.error }]}>
-                  <Icon source="package-variant" size={24} color={COLORS.error} />
-                  <View style={styles.bannerText}>
-                    <Text style={[styles.bannerTitle, { color: COLORS.error }]}>Propuesta rechazada</Text>
-                    <Text style={[styles.bannerDesc, { color: COLORS.onSurfaceVariant }]}>
-                      Debés coordinar el retiro de tu producto con la empresa.
-                    </Text>
-                    {custodia && (
-                      <Text style={[styles.bannerField, { color: COLORS.onSurface }]}>
-                        Ubicación actual: {custodia.nombreDeposito} — {custodia.direccionDeposito}
+                <Surface elevation={0} style={[styles.banner, { backgroundColor: COLORS.error + '22', borderColor: COLORS.error, flexDirection: 'column', gap: 10 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+                    <Icon source="close-circle-outline" size={24} color={COLORS.error} />
+                    <View style={styles.bannerText}>
+                      <Text style={[styles.bannerTitle, { color: COLORS.error }]}>
+                        {producto.etapaRechazo === 'en_deposito'
+                          ? 'Producto rechazado en depósito'
+                          : 'Producto no aceptado'}
                       </Text>
-                    )}
+                      <Text style={[styles.bannerDesc, { color: COLORS.onSurfaceVariant }]}>
+                        {producto.etapaRechazo === 'en_deposito'
+                          ? 'Tu producto fue revisado en el depósito y no cumple los requisitos. Debés coordinar su retiro con la empresa.'
+                          : 'Tu producto no fue aceptado para ingresar al proceso de subasta.'}
+                      </Text>
+                      {custodia && producto.etapaRechazo === 'en_deposito' && (
+                        <Text style={[styles.bannerField, { color: COLORS.onSurface }]}>
+                          Ubicación actual: {custodia.nombreDeposito} — {custodia.direccionDeposito}
+                        </Text>
+                      )}
+                    </View>
                   </View>
+                  {producto.motivoRechazo ? (
+                    <View style={[styles.aviso, { backgroundColor: COLORS.error + '15' }]}>
+                      <Icon source="information-outline" size={16} color={COLORS.error} />
+                      <Text style={[styles.avisoText, { color: COLORS.error }]}>
+                        Motivo: {producto.motivoRechazo}
+                      </Text>
+                    </View>
+                  ) : null}
                 </Surface>
               )}
 
@@ -300,6 +342,8 @@ const styles = StyleSheet.create({
   bannerTitle: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
   bannerDesc: { fontSize: 13, lineHeight: 18 },
   bannerField: { fontSize: 13, fontWeight: '500', lineHeight: 18 },
+  aviso: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 8, padding: 10 },
+  avisoText: { fontSize: 12, lineHeight: 17, flex: 1 },
   card: { backgroundColor: COLORS.surfaceContainerLow, borderRadius: 16, padding: 20, gap: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', marginBottom: 16 },
   cardDesc: { fontSize: 14, lineHeight: 22, color: COLORS.onSurfaceVariant },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

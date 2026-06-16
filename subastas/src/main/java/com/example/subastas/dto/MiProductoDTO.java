@@ -14,10 +14,13 @@ public class MiProductoDTO {
     private BigDecimal comision;
     private LocalDate fechaSubasta;
     private List<String> fotos;
+    private String motivoRechazo;
+    private String etapaRechazo;
 
     public MiProductoDTO(Integer id, String descripcionCatalogo, String descripcionCompleta,
                          String estadoAdmin, String estadoPropuesta, BigDecimal precioPropuesto,
-                         BigDecimal comision, LocalDate fechaSubasta, List<String> fotos) {
+                         BigDecimal comision, LocalDate fechaSubasta, List<String> fotos,
+                         String motivoRechazo, String etapaRechazo) {
         this.id = id;
         this.descripcionCatalogo = descripcionCatalogo;
         this.descripcionCompleta = descripcionCompleta;
@@ -27,6 +30,8 @@ public class MiProductoDTO {
         this.comision = comision;
         this.fechaSubasta = fechaSubasta;
         this.fotos = fotos;
+        this.motivoRechazo = motivoRechazo;
+        this.etapaRechazo = etapaRechazo;
     }
 
     public Integer getId() { return id; }
@@ -38,4 +43,6 @@ public class MiProductoDTO {
     public BigDecimal getComision() { return comision; }
     public LocalDate getFechaSubasta() { return fechaSubasta; }
     public List<String> getFotos() { return fotos; }
+    public String getMotivoRechazo() { return motivoRechazo; }
+    public String getEtapaRechazo() { return etapaRechazo; }
 }

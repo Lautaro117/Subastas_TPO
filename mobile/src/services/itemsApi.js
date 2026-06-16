@@ -87,6 +87,10 @@ export async function rechazarPropuesta(token, productoId) {
   });
 }
 
+export async function marcarEnviado(token, productoId) {
+  return authedRequest(`/api/my-items/${productoId}/shipped`, token, { method: 'POST' });
+}
+
 export async function getCustodia(token, productoId) {
   return authedRequest(`/api/my-items/${productoId}/custody`, token);
 }

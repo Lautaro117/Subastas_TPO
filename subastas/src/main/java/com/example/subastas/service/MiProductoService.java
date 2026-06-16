@@ -79,7 +79,9 @@ public class MiProductoService {
                 ap != null ? ap.getPrecioPropuesto() : null,
                 ap != null ? ap.getComision() : null,
                 ap != null ? ap.getFechaSubasta() : null,
-                null
+                null,
+                ap != null ? ap.getMotivoRechazo() : null,
+                ap != null ? ap.getEtapaRechazo() : null
             );
         }).collect(Collectors.toList());
     }
@@ -144,6 +146,23 @@ public class MiProductoService {
         adminProductoRepository.save(ap);
 
         producto.setEstadoAdmin("aprobado");
+        productoRepository.save(producto);
+    }
+
+    public void marcarEnviado(String email, Integer productoId) {
+        Integer clienteId = getClienteId(email);
+        Producto producto = productoRepository.findById(productoId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+
+        if (!producto.getDuenio().equals(clienteId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+
+        if (!"enviar_deposito".equals(producto.getEstadoAdmin())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El producto no está en estado de envío");
+        }
+
+        producto.setEstadoAdmin("en_deposito");
         productoRepository.save(producto);
     }
 
@@ -222,7 +241,9 @@ public class MiProductoService {
             ap != null ? ap.getPrecioPropuesto() : null,
             ap != null ? ap.getComision() : null,
             ap != null ? ap.getFechaSubasta() : null,
-            fotosBase64
+            fotosBase64,
+            ap != null ? ap.getMotivoRechazo() : null,
+            ap != null ? ap.getEtapaRechazo() : null
         );
     }
 }

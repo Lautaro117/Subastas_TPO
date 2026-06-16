@@ -58,7 +58,7 @@ function ProductoCard({ item, onPress }) {
             {ESTADO_LABEL[item.estadoAdmin] || item.estadoAdmin}
           </Text>
         </View>
-        {item.estadoPropuesta ? (
+        {item.estadoPropuesta && item.estadoPropuesta !== 'sin_propuesta' ? (
           <View style={styles.infoRow}>
             <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Propuesta:</Text>
             <Text style={[styles.infoValue, { color: propuestaColor }]}>
