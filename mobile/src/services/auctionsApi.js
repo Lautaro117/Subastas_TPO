@@ -165,6 +165,18 @@ export async function getResultadoItem(token, auctionId, itemId) {
 }
 
 /**
+ * DELETE /api/auctions/leave-all
+ * Sale de todas las subastas activas (para testing).
+ */
+export async function leaveAllAuctions(token) {
+  const response = await fetch(buildApiUrl('/api/auctions/leave-all'), {
+    method: 'DELETE',
+    headers: buildAuthHeaders(token),
+  });
+  if (!response.ok) throw new Error(`Error: ${response.status}`);
+}
+
+/**
  * GET /api/auctions/:auctionId/catalog/:itemId/product
  * Detalle completo del producto: descripción + fotos en base64.
  */

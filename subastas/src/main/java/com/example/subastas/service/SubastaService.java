@@ -389,6 +389,14 @@ public class SubastaService {
         auctionNotificationService.notificarCierre(subastaId);
     }
 
+    @Transactional
+    public void salirDeTodas(String email) {
+        var usuario = usuarioAuthRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        List<Asistente> asistentes = asistenteRepository.findAllByClienteId(usuario.getClienteId());
+        asistenteRepository.deleteAll(asistentes);
+    }
+
     // ── Construcción de sala ───────────────────────────────────────────────────
 
     private SalaResponse construirSalaResponse(Integer subastaId) {
