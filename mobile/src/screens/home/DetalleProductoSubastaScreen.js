@@ -330,7 +330,7 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
               mode="contained"
               onPress={() => navigation.navigate('SalaSubasta', {
                 auctionId,
-                auction: { identificador: auctionId },
+                auction: { identificador: auctionId, estado: 'abierta' },
               })}
               style={styles.ingresarButton}
               contentStyle={styles.ingresarButtonContent}
