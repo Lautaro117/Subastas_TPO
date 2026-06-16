@@ -219,6 +219,7 @@ export default function SalaSubastaScreen({ navigation, route }) {
   const stompClientRef = useRef(null);
   const countdownRef = useRef(null);
   const pollingRef = useRef(null);
+  const autoJoinHandled = useRef(false);
 
   // ─── Carga inicial ──────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -257,6 +258,14 @@ export default function SalaSubastaScreen({ navigation, route }) {
     };
   }, [joined, token, auctionId]);
 
+  // Auto-join cuando se navega desde DetalleProductoSubasta con autoJoin=true
+  useEffect(() => {
+    if (route.params?.autoJoin && !autoJoinHandled.current && fase === 'preview' && !joined && !joining && !isLoading) {
+      autoJoinHandled.current = true;
+      handleJoin();
+    }
+  }, [route.params?.autoJoin, fase, joined, joining, isLoading, handleJoin]);
+
   // ─── Join ───────────────────────────────────────────────────────────────────
   const handleJoin = useCallback(async () => {
     if (userEstado === 'E2' || userEstado === 'E3') {
@@ -271,12 +280,24 @@ export default function SalaSubastaScreen({ navigation, route }) {
       setFase('sala');
       connectWebSocket();
     } catch (err) {
-      if (err.status === 409) setSnackbar('Ya estás en otra sala. Salí primero.');
-      else if (err.status === 403) {
-        const msg = err.message ?? '';
-        if (msg.toLowerCase().includes('categoría')) setModalCategoriaInsuficiente(true);
-        else setSnackbar('No tenés acceso a esta subasta.');
-      } else setSnackbar('No se pudo unir a la sala.');
+      const msg = (err.message ?? '').toLowerCase();
+      if (err.status === 409) {
+        if (msg.includes('activa') || msg.includes('finaliz')) {
+          setSnackbar('La subasta aún no está activa.');
+        } else {
+          setSnackbar('Ya estás en otra sala. Salí primero.');
+        }
+      } else if (err.status === 403) {
+        if (msg.includes('categor')) {
+          setModalCategoriaInsuficiente(true);
+        } else if (msg.includes('otra subasta')) {
+          setSnackbar('Ya estás en otra subasta activa. Salí primero.');
+        } else {
+          setModalCategoriaInsuficiente(true);
+        }
+      } else {
+        setSnackbar('No se pudo unir a la sala.');
+      }
     } finally {
       setJoining(false);
     }

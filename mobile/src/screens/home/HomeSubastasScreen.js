@@ -18,7 +18,7 @@ import { getAuctions } from '../../services/auctionsApi';
 
 const STATUS_MAP = {
   active: 'abierta',
-  upcoming: 'proxima',
+  upcoming: 'pendiente',
   closed: 'cerrada',
 };
 

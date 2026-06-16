@@ -331,6 +331,7 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
               onPress={() => navigation.navigate('SalaSubasta', {
                 auctionId,
                 auction: { identificador: auctionId, estado: 'abierta' },
+                autoJoin: true,
               })}
               style={styles.ingresarButton}
               contentStyle={styles.ingresarButtonContent}
