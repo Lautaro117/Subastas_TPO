@@ -268,7 +268,8 @@ export default function SalaSubastaScreen({ navigation, route }) {
       const salaResponse = await joinAuction(token, auctionId);
       if (salaResponse) setSalaData(salaResponse);
       setJoined(true);
-      startWarmup();
+      setFase('sala');
+      connectWebSocket();
     } catch (err) {
       if (err.status === 409) setSnackbar('Ya estás en otra sala. Salí primero.');
       else if (err.status === 403) {
@@ -281,16 +282,16 @@ export default function SalaSubastaScreen({ navigation, route }) {
     }
   }, [token, auctionId, userEstado]);
 
-  // ─── Warmup ─────────────────────────────────────────────────────────────────
+  // ─── Warmup (solo entre ítems, no al ingresar) ──────────────────────────────
   function startWarmup() {
     setFase('warmup');
     setCountdown(WARMUP_SECONDS);
+    clearInterval(countdownRef.current);
     countdownRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(countdownRef.current);
           setFase('sala');
-          connectWebSocket();
           return 0;
         }
         return prev - 1;
@@ -348,13 +349,13 @@ export default function SalaSubastaScreen({ navigation, route }) {
         break;
 
       case 'item.next':
-        // Siguiente ítem — el payload es el SalaResponse nuevo
         if (event.payload?.itemActual !== undefined) {
           setSalaData(event.payload);
         }
         getAuctionCatalog(token, auctionId)
           .then((cat) => { if (cat) setCatalogo(Array.isArray(cat) ? cat : []); })
           .catch(() => {});
+        startWarmup();
         break;
 
       case 'auction.closed':

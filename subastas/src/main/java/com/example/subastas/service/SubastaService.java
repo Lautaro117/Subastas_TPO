@@ -20,6 +20,8 @@ import com.example.subastas.dto.CatalogoDTO;
 import com.example.subastas.dto.ProductoDetalleDTO;
 import com.example.subastas.dto.ResultadoItemDTO;
 import com.example.subastas.dto.SalaResponse;
+import java.time.LocalDateTime;
+import com.example.subastas.model.Adjudicaciones;
 import com.example.subastas.model.Asistente;
 import com.example.subastas.model.Catalogo;
 import com.example.subastas.model.FotoProducto;
@@ -287,10 +289,19 @@ public class SubastaService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "El ítem ya fue adjudicado");
         }
 
-        // Marcar puja ganadora
+        // Marcar puja ganadora y crear adjudicación
         pujoRepository.findTopByItemIdOrderByImporteDesc(itemId).ifPresent(p -> {
             p.setGanador("si");
             pujoRepository.save(p);
+
+            Adjudicaciones adj = new Adjudicaciones();
+            adj.setItemId(itemId);
+            adj.setAsistenteId(p.getAsistenteId());
+            adj.setImporte(p.getImporte());
+            adj.setComision(item.getComision() != null ? item.getComision() : BigDecimal.ZERO);
+            adj.setCostoEnvio(BigDecimal.ZERO);
+            adj.setCreatedAt(LocalDateTime.now());
+            adjudicacionesRepository.save(adj);
         });
 
         // Marcar ítem como vendido y quitar en_vivo
@@ -389,13 +400,10 @@ public class SubastaService {
         if (catalogo == null) return response;
 
         List<ItemCatalogo> items = itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador());
-        // Preferir el ítem marcado explícitamente como en_vivo; si no hay ninguno, usar el primero no subastado
+        // Solo mostrar ítem activo si fue explícitamente marcado en_vivo='si' por el admin
         Optional<ItemCatalogo> actualOpt = items.stream()
                 .filter(i -> "si".equalsIgnoreCase(i.getEnVivo()) && !"si".equalsIgnoreCase(i.getSubastado()))
-                .findFirst()
-                .or(() -> items.stream()
-                        .filter(i -> !"si".equalsIgnoreCase(i.getSubastado()))
-                        .findFirst());
+                .findFirst();
 
         if (actualOpt.isEmpty()) return response;
 
