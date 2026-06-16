@@ -50,6 +50,7 @@ export default function DetalleProducto({ navigation, route }) {
   const { productoId } = route.params;
   const [producto, setProducto] = useState(null);
   const [custodia, setCustodia] = useState(null);
+  const [custodiaLoading, setCustodiaLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [accionando, setAccionando] = useState(false);
@@ -64,11 +65,12 @@ export default function DetalleProducto({ navigation, route }) {
       const data = await response.json();
       setProducto(data);
 
-      // Cargar info de depósito si está en estado de depósito
       if (data.estadoAdmin === 'enviar_deposito' || data.estadoAdmin === 'en_deposito') {
+        setCustodiaLoading(true);
         getCustodia(session.token, productoId)
           .then(setCustodia)
-          .catch(() => setCustodia(null));
+          .catch(() => setCustodia(null))
+          .finally(() => setCustodiaLoading(false));
       }
     } catch {
       setError('No se pudo cargar el producto');
@@ -169,42 +171,45 @@ export default function DetalleProducto({ navigation, route }) {
 
               {/* Banner: enviar al depósito */}
               {producto.estadoAdmin === 'enviar_deposito' && (
-                <Surface elevation={0} style={[styles.banner, { backgroundColor: '#FFA72622', borderColor: '#FFA726', flexDirection: 'column', gap: 12 }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-                    <Icon source="truck-delivery-outline" size={24} color="#FFA726" />
-                    <View style={styles.bannerText}>
-                      <Text style={[styles.bannerTitle, { color: '#FFA726' }]}>Enviá tu producto al depósito</Text>
-                      {custodia ? (
-                        <>
-                          <Text style={[styles.bannerField, { color: COLORS.onSurface }]}>
-                            {custodia.nombreDeposito}
-                          </Text>
-                          <Text style={[styles.bannerField, { color: COLORS.onSurface }]}>
-                            {custodia.direccionDeposito}
-                          </Text>
-                        </>
-                      ) : (
-                        <Text style={[styles.bannerDesc, { color: COLORS.onSurfaceVariant }]}>
-                          La empresa se pondrá en contacto con las instrucciones de envío.
-                        </Text>
-                      )}
+                <Surface elevation={0} style={styles.envioCard}>
+                  <View style={styles.envioHeader}>
+                    <Icon source="truck-delivery-outline" size={22} color="#fff" />
+                    <Text style={styles.envioHeaderText}>Enviá tu producto al depósito</Text>
+                  </View>
+
+                  <View style={styles.envioBody}>
+                    {custodiaLoading ? (
+                      <Text style={styles.envioMuted}>Cargando dirección...</Text>
+                    ) : custodia ? (
+                      <View style={styles.envioDir}>
+                        <Text style={styles.envioDirLabel}>Depósito</Text>
+                        <Text style={styles.envioDirNombre}>{custodia.nombreDeposito}</Text>
+                        <Text style={styles.envioDirLabel}>Dirección</Text>
+                        <Text style={styles.envioDirValor}>{custodia.direccionDeposito}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.envioMuted}>
+                        La empresa te informará la dirección de envío a la brevedad.
+                      </Text>
+                    )}
+
+                    <View style={styles.envioCosto}>
+                      <Icon source="alert-circle-outline" size={16} color="#92400e" />
+                      <Text style={styles.envioCostoText}>
+                        El costo del envío al depósito corre por tu cuenta.
+                      </Text>
                     </View>
+
+                    <Button
+                      mode="contained"
+                      onPress={handleMarcarEnviado}
+                      disabled={accionando}
+                      style={styles.envioBtn}
+                      labelStyle={{ fontSize: 14, fontWeight: '700', color: '#92400e' }}
+                    >
+                      Ya lo envié
+                    </Button>
                   </View>
-                  <View style={[styles.aviso, { backgroundColor: '#FFA72615' }]}>
-                    <Icon source="information-outline" size={16} color="#FFA726" />
-                    <Text style={[styles.avisoText, { color: '#92400e' }]}>
-                      El costo del envío al depósito corre por tu cuenta.
-                    </Text>
-                  </View>
-                  <Button
-                    mode="contained"
-                    onPress={handleMarcarEnviado}
-                    disabled={accionando}
-                    style={{ borderRadius: 999, backgroundColor: '#FFA726' }}
-                    labelStyle={{ fontSize: 14, fontWeight: '700' }}
-                  >
-                    Marcar como enviado
-                  </Button>
                 </Surface>
               )}
 
@@ -239,6 +244,15 @@ export default function DetalleProducto({ navigation, route }) {
                       </Text>
                     </View>
                   ) : null}
+                  {producto.etapaRechazo === 'en_deposito' && (
+                    <View style={[styles.aviso, { backgroundColor: '#FEF3C7' }]}>
+                      <Icon source="email-outline" size={16} color="#92400e" />
+                      <Text style={[styles.avisoText, { color: '#92400e' }]}>
+                        Para coordinar el retiro de tu producto contactate con el depósito en{' '}
+                        <Text style={{ fontWeight: '700' }}>deposito@subastas.com</Text>
+                      </Text>
+                    </View>
+                  )}
                 </Surface>
               )}
 
@@ -344,6 +358,18 @@ const styles = StyleSheet.create({
   bannerField: { fontSize: 13, fontWeight: '500', lineHeight: 18 },
   aviso: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 8, padding: 10 },
   avisoText: { fontSize: 12, lineHeight: 17, flex: 1 },
+  envioCard: { borderRadius: 16, overflow: 'hidden', marginBottom: 16, backgroundColor: COLORS.surfaceContainerLow, borderWidth: 1, borderColor: '#FFA726' },
+  envioHeader: { backgroundColor: '#FFA726', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
+  envioHeaderText: { fontSize: 15, fontWeight: '700', color: '#fff', flex: 1 },
+  envioBody: { padding: 16, gap: 14 },
+  envioDir: { gap: 2 },
+  envioDirLabel: { fontSize: 11, fontWeight: '700', color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8 },
+  envioDirNombre: { fontSize: 15, fontWeight: '600', color: COLORS.onSurface },
+  envioDirValor: { fontSize: 14, color: COLORS.onSurface },
+  envioMuted: { fontSize: 13, color: COLORS.onSurfaceVariant, lineHeight: 18 },
+  envioCosto: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#FEF3C7', borderRadius: 8, padding: 12 },
+  envioCostoText: { fontSize: 13, color: '#92400e', flex: 1, lineHeight: 18, fontWeight: '500' },
+  envioBtn: { borderRadius: 999, backgroundColor: '#FEF3C7' },
   card: { backgroundColor: COLORS.surfaceContainerLow, borderRadius: 16, padding: 20, gap: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', marginBottom: 16 },
   cardDesc: { fontSize: 14, lineHeight: 22, color: COLORS.onSurfaceVariant },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
