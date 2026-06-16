@@ -249,7 +249,7 @@ export default function DetalleProducto({ navigation, route }) {
                       <Icon source="email-outline" size={16} color="#92400e" />
                       <Text style={[styles.avisoText, { color: '#92400e' }]}>
                         Para coordinar el retiro de tu producto contactate con el depósito en{' '}
-                        <Text style={{ fontWeight: '700' }}>deposito@subastas.com</Text>
+                        <Text style={{color: '#92400e', fontWeight: '700' }}>deposito@subastas.com</Text>
                       </Text>
                     </View>
                   )}
@@ -267,7 +267,7 @@ export default function DetalleProducto({ navigation, route }) {
                   </Text>
                 </View>
 
-                {producto.estadoPropuesta ? (
+                {producto.estadoPropuesta && producto.estadoPropuesta !== 'sin_propuesta' ? (
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Propuesta:</Text>
                     <Text style={[styles.infoValue, { color: propuestaColor }]}>
