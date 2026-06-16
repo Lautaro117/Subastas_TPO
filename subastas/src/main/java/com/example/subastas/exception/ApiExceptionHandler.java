@@ -49,6 +49,7 @@ public class ApiExceptionHandler {
         body.put("status", HttpStatus.UNPROCESSABLE_ENTITY.value());
         body.put("error", HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase());
         body.put("message", "No se pudo procesar la solicitud");
+        body.put("detail", detail);
 
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
     }
