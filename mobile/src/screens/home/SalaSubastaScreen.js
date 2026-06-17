@@ -40,16 +40,15 @@ import {
 const WARMUP_SECONDS = 10;
 
 // ─── Countdown circular ───────────────────────────────────────────────────────
-function CountdownCircle({ seconds, total }) {
+function CountdownCircle({ seconds, total, size = 180 }) {
   const theme = useTheme();
-  const size = 180;
   const strokeWidth = 8;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference * (1 - seconds / total);
 
   return (
-    <View style={styles.countdownWrap}>
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={size} height={size}>
         <Circle
           cx={size / 2} cy={size / 2} r={radius}
@@ -66,8 +65,8 @@ function CountdownCircle({ seconds, total }) {
           rotation="-90" originX={size / 2} originY={size / 2}
         />
       </Svg>
-      <View style={styles.countdownCenter}>
-        <Text style={[styles.countdownTime, { color: theme.colors.primary }]}>
+      <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={[styles.countdownTime, { color: theme.colors.primary, fontSize: size < 120 ? 18 : 32 }]}>
           {String(Math.floor(seconds / 60)).padStart(2, '0')}:
           {String(seconds % 60).padStart(2, '0')}
         </Text>
@@ -99,7 +98,9 @@ function BidRow({ bid, isTop }) {
 // ─── Fila de ítem del catálogo ────────────────────────────────────────────────
 function CatalogoRow({ item, isActivo, notificado, onBellPress, onPress }) {
   const theme = useTheme();
-  const subastado = item.subastado === 'si';
+  // 'si' = adjudicado con ganador · 'deshabilitado' = venció sin postores
+  const subastado = item.subastado === 'si' || item.subastado === 'deshabilitado';
+  const sinPostores = item.subastado === 'deshabilitado';
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
@@ -150,6 +151,8 @@ function CatalogoRow({ item, isActivo, notificado, onBellPress, onPress }) {
       </View>
       {isActivo ? (
         <Text style={[styles.ahoraLabel, { color: theme.colors.primary }]}>AHORA</Text>
+      ) : sinPostores ? (
+        <Text style={[styles.ahoraLabel, { color: theme.colors.onSurfaceVariant }]}>SIN POSTOR</Text>
       ) : !subastado ? (
         <IconButton
           icon={notificado ? 'bell' : 'bell-outline'}
@@ -219,9 +222,14 @@ export default function SalaSubastaScreen({ navigation, route }) {
   const stompClientRef = useRef(null);
   const countdownRef = useRef(null);
   const pollingRef = useRef(null);
+  const timerIntervalRef = useRef(null);
   const autoJoinHandled = useRef(false);
   // Ref al handler de eventos WS para evitar closures stale
   const wsEventHandlerRef = useRef(null);
+
+  // Countdown del ítem actual sincronizado con el deadline del backend
+  const [tiempoRestante, setTiempoRestante] = useState(null);
+  const [timerTotal, setTimerTotal] = useState(300);
 
   // ─── Carga inicial ──────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -248,9 +256,38 @@ export default function SalaSubastaScreen({ navigation, route }) {
     return () => {
       clearInterval(countdownRef.current);
       clearInterval(pollingRef.current);
+      clearInterval(timerIntervalRef.current);
       stompClientRef.current?.deactivate?.();
     };
   }, []);
+
+  // Sincronizar la cuenta regresiva local con el deadline que manda el backend.
+  // El backend incluye tiempoLimite (epoch millis) en cada SalaResponse.
+  // El frontend calcula el tiempo restante localmente sin necesidad de ticks WS.
+  useEffect(() => {
+    clearInterval(timerIntervalRef.current);
+
+    const deadline = salaData?.tiempoLimite;
+    if (!deadline) {
+      setTiempoRestante(null);
+      return;
+    }
+
+    const total = salaData?.timerTotalSegundos ?? 300;
+    setTimerTotal(total);
+
+    const calcRemaining = () => Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+
+    setTiempoRestante(calcRemaining());
+
+    timerIntervalRef.current = setInterval(() => {
+      const r = calcRemaining();
+      setTiempoRestante(r);
+      if (r <= 0) clearInterval(timerIntervalRef.current);
+    }, 1000);
+
+    return () => clearInterval(timerIntervalRef.current);
+  }, [salaData?.tiempoLimite, salaData?.timerTotalSegundos]);
 
   // Salir de la sala cuando joined cambia a false (o al desmontar si joined es true)
   useEffect(() => {
@@ -384,13 +421,14 @@ export default function SalaSubastaScreen({ navigation, route }) {
         break;
 
       case 'item.next':
+        // Actualizar datos del nuevo ítem (incluye el nuevo tiempoLimite → el círculo se resetea)
         if (event.payload?.itemActual !== undefined) {
           setSalaData(event.payload);
         }
+        // Refrescar catálogo para mostrar el ítem previo como adjudicado/deshabilitado
         getAuctionCatalog(token, auctionId)
           .then((cat) => { if (cat) setCatalogo(Array.isArray(cat) ? cat : []); })
           .catch(() => {});
-        startWarmup();
         break;
 
       case 'auction.closed':
@@ -582,7 +620,9 @@ export default function SalaSubastaScreen({ navigation, route }) {
         </Appbar.Header>
 
         <ScrollView contentContainerStyle={styles.warmupContent}>
-          <CountdownCircle seconds={countdown} total={WARMUP_SECONDS} />
+          <View style={{ marginBottom: 32 }}>
+            <CountdownCircle seconds={countdown} total={WARMUP_SECONDS} size={180} />
+          </View>
           <View style={styles.proximasHeader}>
             <Text style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Próximas subastas →</Text>
           </View>
@@ -641,6 +681,23 @@ export default function SalaSubastaScreen({ navigation, route }) {
                 )}
               </View>
             </View>
+
+            {/* Cuenta regresiva del ítem actual */}
+            {tiempoRestante !== null && (
+              <View style={styles.timerRow}>
+                <CountdownCircle seconds={tiempoRestante} total={timerTotal} size={96} />
+                <View style={styles.timerLabels}>
+                  <Text style={[styles.timerLabel, { color: theme.colors.onSurfaceVariant }]}>
+                    {timerTotal === 300 ? 'Sin postores aún' : '¡Última oportunidad!'}
+                  </Text>
+                  <Text style={[styles.timerSub, { color: theme.colors.onSurfaceVariant }]}>
+                    {timerTotal === 300
+                      ? 'Primero en pujar inicia 1 min final'
+                      : 'Sin nueva puja, se adjudica el ítem'}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Mejor oferta */}
             <Surface elevation={0} style={[styles.mejorOfertaCard, { backgroundColor: theme.colors.surfaceContainerLow }]}>
@@ -822,8 +879,14 @@ const styles = StyleSheet.create({
   pujaHintText: { fontSize: 11, lineHeight: 16 },
 
   warmupContent: { alignItems: 'center', paddingTop: 32, paddingBottom: 32 },
-  countdownWrap: { width: 180, height: 180, alignItems: 'center', justifyContent: 'center', marginBottom: 32 },
-  countdownCenter: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  countdownTime: { fontSize: 32, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  countdownTime: { fontWeight: '700', fontVariant: ['tabular-nums'] },
   proximasHeader: { alignSelf: 'stretch', paddingHorizontal: 20, marginBottom: 12 },
+
+  timerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    marginHorizontal: 20, marginTop: 16, marginBottom: 4,
+  },
+  timerLabels: { flex: 1 },
+  timerLabel: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  timerSub: { fontSize: 11, lineHeight: 16, marginTop: 2 },
 });

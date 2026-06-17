@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -50,6 +51,9 @@ public class SubastaService {
 
     @Autowired private AuctionNotificationService auctionNotificationService;
     @Autowired private SesionSubastaService sesionSubastaService;
+    @Autowired private ItemTimerService itemTimerService;
+    // Auto-inyección lazy para poder llamar métodos @Transactional desde callbacks de timer
+    @Lazy @Autowired private SubastaService self;
     @Autowired private SubastaRepository subastaRepository;
     @Autowired private CatalogoRepository catalogoRepository;
     @Autowired private ItemCatalogoRepository itemCatalogoRepository;
@@ -279,6 +283,12 @@ public class SubastaService {
         pujoExt.setMedioPagoId(medioPagoId);
         pujoExtRepository.save(pujoExt);
 
+        // Puja recibida → resetear cuenta regresiva a 1 minuto
+        // (se hace ANTES de construirSalaResponse para que el deadline quede en el broadcast)
+        final Integer itemIdFinal = item.getIdentificador();
+        itemTimerService.iniciarTimer(subastaId, 60,
+                () -> self.onTimerExpired(subastaId, itemIdFinal));
+
         // Construir sala actualizada y notificar a todos los dispositivos con el estado completo
         SalaResponse salaActualizada = construirSalaResponse(subastaId);
         auctionNotificationService.notificarNuevaPuja(subastaId, salaActualizada);
@@ -296,6 +306,9 @@ public class SubastaService {
 
     @Transactional
     public SalaResponse adjudicarItem(Integer subastaId, Integer itemId) {
+        // El admin adjudicó manualmente → cancelar cualquier timer automático en curso
+        itemTimerService.cancelarTimer(subastaId);
+
         Subasta subasta = buscarPorId(subastaId);
         if (!"abierta".equalsIgnoreCase(subasta.getEstado())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La subasta no está activa");
@@ -393,6 +406,11 @@ public class SubastaService {
         target.setEnVivo("si");
         itemCatalogoRepository.save(target);
 
+        // Arrancar cuenta regresiva de 5 minutos para este ítem
+        final Integer activatedItemId = target.getIdentificador();
+        itemTimerService.iniciarTimer(subastaId, 300,
+                () -> self.onTimerExpired(subastaId, activatedItemId));
+
         SalaResponse estado = construirSalaResponse(subastaId);
         auctionNotificationService.notificarSiguienteItem(subastaId, estado);
         return estado;
@@ -421,6 +439,104 @@ public class SubastaService {
         for (Asistente a : asistentes) {
             boolean tienePujas = !pujoRepository.findByAsistenteId(a.getIdentificador()).isEmpty();
             if (!tienePujas) asistenteRepository.delete(a);
+        }
+    }
+
+    // ── Timer automático ───────────────────────────────────────────────────────
+
+    /**
+     * Llamado por ItemTimerService cuando un timer vence.
+     * Debe ser público y @Transactional para que Spring gestione la transacción
+     * al invocarse a través del proxy (self.onTimerExpired).
+     */
+    @Transactional
+    public void onTimerExpired(Integer subastaId, Integer itemId) {
+        ItemCatalogo item = itemCatalogoRepository.findById(itemId).orElse(null);
+        if (item == null) return;
+        // Guard: si el ítem ya fue procesado (adjudicado o deshabilitado), ignorar
+        if ("si".equalsIgnoreCase(item.getSubastado())
+                || "deshabilitado".equalsIgnoreCase(item.getSubastado())) return;
+
+        List<Pujo> pujas = pujoRepository.findByItemId(itemId);
+
+        if (pujas.isEmpty()) {
+            // Sin postores → deshabilitar ítem y avanzar al siguiente
+            item.setSubastado("deshabilitado");
+            item.setEnVivo("no");
+            itemCatalogoRepository.save(item);
+        } else {
+            // Hay pujas → adjudicar al mejor postor
+            Pujo ganadora = pujas.stream()
+                    .max(Comparator.comparing(Pujo::getImporte))
+                    .get();
+            ganadora.setGanador("si");
+            pujoRepository.save(ganadora);
+
+            Adjudicaciones adj = new Adjudicaciones();
+            adj.setItemId(itemId);
+            adj.setAsistenteId(ganadora.getAsistenteId());
+            adj.setImporte(ganadora.getImporte());
+            adj.setComision(item.getComision() != null ? item.getComision() : BigDecimal.ZERO);
+            adj.setCostoEnvio(BigDecimal.ZERO);
+            adj.setCreatedAt(LocalDateTime.now());
+            adjudicacionesRepository.save(adj);
+
+            item.setSubastado("si");
+            item.setEnVivo("no");
+            itemCatalogoRepository.save(item);
+        }
+
+        // Avanzar al siguiente ítem disponible (o cerrar la subasta)
+        autoAvanzarDesdeItem(subastaId, item);
+    }
+
+    /**
+     * Busca el próximo ítem disponible en el catálogo y lo activa,
+     * arrancando su timer de 5 minutos y notificando a todos los postores.
+     * Si no hay más ítems, cierra la subasta.
+     */
+    private void autoAvanzarDesdeItem(Integer subastaId, ItemCatalogo itemPrevio) {
+        Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId).orElse(null);
+        if (catalogo == null) {
+            auctionNotificationService.notificarCierre(subastaId);
+            return;
+        }
+
+        List<ItemCatalogo> todos = itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador());
+        Optional<ItemCatalogo> siguienteOpt = todos.stream()
+                .filter(i -> !"si".equalsIgnoreCase(i.getSubastado())
+                          && !"deshabilitado".equalsIgnoreCase(i.getSubastado())
+                          && !i.getIdentificador().equals(itemPrevio.getIdentificador()))
+                .findFirst();
+
+        if (siguienteOpt.isPresent()) {
+            ItemCatalogo siguiente = siguienteOpt.get();
+
+            // Quitar en_vivo de todos y activar el siguiente
+            todos.forEach(i -> {
+                if (!"no".equalsIgnoreCase(i.getEnVivo())) {
+                    i.setEnVivo("no");
+                    itemCatalogoRepository.save(i);
+                }
+            });
+            siguiente.setEnVivo("si");
+            itemCatalogoRepository.save(siguiente);
+
+            // Arrancar timer de 5 minutos para el nuevo ítem
+            final Integer nextId = siguiente.getIdentificador();
+            itemTimerService.iniciarTimer(subastaId, 300,
+                    () -> self.onTimerExpired(subastaId, nextId));
+
+            SalaResponse estado = construirSalaResponse(subastaId);
+            auctionNotificationService.notificarSiguienteItem(subastaId, estado);
+        } else {
+            // No quedan ítems disponibles → cerrar la subasta
+            Subasta subasta = subastaRepository.findById(subastaId).orElse(null);
+            if (subasta != null && !"cerrada".equalsIgnoreCase(subasta.getEstado())) {
+                subasta.setEstado("cerrada");
+                subastaRepository.save(subasta);
+            }
+            auctionNotificationService.notificarCierre(subastaId);
         }
     }
 
@@ -501,6 +617,10 @@ public class SubastaService {
                 response.setMaxPuja(ultima.add(inc20));
             }
         }
+
+        // Timer: cuándo vence y duración total de la fase actual
+        response.setTiempoLimite(itemTimerService.getDeadline(subastaId));
+        response.setTimerTotalSegundos(itemTimerService.getTotalSegundos(subastaId));
 
         return response;
     }

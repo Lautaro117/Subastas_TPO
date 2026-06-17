@@ -12,6 +12,12 @@ public class SalaResponse {
     private BigDecimal minPuja;
     private BigDecimal maxPuja;
 
+    /** Epoch millis cuando vence el timer del ítem actual (null = sin timer activo). */
+    private Long tiempoLimite;
+
+    /** Duración total de la fase activa en segundos: 300 (sin pujas) o 60 (con pujas). */
+    private Integer timerTotalSegundos;
+
     public SalaResponse() {}
 
     public CatalogoDTO getItemActual() { return itemActual; }
@@ -31,6 +37,12 @@ public class SalaResponse {
 
     public BigDecimal getMaxPuja() { return maxPuja; }
     public void setMaxPuja(BigDecimal maxPuja) { this.maxPuja = maxPuja; }
+
+    public Long getTiempoLimite() { return tiempoLimite; }
+    public void setTiempoLimite(Long tiempoLimite) { this.tiempoLimite = tiempoLimite; }
+
+    public Integer getTimerTotalSegundos() { return timerTotalSegundos; }
+    public void setTimerTotalSegundos(Integer timerTotalSegundos) { this.timerTotalSegundos = timerTotalSegundos; }
 
     // ── Mejor oferta actual ────────────────────────────────────────────────────
     public static class MejorOferta {
