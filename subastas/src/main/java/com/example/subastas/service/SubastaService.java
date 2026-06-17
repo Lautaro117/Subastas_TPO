@@ -49,6 +49,7 @@ import jakarta.transaction.Transactional;
 public class SubastaService {
 
     @Autowired private AuctionNotificationService auctionNotificationService;
+    @Autowired private SesionSubastaService sesionSubastaService;
     @Autowired private SubastaRepository subastaRepository;
     @Autowired private CatalogoRepository catalogoRepository;
     @Autowired private ItemCatalogoRepository itemCatalogoRepository;
@@ -147,26 +148,34 @@ public class SubastaService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         Integer clienteId = usuario.getClienteId();
 
-        // Ya está en esta subasta → devolver estado actual
-        if (asistenteRepository.findByClienteIdAndSubastaId(clienteId, subastaId).isPresent()) {
+        // Ya está activo en esta subasta (sesión en memoria) → devolver estado actual
+        if (sesionSubastaService.estaEnSala(clienteId, subastaId)) {
             return construirSalaResponse(subastaId);
         }
 
-        // Limpiar registros de subastas cerradas; bloquear si hay una subasta abierta diferente
-        List<Asistente> otros = asistenteRepository.findAllByClienteId(clienteId);
-        for (Asistente a : otros) {
-            Subasta otraSubasta = subastaRepository.findById(a.getSubastaId()).orElse(null);
+        // Verificar si está activo en OTRA subasta abierta (sesión en memoria)
+        Optional<Integer> otraActiva = sesionSubastaService.getSalaActiva(clienteId);
+        if (otraActiva.isPresent() && !otraActiva.get().equals(subastaId)) {
+            Subasta otraSubasta = subastaRepository.findById(otraActiva.get()).orElse(null);
             if (otraSubasta != null && "abierta".equalsIgnoreCase(otraSubasta.getEstado())) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ya estás conectado a otra subasta activa");
             }
-            asistenteRepository.delete(a);
+            // La otra subasta ya cerró → limpiar sesión fantasma y continuar
+            sesionSubastaService.registrarSalida(clienteId);
         }
 
-        Asistente asistente = new Asistente();
-        asistente.setClienteId(clienteId);
-        asistente.setSubastaId(subastaId);
-        asistente.setNumeroPostor((int) (Math.random() * 9000) + 1000);
-        asistenteRepository.save(asistente);
+        // Reutilizar el Asistente histórico si ya existe (puede haber quedado en DB por FK con pujas),
+        // o crear uno nuevo si es la primera vez que el usuario entra a esta subasta.
+        asistenteRepository.findByClienteIdAndSubastaId(clienteId, subastaId)
+                .orElseGet(() -> {
+                    Asistente nuevo = new Asistente();
+                    nuevo.setClienteId(clienteId);
+                    nuevo.setSubastaId(subastaId);
+                    nuevo.setNumeroPostor((int) (Math.random() * 9000) + 1000);
+                    return asistenteRepository.save(nuevo);
+                });
+
+        sesionSubastaService.registrarEntrada(clienteId, subastaId);
         return construirSalaResponse(subastaId);
     }
 
@@ -174,19 +183,28 @@ public class SubastaService {
     public void salirDeSala(Integer subastaId, String email) {
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        Asistente asistente = asistenteRepository
-                .findByClienteIdAndSubastaId(usuario.getClienteId(), subastaId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No estás en esta subasta"));
-        boolean tienePujas = !pujoRepository.findByAsistenteId(asistente.getIdentificador()).isEmpty();
-        if (!tienePujas) asistenteRepository.delete(asistente);
+        Integer clienteId = usuario.getClienteId();
+
+        // Quitar de la sesión en memoria (fuente de verdad para "está en sala")
+        sesionSubastaService.registrarSalida(clienteId);
+
+        // Intentar borrar el Asistente de la DB solo si no tiene pujas.
+        // Si tiene pujas el registro queda como historial — está bien, ya no bloquea al usuario
+        // porque la presencia se maneja en memoria.
+        asistenteRepository.findByClienteIdAndSubastaId(clienteId, subastaId).ifPresent(asistente -> {
+            boolean tienePujas = !pujoRepository.findByAsistenteId(asistente.getIdentificador()).isEmpty();
+            if (!tienePujas) asistenteRepository.delete(asistente);
+        });
     }
 
     public SalaResponse obtenerEstadoVivo(Integer subastaId, String email) {
         buscarPorId(subastaId);
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        asistenteRepository.findByClienteIdAndSubastaId(usuario.getClienteId(), subastaId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No estás conectado a esta subasta"));
+        // Verificar presencia activa en memoria (no en la tabla, que puede tener registros históricos)
+        if (!sesionSubastaService.estaEnSala(usuario.getClienteId(), subastaId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No estás conectado a esta subasta");
+        }
         return construirSalaResponse(subastaId);
     }
 
@@ -392,8 +410,17 @@ public class SubastaService {
     public void salirDeTodas(String email) {
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        List<Asistente> asistentes = asistenteRepository.findAllByClienteId(usuario.getClienteId());
-        asistenteRepository.deleteAll(asistentes);
+        Integer clienteId = usuario.getClienteId();
+
+        // Quitar sesión activa en memoria
+        sesionSubastaService.registrarSalida(clienteId);
+
+        // Borrar de la DB solo los Asistentes sin pujas; los que tienen pujas quedan como historial
+        List<Asistente> asistentes = asistenteRepository.findAllByClienteId(clienteId);
+        for (Asistente a : asistentes) {
+            boolean tienePujas = !pujoRepository.findByAsistenteId(a.getIdentificador()).isEmpty();
+            if (!tienePujas) asistenteRepository.delete(a);
+        }
     }
 
     // ── Construcción de sala ───────────────────────────────────────────────────
