@@ -220,6 +220,8 @@ export default function SalaSubastaScreen({ navigation, route }) {
   const countdownRef = useRef(null);
   const pollingRef = useRef(null);
   const autoJoinHandled = useRef(false);
+  // Ref al handler de eventos WS para evitar closures stale
+  const wsEventHandlerRef = useRef(null);
 
   // ─── Carga inicial ──────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -278,6 +280,17 @@ export default function SalaSubastaScreen({ navigation, route }) {
       if (salaResponse) setSalaData(salaResponse);
       setJoined(true);
       setFase('sala');
+
+      // Polling arranca inmediatamente al unirse, sin depender del WebSocket.
+      // Esto garantiza que todos los postores vean las pujas nuevas incluso si
+      // el WebSocket falla o tarda en conectarse.
+      clearInterval(pollingRef.current);
+      pollingRef.current = setInterval(() => {
+        getAuctionLive(token, auctionId)
+          .then((live) => { if (live) setSalaData(live); })
+          .catch(() => {});
+      }, 1500);
+
       connectWebSocket();
     } catch (err) {
       const msg = (err.message ?? '').toLowerCase();
@@ -325,29 +338,27 @@ export default function SalaSubastaScreen({ navigation, route }) {
     const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + '/ws';
 
     const client = new Client({
-      brokerURL: wsUrl,
+      // webSocketFactory explícito: mejor compatibilidad en React Native
+      webSocketFactory: () => new WebSocket(wsUrl),
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 3000,
       onConnect: () => {
         client.subscribe(`/topic/auction/${auctionId}`, (msg) => {
           try {
             const event = JSON.parse(msg.body);
-            handleWebSocketEvent(event);
+            // Siempre llamar al handler más reciente via ref (evita stale closures)
+            wsEventHandlerRef.current?.(event);
           } catch {}
         });
-        // Estado inicial al conectar
+        // Sincronizar estado al (re)conectar el WebSocket
         getAuctionLive(token, auctionId)
           .then((live) => { if (live) setSalaData(live); })
           .catch(() => {});
-        // Polling de respaldo cada 5 s — cubre eventos WebSocket perdidos
-        clearInterval(pollingRef.current);
-        pollingRef.current = setInterval(() => {
-          getAuctionLive(token, auctionId)
-            .then((live) => { if (live) setSalaData(live); })
-            .catch(() => {});
-        }, 5000);
+        // El polling ya fue iniciado en handleJoin; no se duplica aquí
       },
-      onStompError: () => setSnackbar('Error en la conexión en tiempo real.'),
+      onStompError: () => {
+        // El polling sigue corriendo aunque el WS falle
+      },
     });
 
     client.activate();
@@ -355,6 +366,9 @@ export default function SalaSubastaScreen({ navigation, route }) {
   }
 
   // ─── Manejo de eventos WebSocket ─────────────────────────────────────────────
+  // Se actualiza el ref en cada render para que el subscriber siempre use la
+  // versión más fresca del handler (con los closures correctos).
+  wsEventHandlerRef.current = handleWebSocketEvent;
   function handleWebSocketEvent(event) {
     switch (event.tipo) {
       case 'bid.new':
@@ -420,8 +434,9 @@ export default function SalaSubastaScreen({ navigation, route }) {
       });
       setMontoInput('');
       setSnackbar('¡Puja enviada!');
-      const live = await getAuctionLive(token, auctionId);
-      setSalaData(live);
+      // El backend emite bid.new por WebSocket al aceptar la puja.
+      // Ese evento actualiza la sala para TODOS (incluyendo quien pujó).
+      // No hace falta un REST adicional acá; el polling/WS ya cubren la sync.
     } catch (err) {
       setSnackbar(err.message ?? 'Error al enviar la puja.');
     } finally {
