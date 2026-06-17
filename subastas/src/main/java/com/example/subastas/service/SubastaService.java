@@ -8,6 +8,7 @@ import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,8 +74,34 @@ public class SubastaService {
 
     // ── Listado ────────────────────────────────────────────────────────────────
 
+    // readOnly=true: Hibernate no hace flush al cerrar la sesión,
+    // así el setEstado() en memoria no intenta escribir en la DB.
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<Subasta> listarTodas() {
-        return subastaRepository.findAll();
+        List<Subasta> todas = subastaRepository.findAll();
+
+        // subastas.estado no se actualiza en la DB (fecha_check constraint).
+        // Parcheamos el campo en memoria: las subastas en subastas_cierre
+        // se devuelven con estado='cerrada' para que el frontend las filtre correctamente.
+        // Usamos Number → intValue() para no depender del tipo exacto que devuelva el driver JDBC.
+        Set<Integer> cerradas = subastaRepository.findAllCerradasIds()
+                .stream()
+                .map(obj -> ((Number) obj).intValue())
+                .collect(java.util.stream.Collectors.toSet());
+
+        if (!cerradas.isEmpty()) {
+            todas.forEach(s -> {
+                if (cerradas.contains(s.getIdentificador())) {
+                    s.setEstado("cerrada");   // solo en memoria, no se persiste
+                }
+            });
+        }
+        return todas;
+    }
+
+    /** Verifica si una subasta fue cerrada según subastas_cierre (fuente de verdad). */
+    private boolean esCerrada(Integer subastaId) {
+        return subastaRepository.existeEnCierre(subastaId);
     }
 
     public Subasta buscarPorId(Integer id) {
@@ -140,7 +167,7 @@ public class SubastaService {
     @Transactional
     public SalaResponse unirseASala(Integer subastaId, String email, String categoriaUsuario) {
         Subasta subasta = buscarPorId(subastaId);
-        if (!"abierta".equalsIgnoreCase(subasta.getEstado())) {
+        if (!"abierta".equalsIgnoreCase(subasta.getEstado()) || esCerrada(subastaId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La subasta no está activa o ya finalizó");
         }
         int nivelUsuario = ORDEN_CATEGORIAS.indexOf(categoriaUsuario);
@@ -161,7 +188,10 @@ public class SubastaService {
         Optional<Integer> otraActiva = sesionSubastaService.getSalaActiva(clienteId);
         if (otraActiva.isPresent() && !otraActiva.get().equals(subastaId)) {
             Subasta otraSubasta = subastaRepository.findById(otraActiva.get()).orElse(null);
-            if (otraSubasta != null && "abierta".equalsIgnoreCase(otraSubasta.getEstado())) {
+            boolean otraAbierta = otraSubasta != null
+                    && "abierta".equalsIgnoreCase(otraSubasta.getEstado())
+                    && !esCerrada(otraActiva.get());
+            if (otraAbierta) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ya estás conectado a otra subasta activa");
             }
             // La otra subasta ya cerró → limpiar sesión fantasma y continuar
@@ -217,7 +247,7 @@ public class SubastaService {
     @Transactional
     public Pujo enviarPuja(Integer subastaId, String email, BidRequest request) {
         Subasta subasta = buscarPorId(subastaId);
-        if (!"abierta".equalsIgnoreCase(subasta.getEstado())) {
+        if (!"abierta".equalsIgnoreCase(subasta.getEstado()) || esCerrada(subastaId)) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "La subasta no está activa");
         }
 
@@ -310,7 +340,7 @@ public class SubastaService {
         itemTimerService.cancelarTimer(subastaId);
 
         Subasta subasta = buscarPorId(subastaId);
-        if (!"abierta".equalsIgnoreCase(subasta.getEstado())) {
+        if (!"abierta".equalsIgnoreCase(subasta.getEstado()) || esCerrada(subastaId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "La subasta no está activa");
         }
 
@@ -464,21 +494,27 @@ public class SubastaService {
             item.setEnVivo("no");
             itemCatalogoRepository.save(item);
         } else {
-            // Hay pujas → adjudicar al mejor postor
+            // Hay pujas → adjudicar al mejor postor.
+            // Guard adicional: si ya existe una adjudicación para este ítem (por concurrencia
+            // entre timer y adjudicación manual), solo marcar la puja ganadora y el estado.
+            boolean yaAdjudicado = adjudicacionesRepository.findByItemId(itemId).isPresent();
+
             Pujo ganadora = pujas.stream()
                     .max(Comparator.comparing(Pujo::getImporte))
                     .get();
             ganadora.setGanador("si");
             pujoRepository.save(ganadora);
 
-            Adjudicaciones adj = new Adjudicaciones();
-            adj.setItemId(itemId);
-            adj.setAsistenteId(ganadora.getAsistenteId());
-            adj.setImporte(ganadora.getImporte());
-            adj.setComision(item.getComision() != null ? item.getComision() : BigDecimal.ZERO);
-            adj.setCostoEnvio(BigDecimal.ZERO);
-            adj.setCreatedAt(LocalDateTime.now());
-            adjudicacionesRepository.save(adj);
+            if (!yaAdjudicado) {
+                Adjudicaciones adj = new Adjudicaciones();
+                adj.setItemId(itemId);
+                adj.setAsistenteId(ganadora.getAsistenteId());
+                adj.setImporte(ganadora.getImporte());
+                adj.setComision(item.getComision() != null ? item.getComision() : BigDecimal.ZERO);
+                adj.setCostoEnvio(BigDecimal.ZERO);
+                adj.setCreatedAt(LocalDateTime.now());
+                adjudicacionesRepository.save(adj);
+            }
 
             item.setSubastado("si");
             item.setEnVivo("no");
@@ -529,12 +565,10 @@ public class SubastaService {
             SalaResponse estado = construirSalaResponse(subastaId);
             auctionNotificationService.notificarSiguienteItem(subastaId, estado);
         } else {
-            // No quedan ítems disponibles → cerrar la subasta
-            Subasta subasta = subastaRepository.findById(subastaId).orElse(null);
-            if (subasta != null && !"cerrada".equalsIgnoreCase(subasta.getEstado())) {
-                subasta.setEstado("cerrada");
-                subastaRepository.save(subasta);
-            }
+            // No quedan ítems disponibles → registrar cierre y notificar
+            // No se toca subastas.estado directamente (fecha_check constraint);
+            // cerrarSubasta() hace INSERT en subastas_cierre ON CONFLICT DO NOTHING.
+            subastaRepository.cerrarSubasta(subastaId);
             auctionNotificationService.notificarCierre(subastaId);
         }
     }

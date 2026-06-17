@@ -48,14 +48,17 @@ public class ItemTimerService {
         totales.put(subastaId, segundos);
 
         ScheduledFuture<?> future = executor.schedule(() -> {
-            // Limpiar antes de ejecutar la acción para que getDeadline() devuelva null
+            // Limpiar referencias del timer vencido.
+            // NOTA: onExpiry.run() puede volver a llamar iniciarTimer (para el próximo ítem),
+            // lo que re-poblará deadlines/totales. Limpiamos antes para marcar que el timer
+            // ya no está activo, y el próximo iniciarTimer sobrescribirá con los nuevos valores.
+            timers.remove(subastaId);
             deadlines.remove(subastaId);
             totales.remove(subastaId);
-            timers.remove(subastaId);
             try {
                 onExpiry.run();
             } catch (Exception e) {
-                // Loggear pero no propagar — el executor no debe morir por errores de negocio
+                System.err.println("[ItemTimerService] ERROR en onExpiry para subasta " + subastaId + ": " + e);
                 e.printStackTrace();
             }
         }, segundos, TimeUnit.SECONDS);

@@ -78,8 +78,10 @@ public class UserController {
     @GetMapping("/penalty")
     public ResponseEntity<Multas> getMultaActiva(@RequestHeader("Authorization") String authHeader) {
         String email = jwtUtil.extractEmail(authHeader.substring(7));
-    return ResponseEntity.ok(userService.getMultaActiva(email));
-}
+        Multas multa = userService.getMultaActiva(email);
+        if (multa == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(multa);
+    }
 
     @PostMapping("/penalty/pay")
         public ResponseEntity<Void> pagarMulta(@RequestHeader("Authorization") String authHeader,

@@ -52,6 +52,7 @@ export default function PenalizacionesScreen({ navigation }) {
       setMediosPago(verificados);
       if (verificados.length > 0) setMedioPagoSeleccionado(verificados[0].id);
     } catch {
+      setMulta(null); // evitar spinner infinito si la API falla
       setSnackbar('No se pudieron cargar las penalizaciones.');
     } finally {
       setIsLoading(false);

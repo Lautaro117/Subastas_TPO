@@ -160,6 +160,12 @@ public class SubastaController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/{id}/notify-close")
+    public ResponseEntity<Void> notifyClose(@PathVariable Integer id) {
+        subastaService.notificarCierre(id);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/{id}/catalog/{itemId}/product")
     public ResponseEntity<ProductoDetalleDTO> detalleProducto(
             @PathVariable Integer id,
