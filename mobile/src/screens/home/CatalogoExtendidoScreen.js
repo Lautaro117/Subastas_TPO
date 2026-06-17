@@ -63,11 +63,11 @@ export default function CatalogoExtendidoScreen({ navigation, route }) {
         renderItem={({ item }) => (
           <TouchableOpacity
             activeOpacity={0.75}
-            onPress={() => navigation.navigate('DetalleProductoSubasta', {
-              auctionId,
-              itemId: item.itemId,
-              item,
-            })}
+            onPress={() =>navigation.navigate('SalaSubasta', 
+                {auctionId, auction: { identificador: auctionId, estado: 'abierta' }, 
+                autoJoin: true,
+
+              })}
           >
           <Surface
             elevation={0}

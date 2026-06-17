@@ -328,10 +328,10 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
           {!subastado && auctionId && (
             <Button
               mode="contained"
-              onPress={() => navigation.navigate('SalaSubasta', {
-                auctionId,
-                auction: { identificador: auctionId, estado: 'abierta' },
+              onPress={() => navigation.navigate('SalaSubasta', 
+                {auctionId, auction: { identificador: auctionId, estado: 'abierta' }, 
                 autoJoin: true,
+
               })}
               style={styles.ingresarButton}
               contentStyle={styles.ingresarButtonContent}

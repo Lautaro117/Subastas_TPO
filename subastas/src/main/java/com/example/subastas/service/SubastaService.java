@@ -354,8 +354,7 @@ public class SubastaService {
             auctionNotificationService.notificarSiguienteItem(subastaId, nextState);
             return nextState;
         } else {
-            subasta.setEstado("cerrada");
-            subastaRepository.save(subasta);
+            subastaRepository.cerrarSubasta(subastaId);
             auctionNotificationService.notificarCierre(subastaId);
             return construirSalaResponse(subastaId);
         }
