@@ -16,11 +16,16 @@ public class MiProductoDTO {
     private List<String> fotos;
     private String motivoRechazo;
     private String etapaRechazo;
+    /** Nombre del depósito asignado (presente cuando estadoAdmin es enviar_deposito o en_deposito). */
+    private String nombreDeposito;
+    /** Dirección del depósito asignado. */
+    private String direccionDeposito;
 
     public MiProductoDTO(Integer id, String descripcionCatalogo, String descripcionCompleta,
                          String estadoAdmin, String estadoPropuesta, BigDecimal precioPropuesto,
                          BigDecimal comision, LocalDate fechaSubasta, List<String> fotos,
-                         String motivoRechazo, String etapaRechazo) {
+                         String motivoRechazo, String etapaRechazo,
+                         String nombreDeposito, String direccionDeposito) {
         this.id = id;
         this.descripcionCatalogo = descripcionCatalogo;
         this.descripcionCompleta = descripcionCompleta;
@@ -32,6 +37,8 @@ public class MiProductoDTO {
         this.fotos = fotos;
         this.motivoRechazo = motivoRechazo;
         this.etapaRechazo = etapaRechazo;
+        this.nombreDeposito = nombreDeposito;
+        this.direccionDeposito = direccionDeposito;
     }
 
     public Integer getId() { return id; }
@@ -45,4 +52,6 @@ public class MiProductoDTO {
     public List<String> getFotos() { return fotos; }
     public String getMotivoRechazo() { return motivoRechazo; }
     public String getEtapaRechazo() { return etapaRechazo; }
+    public String getNombreDeposito() { return nombreDeposito; }
+    public String getDireccionDeposito() { return direccionDeposito; }
 }

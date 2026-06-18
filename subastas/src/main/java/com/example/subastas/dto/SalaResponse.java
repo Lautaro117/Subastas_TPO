@@ -18,6 +18,13 @@ public class SalaResponse {
     /** Duración total de la fase activa en segundos: 300 (sin pujas) o 60 (con pujas). */
     private Integer timerTotalSegundos;
 
+    /**
+     * Número de postor del usuario que realizó el JOIN (solo presente en la respuesta
+     * del endpoint /join, null en los broadcasts de WebSocket).
+     * El frontend lo usa para detectar si fue el ganador de un ítem.
+     */
+    private Integer miNumeroPostor;
+
     /** Epoch millis cuando termina el cooldown entre ítems (null = sin cooldown activo). */
     private Long cooldownHasta;
 
@@ -49,6 +56,9 @@ public class SalaResponse {
 
     public Integer getTimerTotalSegundos() { return timerTotalSegundos; }
     public void setTimerTotalSegundos(Integer timerTotalSegundos) { this.timerTotalSegundos = timerTotalSegundos; }
+
+    public Integer getMiNumeroPostor() { return miNumeroPostor; }
+    public void setMiNumeroPostor(Integer miNumeroPostor) { this.miNumeroPostor = miNumeroPostor; }
 
     public Long getCooldownHasta() { return cooldownHasta; }
     public void setCooldownHasta(Long cooldownHasta) { this.cooldownHasta = cooldownHasta; }

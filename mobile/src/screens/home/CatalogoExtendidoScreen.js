@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Appbar,
@@ -63,42 +63,55 @@ export default function CatalogoExtendidoScreen({ navigation, route }) {
         renderItem={({ item }) => (
           <TouchableOpacity
             activeOpacity={0.75}
-            onPress={() =>navigation.navigate('SalaSubasta', 
-                {auctionId, auction: { identificador: auctionId, estado: 'abierta' }, 
-                autoJoin: true,
-
-              })}
+            onPress={() => navigation.navigate('DetalleProductoSubasta', {
+              auctionId,
+              itemId: item.itemId,
+              item,
+            })}
           >
           <Surface
             elevation={0}
             style={[
               styles.row,
               {
-                backgroundColor: theme.colors.surfaceContainerLowest,
+                backgroundColor: item.subastado === 'si'
+                  ? theme.colors.surfaceContainerHigh
+                  : theme.colors.surfaceContainerLowest,
                 borderColor: theme.colors.outline,
+                opacity: item.subastado === 'si' ? 0.55 : 1,
               },
             ]}
           >
-            {/* Thumb */}
+            {/* Thumb: foto real o placeholder */}
             <View style={[styles.thumb, { backgroundColor: theme.colors.surfaceContainerHigh }]}>
-              <Text style={{ fontSize: 20 }}>📦</Text>
+              {item.fotoPrincipal ? (
+                <Image
+                  source={{ uri: `data:image/jpeg;base64,${item.fotoPrincipal}` }}
+                  style={{ width: 52, height: 52, borderRadius: 12 }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={{ fontSize: 20 }}>📦</Text>
+              )}
             </View>
 
-            {/* Texto */}
+            {/* Texto: descripción real */}
             <View style={styles.rowText}>
-              <Text style={[styles.rowTitle, { color: theme.colors.onSurface }]} numberOfLines={1}>
-                Producto #{item.productoId}
+              <Text style={[styles.rowTitle, { color: theme.colors.onSurface }]} numberOfLines={2}>
+                {item.descripcionCatalogo ?? `Producto #${item.productoId}`}
               </Text>
-              <Text style={[styles.rowSub, { color: theme.colors.onSurfaceVariant }]} numberOfLines={2}>
+              <Text style={[styles.rowSub, { color: theme.colors.onSurfaceVariant }]} numberOfLines={1}>
                 {item.precioBase != null
-                  ? `Precio base: ${item.precioBase.toLocaleString('es-AR')}`
+                  ? `Base: ${Number(item.precioBase).toLocaleString('es-AR')}`
                   : 'Sin precio base'}
               </Text>
             </View>
 
             {/* Campana o subastado */}
-            {item.subastado === 'si' ? (
-              <Text style={[styles.subastadoLabel, { color: theme.colors.onSurfaceVariant }]}>✓</Text>
+            {item.subastado === 'si' || item.subastado === 'deshabilitado' ? (
+              <Text style={[styles.subastadoLabel, { color: theme.colors.onSurfaceVariant }]}>
+                {item.subastado === 'si' ? '✓' : '—'}
+              </Text>
             ) : (
               <IconButton
                 icon={notificadosIds.has(item.itemId) ? 'bell' : 'bell-outline'}

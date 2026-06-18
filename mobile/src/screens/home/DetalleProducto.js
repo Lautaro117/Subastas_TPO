@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Dimensions, FlatList, Image, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Icon, IconButton, Surface, Text } from 'react-native-paper';
 
 import { COLORS } from '../../theme/colors';
 import { useAppSession } from '../../navigation/AppSessionContext';
-import { aceptarPropuesta, rechazarPropuesta, getCustodia, marcarEnviado } from '../../services/itemsApi';
+import { aceptarPropuesta, rechazarPropuesta, marcarEnviado } from '../../services/itemsApi';
 import { buildApiUrl } from '../../config/api';
 
 const { width } = Dimensions.get('window');
@@ -49,8 +49,6 @@ export default function DetalleProducto({ navigation, route }) {
   const { session } = useAppSession();
   const { productoId } = route.params;
   const [producto, setProducto] = useState(null);
-  const [custodia, setCustodia] = useState(null);
-  const [custodiaLoading, setCustodiaLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [accionando, setAccionando] = useState(false);
@@ -64,14 +62,6 @@ export default function DetalleProducto({ navigation, route }) {
       });
       const data = await response.json();
       setProducto(data);
-
-      if (data.estadoAdmin === 'enviar_deposito' || data.estadoAdmin === 'en_deposito') {
-        setCustodiaLoading(true);
-        getCustodia(session.token, productoId)
-          .then(setCustodia)
-          .catch(() => setCustodia(null))
-          .finally(() => setCustodiaLoading(false));
-      }
     } catch {
       setError('No se pudo cargar el producto');
     } finally {
@@ -178,14 +168,12 @@ export default function DetalleProducto({ navigation, route }) {
                   </View>
 
                   <View style={styles.envioBody}>
-                    {custodiaLoading ? (
-                      <Text style={styles.envioMuted}>Cargando dirección...</Text>
-                    ) : custodia ? (
+                    {producto.nombreDeposito ? (
                       <View style={styles.envioDir}>
                         <Text style={styles.envioDirLabel}>Depósito</Text>
-                        <Text style={styles.envioDirNombre}>{custodia.nombreDeposito}</Text>
+                        <Text style={styles.envioDirNombre}>{producto.nombreDeposito}</Text>
                         <Text style={styles.envioDirLabel}>Dirección</Text>
-                        <Text style={styles.envioDirValor}>{custodia.direccionDeposito}</Text>
+                        <Text style={styles.envioDirValor}>{producto.direccionDeposito}</Text>
                       </View>
                     ) : (
                       <Text style={styles.envioMuted}>
@@ -229,9 +217,9 @@ export default function DetalleProducto({ navigation, route }) {
                           ? 'Tu producto fue revisado en el depósito y no cumple los requisitos. Debés coordinar su retiro con la empresa.'
                           : 'Tu producto no fue aceptado para ingresar al proceso de subasta.'}
                       </Text>
-                      {custodia && producto.etapaRechazo === 'en_deposito' && (
+                      {producto.nombreDeposito && producto.etapaRechazo === 'en_deposito' && (
                         <Text style={[styles.bannerField, { color: COLORS.onSurface }]}>
-                          Ubicación actual: {custodia.nombreDeposito} — {custodia.direccionDeposito}
+                          Ubicación actual: {producto.nombreDeposito} — {producto.direccionDeposito}
                         </Text>
                       )}
                     </View>

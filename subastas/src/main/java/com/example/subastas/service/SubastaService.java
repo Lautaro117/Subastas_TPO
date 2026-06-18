@@ -200,7 +200,7 @@ public class SubastaService {
 
         // Reutilizar el Asistente histórico si ya existe (puede haber quedado en DB por FK con pujas),
         // o crear uno nuevo si es la primera vez que el usuario entra a esta subasta.
-        asistenteRepository.findByClienteIdAndSubastaId(clienteId, subastaId)
+        Asistente asistente = asistenteRepository.findByClienteIdAndSubastaId(clienteId, subastaId)
                 .orElseGet(() -> {
                     Asistente nuevo = new Asistente();
                     nuevo.setClienteId(clienteId);
@@ -210,7 +210,11 @@ public class SubastaService {
                 });
 
         sesionSubastaService.registrarEntrada(clienteId, subastaId);
-        return construirSalaResponse(subastaId);
+        SalaResponse sala = construirSalaResponse(subastaId);
+        // Informar al usuario su número de postor (solo en la respuesta del JOIN,
+        // no en los broadcasts generales) para que pueda detectar si ganó un ítem.
+        sala.setMiNumeroPostor(asistente.getNumeroPostor());
+        return sala;
     }
 
     @Transactional

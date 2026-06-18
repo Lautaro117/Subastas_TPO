@@ -29,8 +29,17 @@ public class CustodiaProductos {
     private LocalDateTime createdAt;
 
     public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+
     public Integer getProductoId() { return productoId; }
+    public void setProductoId(Integer productoId) { this.productoId = productoId; }
+
     public Integer getDepositoId() { return depositoId; }
+    public void setDepositoId(Integer depositoId) { this.depositoId = depositoId; }
+
     public String getEstado() { return estado; }
+    public void setEstado(String estado) { this.estado = estado; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

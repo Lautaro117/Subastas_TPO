@@ -27,6 +27,7 @@ import Svg, { Circle } from 'react-native-svg';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Client } from '@stomp/stompjs';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAppSession } from '../../navigation/AppSessionContext';
 import { API_BASE_URL } from '../../config/api';
 import {
@@ -199,14 +200,18 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
   const STORAGE_KEY = `@subastas:notificados:${auctionId}`;
 
-  // Cargar IDs notificados desde AsyncStorage al montar
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((stored) => {
-        if (stored) setNotificadosIds(new Set(JSON.parse(stored)));
-      })
-      .catch(() => {});
-  }, [STORAGE_KEY]);
+  // Recargar IDs notificados desde AsyncStorage cada vez que esta pantalla entra en foco.
+  // Esto es necesario porque el usuario puede marcar la campanita en CatalogoExtendidoScreen
+  // y volver — sin un re-fetch la notificación de cooldown nunca dispararía.
+  useFocusEffect(
+    React.useCallback(() => {
+      AsyncStorage.getItem(STORAGE_KEY)
+        .then((stored) => {
+          if (stored) setNotificadosIds(new Set(JSON.parse(stored)));
+        })
+        .catch(() => {});
+    }, [STORAGE_KEY])
+  );
 
   // Persistir en AsyncStorage cada vez que cambia notificadosIds
   useEffect(() => {
@@ -226,6 +231,8 @@ export default function SalaSubastaScreen({ navigation, route }) {
   const cooldownIntervalRef = useRef(null);
   // Ref para evitar notificar múltiples veces el mismo cooldown
   const cooldownNotifRef = useRef(null);
+  // Ref para evitar duplicar la notificación de ganador del mismo ítem
+  const ganadorNotifItemRef = useRef(null);
   const autoJoinHandled = useRef(false);
   // Ref al handler de eventos WS para evitar closures stale
   const wsEventHandlerRef = useRef(null);
@@ -236,6 +243,19 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
   // Countdown del cooldown entre ítems sincronizado con el deadline del backend
   const [cooldownRestante, setCooldownRestante] = useState(null);
+
+  // Número de postor propio (recibido en la respuesta del JOIN).
+  // Se usa para detectar si el usuario fue el ganador del ítem adjudicado.
+  const [miNumeroPostor, setMiNumeroPostor] = useState(null);
+
+  // Refs para que los callbacks de setInterval accedan siempre a los valores más frescos
+  // sin recrear el intervalo (los estados no son accesibles desde closures de intervalo antiguas).
+  const salaDataRef = useRef(null);
+  const miNumeroPostorRef = useRef(null);
+
+  // Mantener refs sincronizados en cada render para que los intervalos tengan valores frescos
+  salaDataRef.current = salaData;
+  miNumeroPostorRef.current = miNumeroPostor;
 
   // ─── Carga inicial ──────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -359,17 +379,36 @@ export default function SalaSubastaScreen({ navigation, route }) {
     setJoining(true);
     try {
       const salaResponse = await joinAuction(token, auctionId);
-      if (salaResponse) setSalaData(salaResponse);
+      if (salaResponse) {
+        setSalaData(salaResponse);
+        // Guardar número de postor propio para detectar victorias
+        if (salaResponse.miNumeroPostor) setMiNumeroPostor(salaResponse.miNumeroPostor);
+      }
       setJoined(true);
       setFase('sala');
 
       // Polling arranca inmediatamente al unirse, sin depender del WebSocket.
-      // Esto garantiza que todos los postores vean las pujas nuevas incluso si
-      // el WebSocket falla o tarda en conectarse.
+      // Usa refs para leer el estado más fresco sin recrear el intervalo.
       clearInterval(pollingRef.current);
       pollingRef.current = setInterval(() => {
         getAuctionLive(token, auctionId)
-          .then((live) => { if (live) setSalaData(live); })
+          .then((live) => {
+            if (!live) return;
+            // Detectar transición de ítem → verificar si el usuario ganó el ítem anterior
+            const prevData = salaDataRef.current;
+            const prevItemId = prevData?.itemActual?.itemId;
+            const newItemId  = live?.itemActual?.itemId;
+            if (prevItemId && prevItemId !== newItemId && miNumeroPostorRef.current) {
+              const prevPostor = prevData?.mejorOferta?.postor;
+              if (prevPostor === `Postor #${miNumeroPostorRef.current}`
+                  && ganadorNotifItemRef.current !== prevItemId) {
+                ganadorNotifItemRef.current = prevItemId;
+                const desc = prevData?.itemActual?.descripcionCatalogo ?? 'el producto';
+                setSnackbar(`🏆 ¡Ganaste "${desc}"!`);
+              }
+            }
+            setSalaData(live);
+          })
           .catch(() => {});
       }, 1500);
 
@@ -466,8 +505,20 @@ export default function SalaSubastaScreen({ navigation, route }) {
         break;
 
       case 'item.next':
+        // Verificar si el usuario ganó el ítem que acaba de cerrarse
+        {
+          const prevItemId = salaData?.itemActual?.itemId;
+          if (prevItemId && miNumeroPostor && ganadorNotifItemRef.current !== prevItemId) {
+            const prevPostor = salaData?.mejorOferta?.postor;
+            if (prevPostor === `Postor #${miNumeroPostor}`) {
+              ganadorNotifItemRef.current = prevItemId;
+              const desc = salaData?.itemActual?.descripcionCatalogo ?? 'el producto';
+              setSnackbar(`🏆 ¡Ganaste "${desc}"!`);
+            }
+          }
+        }
         // Actualizar datos del nuevo ítem (incluye el nuevo tiempoLimite → el círculo se resetea)
-        if (event.payload?.itemActual !== undefined) {
+        if (event.payload?.itemActual !== undefined || event.payload?.cooldownHasta !== undefined) {
           setSalaData(event.payload);
         }
         // Refrescar catálogo para mostrar el ítem previo como adjudicado/deshabilitado

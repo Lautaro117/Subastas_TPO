@@ -12,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.subastas.dto.CustodiaDTO;
 import com.example.subastas.dto.MiProductoDTO;
+import com.example.subastas.dto.PropuestaAdminRequest;
 import com.example.subastas.model.AdminProducto;
 import com.example.subastas.model.Cliente;
 import com.example.subastas.model.CustodiaProductos;
@@ -66,10 +67,19 @@ public class MiProductoService {
             .getClienteId();
     }
 
+    /** Resuelve nombre y dirección del depósito asignado a un producto (null si no aplica). */
+    private String[] resolverDeposito(Integer productoId) {
+        return custodiaProductoRepository.findByProductoId(productoId)
+            .flatMap(c -> depositoRepository.findById(c.getDepositoId()))
+            .map(d -> new String[]{ d.getNombre(), d.getDireccion() })
+            .orElse(new String[]{ null, null });
+    }
+
     public List<MiProductoDTO> getMisProductos(String email) {
         Integer clienteId = getClienteId(email);
         return productoRepository.findByDuenio(clienteId).stream().map(p -> {
             AdminProducto ap = adminProductoRepository.findByProductoId(p.getIdentificador()).orElse(null);
+            String[] dep = resolverDeposito(p.getIdentificador());
             return new MiProductoDTO(
                 p.getIdentificador(),
                 p.getDescripcionCatalogo(),
@@ -81,7 +91,8 @@ public class MiProductoService {
                 ap != null ? ap.getFechaSubasta() : null,
                 null,
                 ap != null ? ap.getMotivoRechazo() : null,
-                ap != null ? ap.getEtapaRechazo() : null
+                ap != null ? ap.getEtapaRechazo() : null,
+                dep[0], dep[1]
             );
         }).collect(Collectors.toList());
     }
@@ -216,6 +227,63 @@ public class MiProductoService {
             custodia.getEstado(), nroPoliza, compania);
     }
 
+    public void enviarPropuestaAdmin(Integer productoId, PropuestaAdminRequest body) {
+        if (!productoRepository.existsById(productoId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado");
+        }
+
+        AdminProducto ap = adminProductoRepository.findByProductoId(productoId)
+            .orElseGet(() -> {
+                AdminProducto nuevo = new AdminProducto();
+                nuevo.setProductoId(productoId);
+                return nuevo;
+            });
+
+        ap.setEstadoPropuesta("propuesta_enviada");
+        if (body.getPrecioPropuesto() != null) ap.setPrecioPropuesto(body.getPrecioPropuesto());
+        if (body.getComision() != null) ap.setComision(body.getComision());
+        if (body.getFechaSubasta() != null) ap.setFechaSubasta(body.getFechaSubasta());
+        adminProductoRepository.save(ap);
+
+        if (body.getDepositoId() != null) {
+            depositoRepository.findById(body.getDepositoId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Depósito no encontrado"));
+
+            CustodiaProductos custodia = custodiaProductoRepository.findByProductoId(productoId)
+                .orElseGet(CustodiaProductos::new);
+
+            custodia.setProductoId(productoId);
+            custodia.setDepositoId(body.getDepositoId());
+            if (custodia.getEstado() == null) custodia.setEstado("pendiente");
+            if (custodia.getCreatedAt() == null) custodia.setCreatedAt(java.time.LocalDateTime.now());
+            custodiaProductoRepository.save(custodia);
+        }
+    }
+
+    public void asignarDepositoYEnviar(Integer productoId, Integer depositoId) {
+        if (depositoId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "depositoId es requerido");
+        }
+
+        Producto producto = productoRepository.findById(productoId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+
+        depositoRepository.findById(depositoId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Depósito no encontrado"));
+
+        producto.setEstadoAdmin("enviar_deposito");
+        productoRepository.save(producto);
+
+        CustodiaProductos custodia = custodiaProductoRepository.findByProductoId(productoId)
+            .orElseGet(CustodiaProductos::new);
+
+        custodia.setProductoId(productoId);
+        custodia.setDepositoId(depositoId);
+        if (custodia.getEstado() == null) custodia.setEstado("pendiente");
+        if (custodia.getCreatedAt() == null) custodia.setCreatedAt(java.time.LocalDateTime.now());
+        custodiaProductoRepository.save(custodia);
+    }
+
     public MiProductoDTO getDetalle(String email, Integer productoId) {
         Integer clienteId = getClienteId(email);
 
@@ -228,9 +296,11 @@ public class MiProductoService {
 
         AdminProducto ap = adminProductoRepository.findByProductoId(productoId).orElse(null);
 
-        List<String> fotosBase64 = fotoProductoRepository.findByProducto(productoId).stream()        
+        List<String> fotosBase64 = fotoProductoRepository.findByProducto(productoId).stream()
         .map(f -> Base64.getEncoder().encodeToString(f.getFoto()))
             .collect(Collectors.toList());
+
+        String[] dep = resolverDeposito(productoId);
 
         return new MiProductoDTO(
             producto.getIdentificador(),
@@ -243,7 +313,8 @@ public class MiProductoService {
             ap != null ? ap.getFechaSubasta() : null,
             fotosBase64,
             ap != null ? ap.getMotivoRechazo() : null,
-            ap != null ? ap.getEtapaRechazo() : null
+            ap != null ? ap.getEtapaRechazo() : null,
+            dep[0], dep[1]
         );
     }
 }
