@@ -70,6 +70,7 @@ public class MiProductoService {
     /** Resuelve nombre y dirección del depósito asignado a un producto (null si no aplica). */
     private String[] resolverDeposito(Integer productoId) {
         return custodiaProductoRepository.findByProductoId(productoId)
+            .filter(c -> c.getDepositoId() != null)
             .flatMap(c -> depositoRepository.findById(c.getDepositoId()))
             .map(d -> new String[]{ d.getNombre(), d.getDireccion() })
             .orElse(new String[]{ null, null });
