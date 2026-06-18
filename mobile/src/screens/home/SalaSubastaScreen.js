@@ -230,8 +230,8 @@ export default function SalaSubastaScreen({ navigation, route }) {
   const pollingRef = useRef(null);
   const timerIntervalRef = useRef(null);
   const cooldownIntervalRef = useRef(null);
-  // Ref para evitar notificar múltiples veces el mismo cooldown
-  const cooldownNotifRef = useRef(null);
+  // Set de itemIds ya notificados con campanita (para evitar duplicados en la sesión)
+  const cooldownNotifiedRef = useRef(new Set());
   // Ref para evitar duplicar la notificación de ganador del mismo ítem
   const ganadorNotifItemRef = useRef(null);
   const autoJoinHandled = useRef(false);
@@ -338,19 +338,22 @@ export default function SalaSubastaScreen({ navigation, route }) {
     return () => clearInterval(cooldownIntervalRef.current);
   }, [salaData?.cooldownHasta]);
 
-  // Notificar con campanita cuando empieza un cooldown para un ítem marcado
+  // Notificar con campanita cuando empieza un cooldown para un ítem marcado.
+  // Usamos un Set ref (cooldownNotifiedRef) en vez de comparar timestamps para
+  // evitar falsas re-notificaciones si el polling devuelve un cooldownHasta
+  // ligeramente distinto entre ciclos.
   useEffect(() => {
     const cooldownHasta  = salaData?.cooldownHasta;
     const proximoItemId  = salaData?.proximoItem?.itemId;
 
-    // Cooldown terminó o no hay próximo ítem → limpiar ref
-    if (!cooldownHasta) { cooldownNotifRef.current = null; return; }
-    // Ya notificamos este cooldown
-    if (cooldownNotifRef.current === cooldownHasta) return;
+    // Sin cooldown activo o sin próximo ítem: no hacer nada
+    if (!cooldownHasta || !proximoItemId) return;
     // El usuario no marcó este ítem con la campanita
-    if (!proximoItemId || !notificadosIds.has(proximoItemId)) return;
+    if (!notificadosIds.has(proximoItemId)) return;
+    // Ya notificamos a este ítem en esta sesión
+    if (cooldownNotifiedRef.current.has(proximoItemId)) return;
 
-    cooldownNotifRef.current = cooldownHasta;
+    cooldownNotifiedRef.current.add(proximoItemId);
     const desc = salaData?.proximoItem?.descripcionCatalogo ?? `Producto #${proximoItemId}`;
     const mensaje = `🔔 "${desc}" va a subastarse en 30 segundos`;
     setSnackbar(mensaje);
@@ -593,7 +596,13 @@ export default function SalaSubastaScreen({ navigation, route }) {
   const precioBase = itemActual?.precioBase ?? null;
   const auctionTitle = auction?.ubicacion ?? `Subasta #${auctionId}`;
 
-  const catalogoPreview = catalogo.slice(0, 4);
+  // Mostrar desde el ítem activo (o el próximo no subastado) para que el usuario
+  // vea siempre el contexto actual de la subasta, no los ya adjudicados.
+  const catalogoPreview = (() => {
+    if (!itemActual) return catalogo.slice(0, 4);
+    const idx = catalogo.findIndex((i) => i.itemId === itemActual.itemId);
+    return idx !== -1 ? catalogo.slice(idx, idx + 4) : catalogo.slice(0, 4);
+  })();
 
   // ─── Modales ────────────────────────────────────────────────────────────────
   function renderModals() {

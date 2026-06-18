@@ -12,6 +12,7 @@ import {
   getNotifications,
   getUnreadCount,
   markAllNotificationsRead,
+  markNotificationRead,
 } from '../services/notificationsApi';
 
 const AppSessionContext = createContext(undefined);
@@ -301,6 +302,24 @@ export function AppSessionProvider({ children }) {
   };
 
   /**
+   * Marca una notificación individual del backend como leída.
+   * Se llama cuando el usuario toca la notificación en NotificationsScreen.
+   */
+  const markApiNotificationRead = async (id) => {
+    const token = session.token;
+    if (!token) return;
+    try {
+      await markNotificationRead(token, id);
+      setApiNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, leida: true } : n))
+      );
+      setApiUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {
+      // silent
+    }
+  };
+
+  /**
    * Marca todas las notificaciones del backend como leídas y resetea el conteo.
    */
   const markAllApiNotificationsRead = async () => {
@@ -353,6 +372,7 @@ export function AppSessionProvider({ children }) {
       exitApp,
       markLocalNotificationRead,
       addRemoteNotification,
+      markApiNotificationRead,
       markAllApiNotificationsRead,
       refreshApiNotifications,
     }),

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Icon, IconButton, Surface, Text } from 'react-native-paper';
 
@@ -7,15 +7,19 @@ import { useAppSession } from '../../navigation/AppSessionContext';
 import { COLORS } from '../../theme/colors';
 
 // ─── Formateo de fecha ────────────────────────────────────────────────────────
+// El backend envía LocalDateTime sin zona horaria (ej: "2026-06-18T15:30:00").
+// Añadimos 'Z' para que JS lo interprete como UTC, y lo mostramos en hora de Argentina.
 function formatTimestamp(isoString) {
   if (!isoString) return '';
-  const date = new Date(isoString);
+  const normalized = /[Z+\-]\d{2}:?\d{2}$/.test(isoString) ? isoString : isoString + 'Z';
+  const date = new Date(normalized);
   return date.toLocaleString('es-AR', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'America/Argentina/Buenos_Aires',
   });
 }
 
@@ -30,34 +34,36 @@ function iconForTipo(tipo) {
 }
 
 // ─── Ítem individual ──────────────────────────────────────────────────────────
-function NotificationItem({ item, onFinishRegistration }) {
+function NotificationItem({ item, onPress, onFinishRegistration }) {
   const { source, color } = iconForTipo(item.tipo);
   const isApproval = item.tipo === 'registro_aprobado';
 
   return (
-    <Surface style={[styles.item, item.leida && styles.itemRead]} elevation={0}>
-      <View style={[styles.itemIconBox, { backgroundColor: color + '22' }]}>
-        <Icon source={source} size={22} color={color} />
-      </View>
-      <View style={styles.itemBody}>
-        <Text style={[styles.itemMessage, item.leida && styles.itemMessageRead]}>
-          {item.mensaje}
-        </Text>
-        <Text style={styles.itemTime}>{formatTimestamp(item.createdAt)}</Text>
-        {isApproval ? (
-          <Button
-            mode="contained"
-            compact
-            onPress={onFinishRegistration}
-            style={styles.finishButton}
-            labelStyle={styles.finishLabel}
-          >
-            Finalizar registro
-          </Button>
-        ) : null}
-      </View>
-      {!item.leida ? <View style={styles.unreadDot} /> : null}
-    </Surface>
+    <TouchableOpacity activeOpacity={item.leida ? 1 : 0.75} onPress={item.leida ? undefined : onPress}>
+      <Surface style={[styles.item, item.leida && styles.itemRead]} elevation={0}>
+        <View style={[styles.itemIconBox, { backgroundColor: color + '22' }]}>
+          <Icon source={source} size={22} color={color} />
+        </View>
+        <View style={styles.itemBody}>
+          <Text style={[styles.itemMessage, item.leida && styles.itemMessageRead]}>
+            {item.mensaje}
+          </Text>
+          <Text style={styles.itemTime}>{formatTimestamp(item.createdAt)}</Text>
+          {isApproval ? (
+            <Button
+              mode="contained"
+              compact
+              onPress={onFinishRegistration}
+              style={styles.finishButton}
+              labelStyle={styles.finishLabel}
+            >
+              Finalizar registro
+            </Button>
+          ) : null}
+        </View>
+        {!item.leida ? <View style={styles.unreadDot} /> : null}
+      </Surface>
+    </TouchableOpacity>
   );
 }
 
@@ -67,23 +73,14 @@ export default function NotificationsScreen({ navigation }) {
     localNotifications,
     apiNotifications,
     markLocalNotificationRead,
-    markAllApiNotificationsRead,
+    markApiNotificationRead,
     refreshApiNotifications,
     initiateRegistrationCompletion,
   } = useAppSession();
 
-  // Refrescar del backend al abrir la pantalla
+  // Refrescar del backend al abrir la pantalla (sin marcar como leídas)
   useEffect(() => {
     refreshApiNotifications();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Marcar todas como leídas al abrir (locales + API)
-  useEffect(() => {
-    localNotifications.forEach((n) => {
-      if (!n.leida) markLocalNotificationRead(n.id);
-    });
-    markAllApiNotificationsRead();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -96,6 +93,17 @@ export default function NotificationsScreen({ navigation }) {
       return dateB - dateA;
     });
   }, [apiNotifications, localNotifications]);
+
+  function handlePressNotification(item) {
+    if (item.leida) return;
+    if (item.tipo === 'registro_aprobado' || item.id?.toString().startsWith('local-') || item.id?.toString().startsWith('approval-')) {
+      // Notificación local
+      markLocalNotificationRead(item.id);
+    } else {
+      // Notificación del backend
+      markApiNotificationRead(item.id);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -118,6 +126,7 @@ export default function NotificationsScreen({ navigation }) {
           renderItem={({ item }) => (
             <NotificationItem
               item={item}
+              onPress={() => handlePressNotification(item)}
               onFinishRegistration={initiateRegistrationCompletion}
             />
           )}
@@ -164,7 +173,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 12,
   },
-  itemRead: { opacity: 0.6 },
+  itemRead: { opacity: 0.5 },
   itemIconBox: {
     width: 38,
     height: 38,
