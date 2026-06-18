@@ -223,6 +223,9 @@ export default function SalaSubastaScreen({ navigation, route }) {
   const countdownRef = useRef(null);
   const pollingRef = useRef(null);
   const timerIntervalRef = useRef(null);
+  const cooldownIntervalRef = useRef(null);
+  // Ref para evitar notificar múltiples veces el mismo cooldown
+  const cooldownNotifRef = useRef(null);
   const autoJoinHandled = useRef(false);
   // Ref al handler de eventos WS para evitar closures stale
   const wsEventHandlerRef = useRef(null);
@@ -230,6 +233,9 @@ export default function SalaSubastaScreen({ navigation, route }) {
   // Countdown del ítem actual sincronizado con el deadline del backend
   const [tiempoRestante, setTiempoRestante] = useState(null);
   const [timerTotal, setTimerTotal] = useState(300);
+
+  // Countdown del cooldown entre ítems sincronizado con el deadline del backend
+  const [cooldownRestante, setCooldownRestante] = useState(null);
 
   // ─── Carga inicial ──────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -257,6 +263,7 @@ export default function SalaSubastaScreen({ navigation, route }) {
       clearInterval(countdownRef.current);
       clearInterval(pollingRef.current);
       clearInterval(timerIntervalRef.current);
+      clearInterval(cooldownIntervalRef.current);
       stompClientRef.current?.deactivate?.();
     };
   }, []);
@@ -288,6 +295,44 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
     return () => clearInterval(timerIntervalRef.current);
   }, [salaData?.tiempoLimite, salaData?.timerTotalSegundos]);
+
+  // Sincronizar el countdown de cooldown con el deadline que manda el backend.
+  useEffect(() => {
+    clearInterval(cooldownIntervalRef.current);
+    const deadline = salaData?.cooldownHasta;
+    if (!deadline) {
+      setCooldownRestante(null);
+      return;
+    }
+    const calc = () => Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    setCooldownRestante(calc());
+    cooldownIntervalRef.current = setInterval(() => {
+      const r = calc();
+      setCooldownRestante(r);
+      if (r <= 0) {
+        clearInterval(cooldownIntervalRef.current);
+        setCooldownRestante(null);
+      }
+    }, 1000);
+    return () => clearInterval(cooldownIntervalRef.current);
+  }, [salaData?.cooldownHasta]);
+
+  // Notificar con campanita cuando empieza un cooldown para un ítem marcado
+  useEffect(() => {
+    const cooldownHasta  = salaData?.cooldownHasta;
+    const proximoItemId  = salaData?.proximoItem?.itemId;
+
+    // Cooldown terminó o no hay próximo ítem → limpiar ref
+    if (!cooldownHasta) { cooldownNotifRef.current = null; return; }
+    // Ya notificamos este cooldown
+    if (cooldownNotifRef.current === cooldownHasta) return;
+    // El usuario no marcó este ítem con la campanita
+    if (!proximoItemId || !notificadosIds.has(proximoItemId)) return;
+
+    cooldownNotifRef.current = cooldownHasta;
+    const desc = salaData?.proximoItem?.descripcionCatalogo ?? `Producto #${proximoItemId}`;
+    setSnackbar(`🔔 "${desc}" va a subastarse en 30 segundos`);
+  }, [salaData?.cooldownHasta, salaData?.proximoItem?.itemId, notificadosIds]);
 
   // Salir de la sala cuando joined cambia a false (o al desmontar si joined es true)
   useEffect(() => {
@@ -645,6 +690,88 @@ export default function SalaSubastaScreen({ navigation, route }) {
   }
 
   // ─── SALA ACTIVA ─────────────────────────────────────────────────────────────
+
+  // Pantalla de cooldown entre ítems (30 s de espera antes del siguiente)
+  if (fase === 'sala' && cooldownRestante !== null) {
+    const proximoItem = salaData?.proximoItem ?? null;
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+        <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
+          <Appbar.BackAction onPress={() => setModalSalir(true)} />
+          <Appbar.Content title={auctionTitle} titleStyle={styles.appbarTitle} />
+          <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
+            textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
+        </Appbar.Header>
+
+        <View style={styles.centeredPad}>
+          <Text style={[styles.cooldownHeading, { color: theme.colors.onSurfaceVariant }]}>
+            Próximo ítem en
+          </Text>
+          <CountdownCircle seconds={cooldownRestante} total={30} size={180} />
+
+          {proximoItem && (
+            <Surface
+              elevation={0}
+              style={[styles.proximoItemCard, { backgroundColor: theme.colors.surfaceContainerLow }]}
+            >
+              {proximoItem.fotoPrincipal ? (
+                <Image
+                  source={{ uri: `data:image/jpeg;base64,${proximoItem.fotoPrincipal}` }}
+                  style={styles.proximoItemFoto}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.proximoItemFotoPlaceholder, { backgroundColor: theme.colors.surfaceContainerHigh }]}>
+                  <Text style={{ fontSize: 32 }}>📦</Text>
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.proximoItemTitle, { color: theme.colors.onSurface }]} numberOfLines={2}>
+                  {proximoItem.descripcionCatalogo ?? `Producto #${proximoItem.productoId}`}
+                </Text>
+                {proximoItem.precioBase != null && (
+                  <Text style={[styles.proximoItemBase, { color: theme.colors.onSurfaceVariant }]}>
+                    Base: {moneda} {Number(proximoItem.precioBase).toLocaleString('es-AR')}
+                  </Text>
+                )}
+              </View>
+            </Surface>
+          )}
+        </View>
+
+        {renderModals()}
+        <Snackbar visible={!!snackbar} onDismiss={() => setSnackbar(null)} duration={3000}>{snackbar}</Snackbar>
+      </SafeAreaView>
+    );
+  }
+
+  // Pantalla de espera cuando aún no hay ítem activo (antes de que el admin active el primero)
+  if (fase === 'sala' && !itemActual) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+        <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
+          <Appbar.BackAction onPress={() => setModalSalir(true)} />
+          <Appbar.Content title={auctionTitle} titleStyle={styles.appbarTitle} />
+          <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
+            textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
+        </Appbar.Header>
+
+        <View style={styles.centeredPad}>
+          <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginBottom: 24 }} />
+          <Text style={[styles.cooldownHeading, { color: theme.colors.onSurface }]}>
+            Esperando el primer ítem
+          </Text>
+          <Text style={[styles.cooldownSub, { color: theme.colors.onSurfaceVariant }]}>
+            El subastador activará el primer ítem en breve.
+          </Text>
+        </View>
+
+        {renderModals()}
+        <Snackbar visible={!!snackbar} onDismiss={() => setSnackbar(null)} duration={3000}>{snackbar}</Snackbar>
+      </SafeAreaView>
+    );
+  }
+
   if (fase === 'sala') {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -709,6 +836,15 @@ export default function SalaSubastaScreen({ navigation, route }) {
                   </Text>
                   <Text style={[styles.mejorOfertaSub, { color: theme.colors.onSurfaceVariant }]}>
                     Postor: {mejorOferta.postor}  ·  {mejorOferta.hace}
+                  </Text>
+                </>
+              ) : precioBase != null ? (
+                <>
+                  <Text style={[styles.mejorOfertaMonto, { color: theme.colors.onSurface }]}>
+                    {moneda} {Number(precioBase).toLocaleString('es-AR')}
+                  </Text>
+                  <Text style={[styles.mejorOfertaSub, { color: theme.colors.onSurfaceVariant }]}>
+                    Precio base — ¡Sé el primero en pujar!
                   </Text>
                 </>
               ) : (
@@ -881,6 +1017,18 @@ const styles = StyleSheet.create({
   warmupContent: { alignItems: 'center', paddingTop: 32, paddingBottom: 32 },
   countdownTime: { fontWeight: '700', fontVariant: ['tabular-nums'] },
   proximasHeader: { alignSelf: 'stretch', paddingHorizontal: 20, marginBottom: 12 },
+
+  centeredPad: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+  cooldownHeading: { fontSize: 18, fontWeight: '600', marginBottom: 24, textAlign: 'center' },
+  cooldownSub: { fontSize: 14, textAlign: 'center', marginTop: 12, lineHeight: 20 },
+  proximoItemCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderRadius: 16, padding: 14, marginTop: 28, alignSelf: 'stretch',
+  },
+  proximoItemFoto: { width: 72, height: 72, borderRadius: 12 },
+  proximoItemFotoPlaceholder: { width: 72, height: 72, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  proximoItemTitle: { fontSize: 14, fontWeight: '600', lineHeight: 20, marginBottom: 4 },
+  proximoItemBase: { fontSize: 12, lineHeight: 18 },
 
   timerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 16,

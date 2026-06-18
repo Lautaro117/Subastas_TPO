@@ -18,6 +18,12 @@ public class SalaResponse {
     /** Duración total de la fase activa en segundos: 300 (sin pujas) o 60 (con pujas). */
     private Integer timerTotalSegundos;
 
+    /** Epoch millis cuando termina el cooldown entre ítems (null = sin cooldown activo). */
+    private Long cooldownHasta;
+
+    /** Próximo ítem que se activará al terminar el cooldown (null si no hay cooldown). */
+    private CatalogoDTO proximoItem;
+
     public SalaResponse() {}
 
     public CatalogoDTO getItemActual() { return itemActual; }
@@ -43,6 +49,12 @@ public class SalaResponse {
 
     public Integer getTimerTotalSegundos() { return timerTotalSegundos; }
     public void setTimerTotalSegundos(Integer timerTotalSegundos) { this.timerTotalSegundos = timerTotalSegundos; }
+
+    public Long getCooldownHasta() { return cooldownHasta; }
+    public void setCooldownHasta(Long cooldownHasta) { this.cooldownHasta = cooldownHasta; }
+
+    public CatalogoDTO getProximoItem() { return proximoItem; }
+    public void setProximoItem(CatalogoDTO proximoItem) { this.proximoItem = proximoItem; }
 
     // ── Mejor oferta actual ────────────────────────────────────────────────────
     public static class MejorOferta {

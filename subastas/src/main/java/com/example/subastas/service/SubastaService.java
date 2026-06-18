@@ -336,8 +336,9 @@ public class SubastaService {
 
     @Transactional
     public SalaResponse adjudicarItem(Integer subastaId, Integer itemId) {
-        // El admin adjudicó manualmente → cancelar cualquier timer automático en curso
+        // El admin adjudicó manualmente → cancelar timer automático y cooldown activos
         itemTimerService.cancelarTimer(subastaId);
+        itemTimerService.cancelarCooldown(subastaId);
 
         Subasta subasta = buscarPorId(subastaId);
         if (!"abierta".equalsIgnoreCase(subasta.getEstado()) || esCerrada(subastaId)) {
@@ -417,6 +418,8 @@ public class SubastaService {
     @Transactional
     public SalaResponse activarItem(Integer subastaId, Integer itemId) {
         buscarPorId(subastaId);
+        // Cancelar cooldown activo: el admin activa manualmente, tiene prioridad
+        itemTimerService.cancelarCooldown(subastaId);
         Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Catálogo no encontrado"));
 
@@ -526,6 +529,40 @@ public class SubastaService {
     }
 
     /**
+     * Activa el ítem indicado tras el cooldown de 30 s entre ítems.
+     * Se llama desde el callback del cooldown timer.
+     * Debe ser público y @Transactional para el proxy de Spring.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public void activarItemTrasEspera(Integer subastaId, Integer itemId) {
+        ItemCatalogo item = itemCatalogoRepository.findById(itemId).orElse(null);
+        if (item == null) return;
+        // Guard: si el admin intervino (adjudicó o activó otro ítem) durante el cooldown, ignorar
+        if ("si".equalsIgnoreCase(item.getSubastado())
+                || "deshabilitado".equalsIgnoreCase(item.getSubastado())) return;
+
+        // Quitar en_vivo de todos y activar este
+        Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId).orElse(null);
+        if (catalogo != null) {
+            itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador()).forEach(i -> {
+                if (!"no".equalsIgnoreCase(i.getEnVivo())) {
+                    i.setEnVivo("no");
+                    itemCatalogoRepository.save(i);
+                }
+            });
+        }
+        item.setEnVivo("si");
+        itemCatalogoRepository.save(item);
+
+        // Arrancar timer de 5 minutos para el ítem recién activado
+        itemTimerService.iniciarTimer(subastaId, 300,
+                () -> self.onTimerExpired(subastaId, itemId));
+
+        SalaResponse estado = construirSalaResponse(subastaId);
+        auctionNotificationService.notificarSiguienteItem(subastaId, estado);
+    }
+
+    /**
      * Busca el próximo ítem disponible en el catálogo y lo activa,
      * arrancando su timer de 5 minutos y notificando a todos los postores.
      * Si no hay más ítems, cierra la subasta.
@@ -547,21 +584,20 @@ public class SubastaService {
         if (siguienteOpt.isPresent()) {
             ItemCatalogo siguiente = siguienteOpt.get();
 
-            // Quitar en_vivo de todos y activar el siguiente
+            // Quitar en_vivo de todos (el siguiente se activará tras el cooldown)
             todos.forEach(i -> {
                 if (!"no".equalsIgnoreCase(i.getEnVivo())) {
                     i.setEnVivo("no");
                     itemCatalogoRepository.save(i);
                 }
             });
-            siguiente.setEnVivo("si");
-            itemCatalogoRepository.save(siguiente);
 
-            // Arrancar timer de 5 minutos para el nuevo ítem
+            // Cooldown de 30 segundos entre ítems antes de activar el siguiente
             final Integer nextId = siguiente.getIdentificador();
-            itemTimerService.iniciarTimer(subastaId, 300,
-                    () -> self.onTimerExpired(subastaId, nextId));
+            itemTimerService.iniciarCooldown(subastaId, 30, nextId,
+                    () -> self.activarItemTrasEspera(subastaId, nextId));
 
+            // Notificar estado de cooldown (sin ítem activo, con cooldownHasta y proximoItem)
             SalaResponse estado = construirSalaResponse(subastaId);
             auctionNotificationService.notificarSiguienteItem(subastaId, estado);
         } else {
@@ -588,6 +624,28 @@ public class SubastaService {
         Optional<ItemCatalogo> actualOpt = items.stream()
                 .filter(i -> "si".equalsIgnoreCase(i.getEnVivo()) && !"si".equalsIgnoreCase(i.getSubastado()))
                 .findFirst();
+
+        // Cooldown entre ítems: popularlo ANTES del early-return para que llegue al cliente
+        // aunque no haya ítem activo (es precisamente el estado durante el cooldown).
+        Long cooldownDeadline = itemTimerService.getCooldownDeadline(subastaId);
+        response.setCooldownHasta(cooldownDeadline);
+        if (cooldownDeadline != null) {
+            Integer nextItemId = itemTimerService.getCooldownNextItemId(subastaId);
+            if (nextItemId != null) {
+                itemCatalogoRepository.findById(nextItemId).ifPresent(nextItem -> {
+                    String nextDesc = productoRepository.findById(nextItem.getProductoId())
+                            .map(Producto::getDescripcionCatalogo).orElse(null);
+                    String nextFoto = fotoProductoRepository.findByProducto(nextItem.getProductoId())
+                            .stream().findFirst()
+                            .map(f -> Base64.getEncoder().encodeToString(f.getFoto()))
+                            .orElse(null);
+                    response.setProximoItem(new CatalogoDTO(
+                            nextItem.getIdentificador(), nextItem.getProductoId(),
+                            nextItem.getPrecioBase(), nextItem.getComision(),
+                            nextItem.getSubastado(), nextDesc, nextFoto));
+                });
+            }
+        }
 
         if (actualOpt.isEmpty()) return response;
 
@@ -651,8 +709,18 @@ public class SubastaService {
             }
         }
 
-        // Timer: cuándo vence y duración total de la fase actual
-        response.setTiempoLimite(itemTimerService.getDeadline(subastaId));
+        // Timer: cuándo vence y duración total de la fase actual.
+        // Safety net: si el ítem está vivo pero el timer no existe en memoria (reinicio,
+        // bug de concurrencia, etc.), arrancar uno nuevo de 5 minutos para que el ítem
+        // no quede bloqueado indefinidamente.
+        Long deadline = itemTimerService.getDeadline(subastaId);
+        if (deadline == null) {
+            final Integer itemIdFinal = item.getIdentificador();
+            itemTimerService.iniciarTimer(subastaId, 300,
+                    () -> self.onTimerExpired(subastaId, itemIdFinal));
+            deadline = itemTimerService.getDeadline(subastaId);
+        }
+        response.setTiempoLimite(deadline);
         response.setTimerTotalSegundos(itemTimerService.getTotalSegundos(subastaId));
 
         return response;
