@@ -53,6 +53,7 @@ public class SubastaService {
     @Autowired private AuctionNotificationService auctionNotificationService;
     @Autowired private SesionSubastaService sesionSubastaService;
     @Autowired private ItemTimerService itemTimerService;
+    @Autowired private NotificacionService notificacionService;
     // Auto-inyección lazy para poder llamar métodos @Transactional desde callbacks de timer
     @Lazy @Autowired private SubastaService self;
     @Autowired private SubastaRepository subastaRepository;
@@ -356,6 +357,7 @@ public class SubastaService {
         }
 
         // Marcar puja ganadora y crear adjudicación
+        final ItemCatalogo itemFinal = item;
         pujoRepository.findTopByItemIdOrderByImporteDesc(itemId).ifPresent(p -> {
             p.setGanador("si");
             pujoRepository.save(p);
@@ -364,10 +366,22 @@ public class SubastaService {
             adj.setItemId(itemId);
             adj.setAsistenteId(p.getAsistenteId());
             adj.setImporte(p.getImporte());
-            adj.setComision(item.getComision() != null ? item.getComision() : BigDecimal.ZERO);
+            adj.setComision(itemFinal.getComision() != null ? itemFinal.getComision() : BigDecimal.ZERO);
             adj.setCostoEnvio(BigDecimal.ZERO);
             adj.setCreatedAt(LocalDateTime.now());
             adjudicacionesRepository.save(adj);
+
+            // Notificar al ganador en su bandeja de notificaciones
+            asistenteRepository.findById(p.getAsistenteId()).ifPresent(a -> {
+                String desc = productoRepository.findById(itemFinal.getProductoId())
+                        .map(Producto::getDescripcionCatalogo).orElse("el producto");
+                notificacionService.crearNotificacion(
+                        a.getClienteId(),
+                        "ganador_item",
+                        "🏆 ¡Ganaste la subasta de \"" + desc + "\" por $"
+                                + p.getImporte().toPlainString() + "!"
+                );
+            });
         });
 
         // Marcar ítem como vendido y quitar en_vivo
@@ -522,6 +536,20 @@ public class SubastaService {
                 adj.setCreatedAt(LocalDateTime.now());
                 adjudicacionesRepository.save(adj);
             }
+
+            // Notificar al ganador en su bandeja de notificaciones
+            final Pujo ganadoraFinal = ganadora;
+            final ItemCatalogo itemTimer = item;
+            asistenteRepository.findById(ganadora.getAsistenteId()).ifPresent(a -> {
+                String desc = productoRepository.findById(itemTimer.getProductoId())
+                        .map(Producto::getDescripcionCatalogo).orElse("el producto");
+                notificacionService.crearNotificacion(
+                        a.getClienteId(),
+                        "ganador_item",
+                        "🏆 ¡Ganaste la subasta de \"" + desc + "\" por $"
+                                + ganadoraFinal.getImporte().toPlainString() + "!"
+                );
+            });
 
             item.setSubastado("si");
             item.setEnVivo("no");

@@ -7,6 +7,12 @@ import {
 } from '../services/persistence/sessionStorage';
 
 import { getRegisterStatus } from '../services/authApi';
+import {
+  createNotification,
+  getNotifications,
+  getUnreadCount,
+  markAllNotificationsRead,
+} from '../services/notificationsApi';
 
 const AppSessionContext = createContext(undefined);
 
@@ -22,8 +28,15 @@ const initialSession = {
 
 export function AppSessionProvider({ children }) {
   const [session, setSession] = useState(initialSession);
+  // Notificaciones locales (solo registro_aprobado, campanita offline, etc.)
   const [localNotifications, setLocalNotifications] = useState([]);
-  const pollingRef = useRef(null);
+  // Notificaciones del backend completas (se cargan solo al abrir NotificationsScreen)
+  const [apiNotifications, setApiNotifications] = useState([]);
+  // Conteo de no leídas del backend (se actualiza por polling liviano cada 30s)
+  const [apiUnreadCount, setApiUnreadCount] = useState(0);
+
+  const pollingRef = useRef(null);       // polling de aprobación de registro
+  const notifPollingRef = useRef(null);  // polling liviano de conteo de notificaciones
 
   // ─── Hidratación inicial ───────────────────────────────────────────────────
   useEffect(() => {
@@ -50,6 +63,49 @@ export function AppSessionProvider({ children }) {
     hydrateSession();
     return () => { isActive = false; };
   }, []);
+
+  // ─── Polling LIVIANO de conteo de notificaciones ──────────────────────────
+  // Usa el endpoint /unread-count (una sola columna) en lugar de traer la lista
+  // completa. Esto evita re-renders pesados en SalaSubastaScreen durante una puja.
+  useEffect(() => {
+    const token = session.token;
+    const canPoll = session.isAuthenticated && token &&
+      session.entryMode !== 'guest-login' && session.entryMode !== 'pending-register';
+
+    if (!canPoll) {
+      if (notifPollingRef.current) {
+        clearInterval(notifPollingRef.current);
+        notifPollingRef.current = null;
+      }
+      setApiNotifications([]);
+      setApiUnreadCount(0);
+      return;
+    }
+
+    let isActive = true;
+
+    async function pollUnreadCount() {
+      try {
+        const result = await getUnreadCount(token);
+        if (isActive && result?.count != null) {
+          setApiUnreadCount(result.count);
+        }
+      } catch {
+        // silent — reintenta en el próximo ciclo
+      }
+    }
+
+    pollUnreadCount();
+    notifPollingRef.current = setInterval(pollUnreadCount, 30000); // cada 30s
+
+    return () => {
+      isActive = false;
+      if (notifPollingRef.current) {
+        clearInterval(notifPollingRef.current);
+        notifPollingRef.current = null;
+      }
+    };
+  }, [session.token, session.isAuthenticated, session.entryMode]);
 
   // ─── Polling de aprobación ─────────────────────────────────────────────────
   useEffect(() => {
@@ -87,14 +143,12 @@ export function AppSessionProvider({ children }) {
           clearInterval(pollingRef.current);
           pollingRef.current = null;
 
-          // Guardar el token de registro en el contexto
           setSession((prev) => ({
             ...prev,
             registroAprobado: true,
             registroToken: response.tokenRegistro,
           }));
 
-          // Agregar notificación local
           setLocalNotifications((prev) => {
             if (prev.some((n) => n.tipo === 'registro_aprobado')) return prev;
             return [
@@ -110,7 +164,7 @@ export function AppSessionProvider({ children }) {
           });
         }
       } catch {
-        // silent — reintenta en el próximo ciclo
+        // silent
       }
     }
 
@@ -128,8 +182,6 @@ export function AppSessionProvider({ children }) {
 
   // ─── Acciones ──────────────────────────────────────────────────────────────
   const enterApp = async (entryMode, token) => {
-    // Siempre limpia cualquier estado de registro pendiente al transicionar
-    // a un modo autenticado, para evitar que solicitudId residual active el polling.
     const next = {
       ...session,
       isAuthenticated: true,
@@ -151,24 +203,19 @@ export function AppSessionProvider({ children }) {
     }));
   };
 
-  // Llamar después del registro — guarda solicitudId y activa el polling
   const enterAsPendingGuest = async (solicitudId) => {
-  const next = {
-    ...initialSession,
-    isAuthenticated: false,
-    entryMode: 'pending-register',
-    token: null,
-    solicitudId,
-    bootstrapped: true,
-  };
+    const next = {
+      ...initialSession,
+      isAuthenticated: false,
+      entryMode: 'pending-register',
+      token: null,
+      solicitudId,
+      bootstrapped: true,
+    };
     try { await saveSessionSnapshot(next); } catch {}
     setSession(next);
   };
 
-  // Camino 2 del flujo de registro: el usuario presiona "Continuar como invitado"
-  // desde RegisterVerificationScreen sabiendo que tiene un registro pendiente.
-  // A diferencia de enterApp, esta función establece solicitudId explícitamente
-  // para que el polling del contexto se active y entregue la notificación de aprobación.
   const enterAsGuestLoginWithPending = async (solicitudId) => {
     const next = {
       ...initialSession,
@@ -191,7 +238,6 @@ export function AppSessionProvider({ children }) {
     setSession((prev) => ({ ...prev, token }));
   };
 
-  // Transiciona a AuthStack → RegisterFinalizePassword
   const initiateRegistrationCompletion = () => {
     setLocalNotifications([]);
     setSession((prev) => ({
@@ -206,8 +252,14 @@ export function AppSessionProvider({ children }) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
+    if (notifPollingRef.current) {
+      clearInterval(notifPollingRef.current);
+      notifPollingRef.current = null;
+    }
     try { await clearSessionSnapshot(); } catch {}
     setLocalNotifications([]);
+    setApiNotifications([]);
+    setApiUnreadCount(0);
     setSession({ ...initialSession, bootstrapped: true });
   };
 
@@ -217,12 +269,81 @@ export function AppSessionProvider({ children }) {
     );
   };
 
-  const unreadNotificationsCount = localNotifications.filter((n) => !n.leida).length;
+  /**
+   * Crea una notificación en el backend y la agrega al estado local inmediatamente.
+   * Se usa para notificaciones de campanita de ítem próximo.
+   */
+  const addRemoteNotification = async (tipo, mensaje) => {
+    const token = session.token;
+    if (!token) return;
+    try {
+      const created = await createNotification(token, tipo, mensaje);
+      if (created) {
+        setApiNotifications((prev) => {
+          if (prev.some((n) => n.id === created.id)) return prev;
+          return [created, ...prev];
+        });
+        setApiUnreadCount((prev) => prev + 1);
+      }
+    } catch {
+      // Si falla la creación remota, igual agregar localmente
+      setLocalNotifications((prev) => [
+        {
+          id: `local-${Date.now()}`,
+          tipo,
+          mensaje,
+          leida: false,
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    }
+  };
+
+  /**
+   * Marca todas las notificaciones del backend como leídas y resetea el conteo.
+   */
+  const markAllApiNotificationsRead = async () => {
+    const token = session.token;
+    if (!token) return;
+    try {
+      await markAllNotificationsRead(token);
+      setApiNotifications((prev) => prev.map((n) => ({ ...n, leida: true })));
+      setApiUnreadCount(0);
+    } catch {
+      // silent
+    }
+  };
+
+  /**
+   * Refresca la lista completa de notificaciones del backend
+   * (llamar al abrir NotificationsScreen, no en background).
+   */
+  const refreshApiNotifications = async () => {
+    const token = session.token;
+    if (!token) return;
+    try {
+      const data = await getNotifications(token);
+      if (Array.isArray(data)) {
+        setApiNotifications(data);
+        // Sincronizar conteo con la lista real
+        setApiUnreadCount(data.filter((n) => !n.leida).length);
+      }
+    } catch {
+      // silent
+    }
+  };
+
+  // Conteo total de no leídas: conteo API (liviano, polleado) + locales
+  const unreadNotificationsCount =
+    apiUnreadCount +
+    localNotifications.filter((n) => !n.leida).length;
 
   const value = useMemo(
     () => ({
       session,
       localNotifications,
+      apiNotifications,
       unreadNotificationsCount,
       enterApp,
       enterAsPendingGuest,
@@ -231,8 +352,14 @@ export function AppSessionProvider({ children }) {
       initiateRegistrationCompletion,
       exitApp,
       markLocalNotificationRead,
+      addRemoteNotification,
+      markAllApiNotificationsRead,
+      refreshApiNotifications,
     }),
-    [session, localNotifications, unreadNotificationsCount]
+    // apiNotifications solo cambia al abrir NotificationsScreen (no en background).
+    // apiUnreadCount cambia cada 30s pero es un número primitivo, comparación barata.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [session, localNotifications, apiNotifications, apiUnreadCount, unreadNotificationsCount]
   );
 
   return (

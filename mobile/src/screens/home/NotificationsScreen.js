@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Icon, IconButton, Surface, Text } from 'react-native-paper';
@@ -6,6 +6,7 @@ import { Button, Icon, IconButton, Surface, Text } from 'react-native-paper';
 import { useAppSession } from '../../navigation/AppSessionContext';
 import { COLORS } from '../../theme/colors';
 
+// ─── Formateo de fecha ────────────────────────────────────────────────────────
 function formatTimestamp(isoString) {
   if (!isoString) return '';
   const date = new Date(isoString);
@@ -18,17 +19,25 @@ function formatTimestamp(isoString) {
   });
 }
 
+// ─── Ícono por tipo ───────────────────────────────────────────────────────────
+function iconForTipo(tipo) {
+  switch (tipo) {
+    case 'ganador_item':      return { source: 'trophy-outline',      color: '#f59e0b' };
+    case 'campanita_item':    return { source: 'bell-ring-outline',    color: COLORS.primary };
+    case 'registro_aprobado': return { source: 'check-circle-outline', color: '#22c55e' };
+    default:                  return { source: 'bell-outline',         color: COLORS.onSurfaceVariant };
+  }
+}
+
+// ─── Ítem individual ──────────────────────────────────────────────────────────
 function NotificationItem({ item, onFinishRegistration }) {
+  const { source, color } = iconForTipo(item.tipo);
   const isApproval = item.tipo === 'registro_aprobado';
 
   return (
     <Surface style={[styles.item, item.leida && styles.itemRead]} elevation={0}>
-      <View style={styles.itemIconBox}>
-        <Icon
-          source={isApproval ? 'check-circle-outline' : 'bell-outline'}
-          size={22}
-          color={isApproval ? COLORS.primary : COLORS.onSurfaceVariant}
-        />
+      <View style={[styles.itemIconBox, { backgroundColor: color + '22' }]}>
+        <Icon source={source} size={22} color={color} />
       </View>
       <View style={styles.itemBody}>
         <Text style={[styles.itemMessage, item.leida && styles.itemMessageRead]}>
@@ -52,17 +61,41 @@ function NotificationItem({ item, onFinishRegistration }) {
   );
 }
 
+// ─── Pantalla ──────────────────────────────────────────────────────────────────
 export default function NotificationsScreen({ navigation }) {
-  const { localNotifications, markLocalNotificationRead, initiateRegistrationCompletion } =
-    useAppSession();
+  const {
+    localNotifications,
+    apiNotifications,
+    markLocalNotificationRead,
+    markAllApiNotificationsRead,
+    refreshApiNotifications,
+    initiateRegistrationCompletion,
+  } = useAppSession();
 
-  // Mark all as read when the screen mounts
+  // Refrescar del backend al abrir la pantalla
+  useEffect(() => {
+    refreshApiNotifications();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Marcar todas como leídas al abrir (locales + API)
   useEffect(() => {
     localNotifications.forEach((n) => {
       if (!n.leida) markLocalNotificationRead(n.id);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    markAllApiNotificationsRead();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Unir y ordenar por fecha descendente
+  const allNotifications = useMemo(() => {
+    const combined = [...apiNotifications, ...localNotifications];
+    return combined.sort((a, b) => {
+      const dateA = new Date(a.createdAt ?? 0).getTime();
+      const dateB = new Date(b.createdAt ?? 0).getTime();
+      return dateB - dateA;
+    });
+  }, [apiNotifications, localNotifications]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -80,10 +113,13 @@ export default function NotificationsScreen({ navigation }) {
         </View>
 
         <FlatList
-          data={localNotifications}
-          keyExtractor={(item) => item.id}
+          data={allNotifications}
+          keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
-            <NotificationItem item={item} onFinishRegistration={initiateRegistrationCompletion} />
+            <NotificationItem
+              item={item}
+              onFinishRegistration={initiateRegistrationCompletion}
+            />
           )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -128,10 +164,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 12,
   },
-  itemRead: { opacity: 0.65 },
+  itemRead: { opacity: 0.6 },
   itemIconBox: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },

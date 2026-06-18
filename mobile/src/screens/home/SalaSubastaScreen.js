@@ -37,6 +37,7 @@ import {
   leaveAuction,
   sendBid,
 } from '../../services/auctionsApi';
+import { createNotification } from '../../services/notificationsApi';
 
 const WARMUP_SECONDS = 10;
 
@@ -351,8 +352,12 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
     cooldownNotifRef.current = cooldownHasta;
     const desc = salaData?.proximoItem?.descripcionCatalogo ?? `Producto #${proximoItemId}`;
-    setSnackbar(`🔔 "${desc}" va a subastarse en 30 segundos`);
-  }, [salaData?.cooldownHasta, salaData?.proximoItem?.itemId, notificadosIds]);
+    const mensaje = `🔔 "${desc}" va a subastarse en 30 segundos`;
+    setSnackbar(mensaje);
+    // Llamar directamente al servicio (sin pasar por el context) para evitar
+    // que el setApiNotifications del context dispare re-renders en esta pantalla.
+    if (token) createNotification(token, 'campanita_item', mensaje).catch(() => {});
+  }, [salaData?.cooldownHasta, salaData?.proximoItem?.itemId, notificadosIds, token]);
 
   // Salir de la sala cuando joined cambia a false (o al desmontar si joined es true)
   useEffect(() => {
@@ -568,9 +573,11 @@ export default function SalaSubastaScreen({ navigation, route }) {
       });
       setMontoInput('');
       setSnackbar('¡Puja enviada!');
-      // El backend emite bid.new por WebSocket al aceptar la puja.
-      // Ese evento actualiza la sala para TODOS (incluyendo quien pujó).
-      // No hace falta un REST adicional acá; el polling/WS ya cubren la sync.
+      // Fetch inmediato para actualizar bid y timer sin esperar al WS/polling.
+      // El WS también puede llegar y actualizará los datos si trae info más fresca.
+      getAuctionLive(token, auctionId)
+        .then((live) => { if (live) setSalaData(live); })
+        .catch(() => {});
     } catch (err) {
       setSnackbar(err.message ?? 'Error al enviar la puja.');
     } finally {

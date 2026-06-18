@@ -1,6 +1,7 @@
 package com.example.subastas.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -8,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,13 +42,29 @@ public class NotificacionController {
     }
 
 
-   @PatchMapping("/{id}/read")
+    @PatchMapping("/{id}/read")
     public ResponseEntity<Notificacion> marcarLeida(@PathVariable Integer id,
-                                                   @RequestHeader("Authorization") String authHeader) {
+                                                    @RequestHeader("Authorization") String authHeader) {
         String email = jwtUtil.extractEmail(authHeader.substring(7));
         Notificacion notificacion = notificacionService.marcarLeida(id, email);
         return ResponseEntity.ok(notificacion);
     }
 
+    /** El mobile crea una notificación para sí mismo (ej: campanita de ítem próximo). */
+    @PostMapping
+    public ResponseEntity<Notificacion> crear(@RequestHeader("Authorization") String authHeader,
+                                              @RequestBody Map<String, String> body) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        String tipo    = body.getOrDefault("tipo", "info");
+        String mensaje = body.getOrDefault("mensaje", "");
+        Notificacion n = notificacionService.crearParaUsuario(email, tipo, mensaje);
+        return ResponseEntity.ok(n);
+    }
 
+    /** Devuelve { "count": N } — útil para polling ligero del badge. */
+    @GetMapping("/unread-count")
+    public ResponseEntity<Map<String, Integer>> contarNoLeidas(@RequestHeader("Authorization") String authHeader) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        return ResponseEntity.ok(notificacionService.contarNoLeidas(email));
+    }
 }

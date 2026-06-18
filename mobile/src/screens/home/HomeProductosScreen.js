@@ -183,7 +183,7 @@ export default function HomeProductosScreen({ navigation }) {
               iconColor={theme.colors.primary}
               size={20}
               style={[styles.bellButton, { backgroundColor: theme.colors.surfaceContainerLow }]}
-              onPress={() => navigation.navigate('HomePerfil', { screen: 'Notificaciones' })}
+              onPress={() => navigation.navigate('Notificaciones')}
             />
             <Badge
               visible={unreadNotificationsCount > 0}

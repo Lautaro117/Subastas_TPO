@@ -1,6 +1,8 @@
 package com.example.subastas.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -31,7 +33,7 @@ public class NotificacionService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
         Notificacion notificacion = notificacionRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notificación no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notificacion no encontrada"));
 
         if (!notificacion.getClienteId().equals(usuario.getClienteId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
@@ -52,5 +54,32 @@ public class NotificacionService {
         notificacionRepository.saveAll(pendientes);
 
         return pendientes.size();
+    }
+
+    /** Crea una notificacion para un cliente (usado internamente por el backend). */
+    public Notificacion crearNotificacion(Integer clienteId, String tipo, String mensaje) {
+        Notificacion n = new Notificacion();
+        n.setClienteId(clienteId);
+        n.setTipo(tipo);
+        n.setMensaje(mensaje);
+        n.setLeida(false);
+        n.setCreatedAt(LocalDateTime.now());
+        return notificacionRepository.save(n);
+    }
+
+    /** Crea una notificacion para el usuario autenticado (llamado desde el mobile). */
+    public Notificacion crearParaUsuario(String email, String tipo, String mensaje) {
+        var usuario = usuarioAuthRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        return crearNotificacion(usuario.getClienteId(), tipo, mensaje);
+    }
+
+    /** Devuelve la cantidad de notificaciones no leidas del usuario. */
+    public Map<String, Integer> contarNoLeidas(String email) {
+        var usuario = usuarioAuthRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        int count = notificacionRepository
+                .findByClienteIdAndLeidaFalseOrderByCreatedAtDesc(usuario.getClienteId()).size();
+        return Map.of("count", count);
     }
 }

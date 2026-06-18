@@ -6,6 +6,7 @@ import SalaSubastaScreen from '../screens/home/SalaSubastaScreen';
 import CatalogoExtendidoScreen from '../screens/home/CatalogoExtendidoScreen';
 import DetalleProductoSubastaScreen from '../screens/home/DetalleProductoSubastaScreen';
 import ResultadoSubastaScreen from '../screens/home/ResultadoSubastaScreen';
+import NotificationsScreen from '../screens/home/NotificationsScreen';
 
 
 const Stack = createNativeStackNavigator();
@@ -18,6 +19,7 @@ export function HomeSubastasStack() {
       <Stack.Screen name="CatalogoExtendido" component={CatalogoExtendidoScreen} />
       <Stack.Screen name="DetalleProductoSubasta" component={DetalleProductoSubastaScreen} />
       <Stack.Screen name="ResultadoSubasta" component={ResultadoSubastaScreen} />
+      <Stack.Screen name="Notificaciones" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }
