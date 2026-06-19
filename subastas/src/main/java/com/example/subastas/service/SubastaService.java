@@ -114,6 +114,31 @@ public class SubastaService {
         return subastaRepository.existeEnCierre(subastaId);
     }
 
+    /**
+     * Busca si el cliente ya tiene al menos una puja real (tabla `pujos`) en alguna OTRA
+     * subasta que sigue abierta — y de ser así, devuelve su id.
+     *
+     * Esta es la protección "de verdad" contra estar pujando en dos subastas a la vez: no usa
+     * nada en memoria ni depende de que el cliente avise correctamente que salió de una sala
+     * (eso resultó ser frágil frente a gestos de navegación, tabs, pantallas que quedan
+     * montadas de fondo, etc.). Se basa pura y exclusivamente en datos ya persistidos:
+     * Asistente (a qué subastas se unió alguna vez) + Pujo (si efectivamente pujó ahí) +
+     * Subasta/subastas_cierre (si esa subasta sigue abierta). Ningún bug de navegación puede
+     * saltear esto, porque no depende de la navegación en absoluto.
+     */
+    private Optional<Integer> otraSubastaConPujasActivas(Integer clienteId, Integer subastaIdActual) {
+        return asistenteRepository.findAllByClienteId(clienteId).stream()
+                .filter(a -> !a.getSubastaId().equals(subastaIdActual))
+                .filter(a -> !pujoRepository.findByAsistenteId(a.getIdentificador()).isEmpty())
+                .map(Asistente::getSubastaId)
+                .distinct()
+                .filter(otraId -> {
+                    Subasta otra = subastaRepository.findById(otraId).orElse(null);
+                    return otra != null && "abierta".equalsIgnoreCase(otra.getEstado()) && !esCerrada(otraId);
+                })
+                .findFirst();
+    }
+
     public Subasta buscarPorId(Integer id) {
         return subastaRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Subasta no encontrada"));
@@ -206,7 +231,11 @@ public class SubastaService {
             return construirSalaResponse(subastaId);
         }
 
-        // Verificar si está activo en OTRA subasta abierta (sesión en memoria)
+        // Verificar si está activo en OTRA subasta abierta (sesión en memoria).
+        // Esto es solo una conveniencia de UX (avisar temprano, antes de pujar) — NO es la
+        // protección real, porque depende de que el cliente avise bien que "salió" (navegación,
+        // gestos, etc.), algo que demostró ser frágil. La protección real e inquebrantable es
+        // otraSubastaConPujasActivas() más abajo, basada en pujas ya guardadas en la base.
         Optional<Integer> otraActiva = sesionSubastaService.getSalaActiva(clienteId);
         if (otraActiva.isPresent() && !otraActiva.get().equals(subastaId)) {
             Subasta otraSubasta = subastaRepository.findById(otraActiva.get()).orElse(null);
@@ -219,6 +248,15 @@ public class SubastaService {
             // La otra subasta ya cerró → limpiar sesión fantasma y continuar
             sesionSubastaService.registrarSalida(clienteId);
         }
+
+        // Protección real: si el cliente ya pujó en OTRA subasta que sigue abierta, no puede
+        // unirse a esta. No depende de sesiones en memoria ni de que el cliente avise que salió
+        // de ningún lado — se basa en pujas (`pujos`) que ya están guardadas en la base, así que
+        // ningún bug de navegación (swipe de iOS, tabs, lo que sea) puede saltearlo.
+        otraSubastaConPujasActivas(clienteId, subastaId).ifPresent(otraId -> {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Ya tenés pujas activas en otra subasta. Esperá a que finalice para unirte a esta.");
+        });
 
         // Reutilizar el Asistente histórico si ya existe (puede haber quedado en DB por FK con pujas),
         // o crear uno nuevo si es la primera vez que el usuario entra a esta subasta.
@@ -287,6 +325,21 @@ public class SubastaService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         Asistente asistente = asistenteRepository.findByClienteIdAndSubastaId(usuario.getClienteId(), subastaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No estás unido a esta sala"));
+
+        // Chequeo de conveniencia (sesión en memoria) — útil para UX pero NO es la protección
+        // real, ver comentario más abajo.
+        if (!sesionSubastaService.estaEnSala(usuario.getClienteId(), subastaId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No estás conectado a esta subasta");
+        }
+
+        // Protección real e inquebrantable: si el cliente ya tiene pujas en OTRA subasta que
+        // sigue abierta, no puede pujar en esta, sin importar cómo haya llegado hasta acá
+        // (sesión fantasma, pantalla que quedó montada de fondo, lo que sea). Se basa en pujas
+        // (`pujos`) ya guardadas en la base — no en nada que el cliente pueda desincronizar.
+        otraSubastaConPujasActivas(usuario.getClienteId(), subastaId).ifPresent(otraId -> {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Ya tenés pujas activas en otra subasta. Esperá a que finalice para pujar en esta.");
+        });
 
         // Medio de pago: opcional para el demo
         Integer medioPagoId = null;

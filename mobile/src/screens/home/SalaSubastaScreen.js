@@ -361,13 +361,24 @@ export default function SalaSubastaScreen({ navigation, route }) {
     setSnackbar(`🔔 "${desc}" va a subastarse en 30 segundos`);
   }, [salaData?.cooldownHasta, salaData?.proximoItem?.itemId, notificadosIds]);
 
-  // Salir de la sala cuando joined cambia a false (o al desmontar si joined es true)
-  useEffect(() => {
-    if (!joined) return;
-    return () => {
-      leaveAuction(token, auctionId).catch(() => {});
-    };
-  }, [joined, token, auctionId]);
+  // Salir de la sala cuando esta pantalla pierde el foco mientras joined=true.
+  // OJO: usamos useFocusEffect (no un useEffect atado a mount/unmount) a propósito.
+  // El gesto nativo de swipe-back de iOS navega hacia atrás sin pasar por el botón
+  // "Salir" (que tiene su propio modal + handleLeave), y React Navigation a veces
+  // mantiene la pantalla montada en memoria para volver más rápido — un cleanup de
+  // unmount podría no disparar nunca en ese caso. El evento de "blur" sí se dispara
+  // siempre que se navega fuera de la pantalla, completada por gesto o no, montada o
+  // no, así que es la única forma confiable de avisarle al backend que el usuario
+  // realmente salió (y liberar la sesión para poder unirse a otra subasta).
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        if (joined) {
+          leaveAuction(token, auctionId).catch(() => {});
+        }
+      };
+    }, [joined, token, auctionId])
+  );
 
   // Auto-join cuando se navega desde DetalleProductoSubasta con autoJoin=true
   useEffect(() => {
