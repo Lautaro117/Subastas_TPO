@@ -2,6 +2,7 @@ package com.example.subastas.service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -72,6 +73,14 @@ public class SubastaService {
             "comun", "especial", "plata", "oro", "platino");
 
     private static final String MONEDA = "ARS";
+    /**
+     * Zona horaria fija para timestamps que se muestran al usuario (ej: createdAt de
+     * Adjudicaciones). Antes se usaba LocalDateTime.now() "a secas", que toma la zona
+     * default del JVM del servidor — si ese default no es Argentina (p.ej. un host en
+     * UTC), el horario que ve el usuario queda corrido. Fijarlo explícitamente evita
+     * que dependa de cómo esté configurado el servidor.
+     */
+    private static final ZoneId ZONA_AR = ZoneId.of("America/Argentina/Buenos_Aires");
 
     // ── Listado ────────────────────────────────────────────────────────────────
 
@@ -380,7 +389,7 @@ public class SubastaService {
             adj.setImporte(p.getImporte());
             adj.setComision(itemFinal.getComision() != null ? itemFinal.getComision() : BigDecimal.ZERO);
             adj.setCostoEnvio(BigDecimal.ZERO);
-            adj.setCreatedAt(LocalDateTime.now());
+            adj.setCreatedAt(LocalDateTime.now(ZONA_AR));
             adjudicacionesRepository.save(adj);
 
             // Notificar al ganador en su bandeja de notificaciones
@@ -566,7 +575,7 @@ public class SubastaService {
                 adj.setImporte(ganadora.getImporte());
                 adj.setComision(item.getComision() != null ? item.getComision() : BigDecimal.ZERO);
                 adj.setCostoEnvio(BigDecimal.ZERO);
-                adj.setCreatedAt(LocalDateTime.now());
+                adj.setCreatedAt(LocalDateTime.now(ZONA_AR));
                 adjudicacionesRepository.save(adj);
             }
 
@@ -670,6 +679,14 @@ public class SubastaService {
             final Integer nextId = siguiente.getIdentificador();
             itemTimerService.iniciarCooldown(subastaId, 30, nextId,
                     () -> self.activarItemTrasEspera(subastaId, nextId));
+
+            // Avisar AHORA MISMO (no recién cuando arranque) a todos los que marcaron la
+            // campanita de este ítem: "va a subastarse en breve". No depende de que la app
+            // de cada usuario esté abierta/polleando en este momento, porque queda guardado
+            // como una notificación real en su bandeja (ver NotificacionService).
+            String descSiguiente = productoRepository.findById(siguiente.getProductoId())
+                    .map(Producto::getDescripcionCatalogo).orElse(null);
+            notificacionService.notificarCampanitaItem(nextId, descSiguiente);
 
             // Notificar estado de cooldown (sin ítem activo, con cooldownHasta y proximoItem)
             SalaResponse estado = construirSalaResponse(subastaId);

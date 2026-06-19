@@ -113,13 +113,10 @@ function CatalogoRow({ item, isActivo, notificado, onBellPress, onPress }) {
       style={[
         styles.catalogoRow,
         {
-          backgroundColor: isActivo
-            ? theme.colors.primaryContainer
-            : subastado
-            ? theme.colors.surfaceContainerHigh
-            : theme.colors.surfaceContainerLowest,
+          // Un ítem ya cerrado (vendido o sin postor) se ve igual que uno pendiente —
+          // solo cambia la etiqueta de la derecha (AHORA / SIN POSTOR / campanita).
+          backgroundColor: isActivo ? theme.colors.primaryContainer : theme.colors.surfaceContainerLowest,
           borderColor: isActivo ? theme.colors.primary : theme.colors.outline,
-          opacity: subastado && !isActivo ? 0.55 : 1,
         },
       ]}
     >
@@ -357,12 +354,12 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
     cooldownNotifiedRef.current.add(proximoItemId);
     const desc = salaData?.proximoItem?.descripcionCatalogo ?? `Producto #${proximoItemId}`;
-    const mensaje = `🔔 "${desc}" va a subastarse en 30 segundos`;
-    setSnackbar(mensaje);
-    // Llamar directamente al servicio (sin pasar por el context) para evitar
-    // que el setApiNotifications del context dispare re-renders en esta pantalla.
-    if (token) createNotification(token, 'campanita_item', mensaje).catch(() => {});
-  }, [salaData?.cooldownHasta, salaData?.proximoItem?.itemId, notificadosIds, token]);
+    // El backend ya crea la notificación real (para este usuario y para cualquier otro que
+    // haya marcado este ítem) apenas arranca el cooldown — ver
+    // SubastaService.autoAvanzarDesdeItem + NotificacionService.notificarCampanitaItem.
+    // Acá solo mostramos el toast instantáneo porque la pantalla ya está abierta.
+    setSnackbar(`🔔 "${desc}" va a subastarse en 30 segundos`);
+  }, [salaData?.cooldownHasta, salaData?.proximoItem?.itemId, notificadosIds]);
 
   // Salir de la sala cuando joined cambia a false (o al desmontar si joined es true)
   useEffect(() => {
@@ -705,9 +702,16 @@ export default function SalaSubastaScreen({ navigation, route }) {
             <Button onPress={() => setModalNotificar(null)} textColor={theme.colors.onSurfaceVariant}>Cancelar</Button>
             <Button
               onPress={() => {
-                setNotificadosIds((prev) => new Set([...prev, modalNotificar]));
+                const itemId = modalNotificar;
+                setNotificadosIds((prev) => new Set([...prev, itemId]));
                 setModalNotificar(null);
                 setSnackbar('Te notificaremos cuando comience.');
+                // Persistir la marca en el backend: así el aviso llega aunque la app
+                // esté cerrada cuando arranque el cooldown de este ítem (no depende
+                // de que este dispositivo esté pollendo la sala en ese momento).
+                if (token) {
+                  createNotification(token, 'campanita_pendiente', String(itemId)).catch(() => {});
+                }
               }}
               textColor={theme.colors.primary}
             >

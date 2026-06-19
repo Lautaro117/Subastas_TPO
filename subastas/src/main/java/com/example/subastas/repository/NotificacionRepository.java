@@ -10,4 +10,6 @@ public interface NotificacionRepository extends JpaRepository<Notificacion, Inte
     List<Notificacion> findByClienteIdAndLeidaFalseOrderByCreatedAtDesc(Integer clienteId);
     List<Notificacion> findByClienteIdOrderByCreatedAtDesc(Integer clienteId);
     List<Notificacion> findByClienteId(Integer clienteId);
+    /** Usado para la "campanita": busca quién marcó un ítem puntual para que le avisen. */
+    List<Notificacion> findByTipoAndMensajeAndLeidaFalse(String tipo, String mensaje);
 }

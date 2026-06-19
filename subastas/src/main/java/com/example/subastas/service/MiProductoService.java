@@ -1,6 +1,7 @@
 package com.example.subastas.service;
 
 import java.math.BigDecimal;
+import java.time.ZoneId;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
@@ -40,6 +41,8 @@ import com.example.subastas.repository.UsuarioAuthRepository;
 
 @Service
 public class MiProductoService {
+
+    private static final ZoneId ZONA_AR = ZoneId.of("America/Argentina/Buenos_Aires");
 
     @Autowired
     private ProductoRepository productoRepository;
@@ -305,7 +308,7 @@ public class MiProductoService {
             custodia.setProductoId(productoId);
             custodia.setDepositoId(body.getDepositoId());
             if (custodia.getEstado() == null) custodia.setEstado("pendiente");
-            if (custodia.getCreatedAt() == null) custodia.setCreatedAt(java.time.LocalDateTime.now());
+            if (custodia.getCreatedAt() == null) custodia.setCreatedAt(java.time.LocalDateTime.now(ZONA_AR));
             custodiaProductoRepository.save(custodia);
         }
     }
@@ -330,7 +333,7 @@ public class MiProductoService {
         custodia.setProductoId(productoId);
         custodia.setDepositoId(depositoId);
         if (custodia.getEstado() == null) custodia.setEstado("pendiente");
-        if (custodia.getCreatedAt() == null) custodia.setCreatedAt(java.time.LocalDateTime.now());
+        if (custodia.getCreatedAt() == null) custodia.setCreatedAt(java.time.LocalDateTime.now(ZONA_AR));
         custodiaProductoRepository.save(custodia);
     }
 
