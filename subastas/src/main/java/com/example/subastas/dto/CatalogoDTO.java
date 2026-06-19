@@ -8,15 +8,20 @@ public class CatalogoDTO {
     private BigDecimal precioBase;
     private BigDecimal comision;
     private String subastado;
+    /** "si" cuando el ítem está siendo subastado en este momento. */
+    private String enVivo;
     private String descripcionCatalogo;
     private String fotoPrincipal;
 
-    public CatalogoDTO(Integer itemId, Integer productoId, BigDecimal precioBase, BigDecimal comision, String subastado, String descripcionCatalogo, String fotoPrincipal) {
+    public CatalogoDTO(Integer itemId, Integer productoId, BigDecimal precioBase,
+                       BigDecimal comision, String subastado, String enVivo,
+                       String descripcionCatalogo, String fotoPrincipal) {
         this.itemId = itemId;
         this.productoId = productoId;
         this.precioBase = precioBase;
         this.comision = comision;
         this.subastado = subastado;
+        this.enVivo = enVivo;
         this.descripcionCatalogo = descripcionCatalogo;
         this.fotoPrincipal = fotoPrincipal;
     }
@@ -26,6 +31,7 @@ public class CatalogoDTO {
     public BigDecimal getPrecioBase() { return precioBase; }
     public BigDecimal getComision() { return comision; }
     public String getSubastado() { return subastado; }
+    public String getEnVivo() { return enVivo; }
     public String getDescripcionCatalogo() { return descripcionCatalogo; }
     public String getFotoPrincipal() { return fotoPrincipal; }
 }

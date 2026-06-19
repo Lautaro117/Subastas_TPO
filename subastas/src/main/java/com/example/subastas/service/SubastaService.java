@@ -126,7 +126,8 @@ public class SubastaService {
             return new CatalogoDTO(
                     item.getIdentificador(), item.getProductoId(),
                     "E2".equals(estado) ? null : item.getPrecioBase(),
-                    item.getComision(), item.getSubastado(), descripcion, foto);
+                    item.getComision(), item.getSubastado(), item.getEnVivo(),
+                    descripcion, foto);
         }).toList();
     }
 
@@ -135,7 +136,7 @@ public class SubastaService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
         return new CatalogoDTO(item.getIdentificador(), item.getProductoId(),
                 "E2".equals(estado) ? null : item.getPrecioBase(),
-                item.getComision(), item.getSubastado(), null, null);
+                item.getComision(), item.getSubastado(), item.getEnVivo(), null, null);
     }
 
     public ProductoDetalleDTO obtenerDetalleProducto(Integer subastaId, Integer itemId, String estado) {
@@ -674,7 +675,7 @@ public class SubastaService {
                     response.setProximoItem(new CatalogoDTO(
                             nextItem.getIdentificador(), nextItem.getProductoId(),
                             nextItem.getPrecioBase(), nextItem.getComision(),
-                            nextItem.getSubastado(), nextDesc, nextFoto));
+                            nextItem.getSubastado(), nextItem.getEnVivo(), nextDesc, nextFoto));
                 });
             }
         }
@@ -693,7 +694,7 @@ public class SubastaService {
         response.setItemActual(new CatalogoDTO(
                 item.getIdentificador(), item.getProductoId(),
                 item.getPrecioBase(), item.getComision(),
-                item.getSubastado(), descripcion, foto));
+                item.getSubastado(), item.getEnVivo(), descripcion, foto));
 
         // Pujas del ítem ordenadas desc por importe
         List<Pujo> pujas = pujoRepository.findByItemId(item.getIdentificador());

@@ -596,12 +596,27 @@ export default function SalaSubastaScreen({ navigation, route }) {
   const precioBase = itemActual?.precioBase ?? null;
   const auctionTitle = auction?.ubicacion ?? `Subasta #${auctionId}`;
 
-  // Mostrar desde el ítem activo (o el próximo no subastado) para que el usuario
-  // vea siempre el contexto actual de la subasta, no los ya adjudicados.
+  // ── Ventana de 4 ítems centrada en el contexto actual ──────────────────────
+  // Prioridad 1: enVivo === 'si' en el catálogo (dato directo del backend, siempre fiable)
+  // Prioridad 2: itemActual del SalaResponse (cuando el usuario está unido)
+  // Prioridad 3: primer ítem no adjudicado según campo `subastado`
+  // Prioridad 4: últimos 4 (todo adjudicado)
   const catalogoPreview = (() => {
-    if (!itemActual) return catalogo.slice(0, 4);
-    const idx = catalogo.findIndex((i) => i.itemId === itemActual.itemId);
-    return idx !== -1 ? catalogo.slice(idx, idx + 4) : catalogo.slice(0, 4);
+    // 1. El backend marca el ítem activo con enVivo === 'si'
+    const enVivoIdx = catalogo.findIndex((i) => i.enVivo === 'si');
+    if (enVivoIdx !== -1) return catalogo.slice(enVivoIdx, enVivoIdx + 4);
+    // 2. Tenemos itemActual desde salaData (usuario unido)
+    if (itemActual) {
+      const idx = catalogo.findIndex((i) => i.itemId === itemActual.itemId);
+      if (idx !== -1) return catalogo.slice(idx, idx + 4);
+    }
+    // 3. Inferir posición desde el campo `subastado`
+    const firstPending = catalogo.findIndex(
+      (i) => i.subastado !== 'si' && i.subastado !== 'deshabilitado'
+    );
+    if (firstPending !== -1) return catalogo.slice(firstPending, firstPending + 4);
+    // 4. Todo adjudicado: mostrar últimos 4
+    return catalogo.slice(Math.max(0, catalogo.length - 4));
   })();
 
   // ─── Modales ────────────────────────────────────────────────────────────────
