@@ -77,6 +77,40 @@ function ProductoCard({ item, onPress }) {
   );
 }
 
+const RESULTADO_VENTA_LABEL = {
+  vendido_subasta: 'Vendido en subasta',
+  comprado_empresa: 'Comprado por la empresa',
+};
+
+function VendidoCard({ item, onPress }) {
+  const theme = useTheme();
+  const esEmpresa = item.resultadoVenta === 'comprado_empresa';
+  const color = esEmpresa ? '#FFA726' : '#4CAF50';
+
+  return (
+    <TouchableOpacity onPress={onPress}>
+      <View style={[styles.card, { backgroundColor: theme.colors.surfaceContainerLow }]}>
+        <Text style={[styles.cardTitle, { color: theme.colors.onSurface }]}>{item.descripcionCatalogo}</Text>
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Resultado:</Text>
+          <Text style={[styles.infoValue, { color }]}>
+            {RESULTADO_VENTA_LABEL[item.resultadoVenta] || item.resultadoVenta}
+          </Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Monto:</Text>
+          <Text style={[styles.infoValue, { color: theme.colors.primary }]}>${item.montoVenta}</Text>
+        </View>
+        {esEmpresa ? (
+          <Text style={[styles.cardDesc, { color: theme.colors.onSurfaceVariant }]}>
+            Nadie pujó dentro del tiempo límite, así que la empresa lo compró simulando la subasta.
+          </Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 function CompraCard({ item, onPress }) {
   const theme = useTheme();
   return (
@@ -167,8 +201,11 @@ export default function HomeProductosScreen({ navigation }) {
     if (activeTab === 'compras') cargarCompras();
   }, [activeTab, cargarCompras]);
 
+  const vendidos = productos.filter((p) => !!p.resultadoVenta);
+
   const tabs = [
     { key: 'publicados', label: 'Productos publicados' },
+    { key: 'vendidos', label: 'Vendidos' },
     { key: 'compras', label: 'Mis compras' },
   ];
 
@@ -257,6 +294,31 @@ export default function HomeProductosScreen({ navigation }) {
                   keyExtractor={(item) => item.id.toString()}
                   renderItem={({ item }) => (
                     <ProductoCard
+                      item={item}
+                      onPress={() => navigation.navigate('DetalleProducto', { productoId: item.id })}
+                    />
+                  )}
+                  contentContainerStyle={styles.list}
+                  showsVerticalScrollIndicator={false}
+                />
+              )
+            ) : activeTab === 'vendidos' ? (
+              loading ? (
+                <ActivityIndicator style={styles.loader} />
+              ) : error ? (
+                <Text style={[styles.error, { color: theme.colors.error }]}>{error}</Text>
+              ) : vendidos.length === 0 ? (
+                <View style={styles.placeholder}>
+                  <Text style={[styles.placeholderText, { color: theme.colors.onSurfaceVariant }]}>
+                    Todavía no se vendió ninguno de tus productos
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={vendidos}
+                  keyExtractor={(item) => item.id.toString()}
+                  renderItem={({ item }) => (
+                    <VendidoCard
                       item={item}
                       onPress={() => navigation.navigate('DetalleProducto', { productoId: item.id })}
                     />

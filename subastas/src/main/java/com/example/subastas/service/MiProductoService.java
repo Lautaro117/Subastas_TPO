@@ -1,7 +1,10 @@
 package com.example.subastas.service;
 
+import java.math.BigDecimal;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,19 +17,23 @@ import com.example.subastas.dto.CustodiaDTO;
 import com.example.subastas.dto.MiProductoDTO;
 import com.example.subastas.dto.PropuestaAdminRequest;
 import com.example.subastas.model.AdminProducto;
+import com.example.subastas.model.Adjudicaciones;
 import com.example.subastas.model.Cliente;
 import com.example.subastas.model.CustodiaProductos;
 import com.example.subastas.model.Depositos;
 import com.example.subastas.model.Duenio;
 import com.example.subastas.model.FotoProducto;
+import com.example.subastas.model.ItemCatalogo;
 import com.example.subastas.model.Producto;
 import com.example.subastas.model.Seguro;
+import com.example.subastas.repository.AdjudicacionesRepository;
 import com.example.subastas.repository.AdminProductoRepository;
 import com.example.subastas.repository.ClienteRepository;
 import com.example.subastas.repository.CustodiaProductoRepository;
 import com.example.subastas.repository.DepositoRepository;
 import com.example.subastas.repository.DuenioRepository;
 import com.example.subastas.repository.FotoProductoRepository;
+import com.example.subastas.repository.ItemCatalogoRepository;
 import com.example.subastas.repository.ProductoRepository;
 import com.example.subastas.repository.SeguroRepository;
 import com.example.subastas.repository.UsuarioAuthRepository;
@@ -61,6 +68,12 @@ public class MiProductoService {
     @Autowired
     private ClienteRepository clienteRepository;
 
+    @Autowired
+    private ItemCatalogoRepository itemCatalogoRepository;
+
+    @Autowired
+    private AdjudicacionesRepository adjudicacionesRepository;
+
     private Integer getClienteId(String email) {
         return usuarioAuthRepository.findByEmail(email)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED))
@@ -76,11 +89,46 @@ public class MiProductoService {
             .orElse(new String[]{ null, null });
     }
 
+    /**
+     * Resuelve el resultado de la subasta de un producto a partir de items_catalogo.subastado:
+     * - "si" + existe una fila en Adjudicaciones para ese ítem → se vendió a un postor real:
+     *   "vendido_subasta", monto = importe de la adjudicación.
+     * - "si" + NO existe Adjudicaciones → nadie pujó y venció el timer, la empresa lo "compró"
+     *   simulando la subasta: "comprado_empresa", monto = precio base.
+     *   (items_catalogo.subastado tiene un CHECK constraint que solo permite 'si'/'no' — ver
+     *   EstructuraActual.md — y 'no' ya es el valor por default para "pendiente" que pone el
+     *   panel admin al cargar el ítem, así que no hay un tercer valor disponible para esto;
+     *   por eso la distinción se calcula a partir de Adjudicaciones, no de subastado.)
+     * - cualquier otro caso (todavía pendiente, o ni siquiera entró a un catálogo): null.
+     *
+     * No escribe nada nuevo: se deriva 100% de columnas que ya existen (sin cambios de schema).
+     */
+    private Object[] resolverResultadoVenta(Integer productoId) {
+        List<ItemCatalogo> items = itemCatalogoRepository.findByProductoId(productoId);
+        if (items.isEmpty()) {
+            return new Object[]{ null, null };
+        }
+        // Si hubiera más de un ítem de catálogo para el mismo producto, nos quedamos con el más reciente.
+        ItemCatalogo item = items.stream()
+            .max(Comparator.comparing(ItemCatalogo::getIdentificador))
+            .orElse(null);
+
+        if ("si".equals(item.getSubastado())) {
+            Optional<Adjudicaciones> adjudicacion = adjudicacionesRepository.findByItemId(item.getIdentificador());
+            if (adjudicacion.isPresent()) {
+                return new Object[]{ "vendido_subasta", adjudicacion.get().getImporte() };
+            }
+            return new Object[]{ "comprado_empresa", item.getPrecioBase() };
+        }
+        return new Object[]{ null, null };
+    }
+
     public List<MiProductoDTO> getMisProductos(String email) {
         Integer clienteId = getClienteId(email);
         return productoRepository.findByDuenio(clienteId).stream().map(p -> {
             AdminProducto ap = adminProductoRepository.findByProductoId(p.getIdentificador()).orElse(null);
             String[] dep = resolverDeposito(p.getIdentificador());
+            Object[] venta = resolverResultadoVenta(p.getIdentificador());
             return new MiProductoDTO(
                 p.getIdentificador(),
                 p.getDescripcionCatalogo(),
@@ -93,7 +141,8 @@ public class MiProductoService {
                 null,
                 ap != null ? ap.getMotivoRechazo() : null,
                 ap != null ? ap.getEtapaRechazo() : null,
-                dep[0], dep[1]
+                dep[0], dep[1],
+                (String) venta[0], (BigDecimal) venta[1]
             );
         }).collect(Collectors.toList());
     }
@@ -302,6 +351,7 @@ public class MiProductoService {
             .collect(Collectors.toList());
 
         String[] dep = resolverDeposito(productoId);
+        Object[] venta = resolverResultadoVenta(productoId);
 
         return new MiProductoDTO(
             producto.getIdentificador(),
@@ -315,7 +365,8 @@ public class MiProductoService {
             fotosBase64,
             ap != null ? ap.getMotivoRechazo() : null,
             ap != null ? ap.getEtapaRechazo() : null,
-            dep[0], dep[1]
+            dep[0], dep[1],
+            (String) venta[0], (BigDecimal) venta[1]
         );
     }
 }

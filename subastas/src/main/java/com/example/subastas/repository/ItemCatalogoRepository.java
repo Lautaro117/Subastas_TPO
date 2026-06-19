@@ -12,4 +12,6 @@ public interface ItemCatalogoRepository extends JpaRepository<ItemCatalogo, Inte
         return findByCatalogoIdOrderByIdentificadorAsc(catalogoId);
     }
     java.util.Optional<ItemCatalogo> findByCatalogoIdAndEnVivo(Integer catalogoId, String enVivo);
+    /** Ítems de catálogo asociados a un producto (normalmente uno, puede haber más si se relistó). */
+    List<ItemCatalogo> findByProductoId(Integer productoId);
 }

@@ -100,9 +100,11 @@ function BidRow({ bid, isTop }) {
 // ─── Fila de ítem del catálogo ────────────────────────────────────────────────
 function CatalogoRow({ item, isActivo, notificado, onBellPress, onPress }) {
   const theme = useTheme();
-  // 'si' = adjudicado con ganador · 'deshabilitado' = venció sin postores
-  const subastado = item.subastado === 'si' || item.subastado === 'deshabilitado';
-  const sinPostores = item.subastado === 'deshabilitado';
+  // 'si' = cerrado (vendido a un postor, o comprado por la empresa si nadie pujó).
+  // sinPostor lo manda el backend (no se puede guardar un 3er valor en subastado: la columna
+  // tiene un CHECK constraint que solo permite 'si'/'no').
+  const subastado = item.subastado === 'si';
+  const sinPostores = item.subastado === 'si' && item.sinPostor === true;
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
@@ -611,9 +613,7 @@ export default function SalaSubastaScreen({ navigation, route }) {
       if (idx !== -1) return catalogo.slice(idx, idx + 4);
     }
     // 3. Inferir posición desde el campo `subastado`
-    const firstPending = catalogo.findIndex(
-      (i) => i.subastado !== 'si' && i.subastado !== 'deshabilitado'
-    );
+    const firstPending = catalogo.findIndex((i) => i.subastado !== 'si');
     if (firstPending !== -1) return catalogo.slice(firstPending, firstPending + 4);
     // 4. Todo adjudicado: mostrar últimos 4
     return catalogo.slice(Math.max(0, catalogo.length - 4));

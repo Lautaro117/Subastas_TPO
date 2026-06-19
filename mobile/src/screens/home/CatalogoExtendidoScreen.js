@@ -108,9 +108,9 @@ export default function CatalogoExtendidoScreen({ navigation, route }) {
             </View>
 
             {/* Campana o subastado */}
-            {item.subastado === 'si' || item.subastado === 'deshabilitado' ? (
+            {item.subastado === 'si' ? (
               <Text style={[styles.subastadoLabel, { color: theme.colors.onSurfaceVariant }]}>
-                {item.subastado === 'si' ? '✓' : '—'}
+                {item.sinPostor ? '—' : '✓'}
               </Text>
             ) : (
               <IconButton

@@ -127,7 +127,7 @@ public class SubastaService {
                     item.getIdentificador(), item.getProductoId(),
                     "E2".equals(estado) ? null : item.getPrecioBase(),
                     item.getComision(), item.getSubastado(), item.getEnVivo(),
-                    descripcion, foto);
+                    descripcion, foto, esSinPostor(item));
         }).toList();
     }
 
@@ -136,7 +136,18 @@ public class SubastaService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
         return new CatalogoDTO(item.getIdentificador(), item.getProductoId(),
                 "E2".equals(estado) ? null : item.getPrecioBase(),
-                item.getComision(), item.getSubastado(), item.getEnVivo(), null, null);
+                item.getComision(), item.getSubastado(), item.getEnVivo(), null, null, esSinPostor(item));
+    }
+
+    /**
+     * true si el ítem está cerrado (subastado='si') pero no tiene ninguna Adjudicaciones real:
+     * nadie pujó y venció el timer, la empresa lo "compró" simulando la subasta.
+     * No usamos un tercer valor de `subastado` porque la columna tiene un CHECK constraint
+     * que solo permite 'si'/'no' (ver EstructuraActual.md) — 'no' ya significa "pendiente".
+     */
+    private boolean esSinPostor(ItemCatalogo item) {
+        return "si".equalsIgnoreCase(item.getSubastado())
+                && adjudicacionesRepository.findByItemId(item.getIdentificador()).isEmpty();
     }
 
     public ProductoDetalleDTO obtenerDetalleProducto(Integer subastaId, Integer itemId, String estado) {
@@ -499,20 +510,41 @@ public class SubastaService {
      * Llamado por ItemTimerService cuando un timer vence.
      * Debe ser público y @Transactional para que Spring gestione la transacción
      * al invocarse a través del proxy (self.onTimerExpired).
+     *
+     * Envuelto en try/catch SOLO para loguear con contexto claro antes de relanzar:
+     * si esto falla silenciosamente (como pasaba antes, atrapado únicamente por el
+     * catch genérico de ItemTimerService), el ítem se queda "vivo" para siempre y la
+     * subasta parece congelarse en 00:00 sin avanzar.
      */
     @Transactional
     public void onTimerExpired(Integer subastaId, Integer itemId) {
+        try {
+            onTimerExpiredInterno(subastaId, itemId);
+        } catch (RuntimeException e) {
+            System.err.println("[onTimerExpired] ERROR procesando expiración subastaId=" + subastaId
+                    + " itemId=" + itemId + ": " + e);
+            e.printStackTrace();
+            throw e;
+        }
+    }
+
+    private void onTimerExpiredInterno(Integer subastaId, Integer itemId) {
         ItemCatalogo item = itemCatalogoRepository.findById(itemId).orElse(null);
         if (item == null) return;
-        // Guard: si el ítem ya fue procesado (adjudicado o deshabilitado), ignorar
-        if ("si".equalsIgnoreCase(item.getSubastado())
-                || "deshabilitado".equalsIgnoreCase(item.getSubastado())) return;
+        // Guard: si el ítem ya fue procesado (adjudicado), ignorar
+        if ("si".equalsIgnoreCase(item.getSubastado())) return;
 
         List<Pujo> pujas = pujoRepository.findByItemId(itemId);
 
         if (pujas.isEmpty()) {
-            // Sin postores → deshabilitar ítem y avanzar al siguiente
-            item.setSubastado("deshabilitado");
+            // Sin postores → cerrar el ítem (lo "compra" la empresa) y avanzar al siguiente.
+            // items_catalogo.subastado tiene un CHECK constraint que SOLO permite 'si'/'no'
+            // (EstructuraActual.md), y 'no' ya es el valor por default para "pendiente"
+            // (lo pone así el panel admin al cargar el ítem al catálogo). No hay un tercer
+            // valor disponible, así que usamos 'si' igual que una venta real, y la diferencia
+            // ("nadie pujó" vs "se vendió a un postor") se calcula por la AUSENCIA de una fila
+            // en Adjudicaciones — ver esSinPostor() y MiProductoService.resolverResultadoVenta().
+            item.setSubastado("si");
             item.setEnVivo("no");
             itemCatalogoRepository.save(item);
         } else {
@@ -568,11 +600,21 @@ public class SubastaService {
      */
     @org.springframework.transaction.annotation.Transactional
     public void activarItemTrasEspera(Integer subastaId, Integer itemId) {
+        try {
+            activarItemTrasEsperaInterno(subastaId, itemId);
+        } catch (RuntimeException e) {
+            System.err.println("[activarItemTrasEspera] ERROR activando siguiente ítem subastaId=" + subastaId
+                    + " itemId=" + itemId + ": " + e);
+            e.printStackTrace();
+            throw e;
+        }
+    }
+
+    private void activarItemTrasEsperaInterno(Integer subastaId, Integer itemId) {
         ItemCatalogo item = itemCatalogoRepository.findById(itemId).orElse(null);
         if (item == null) return;
         // Guard: si el admin intervino (adjudicó o activó otro ítem) durante el cooldown, ignorar
-        if ("si".equalsIgnoreCase(item.getSubastado())
-                || "deshabilitado".equalsIgnoreCase(item.getSubastado())) return;
+        if ("si".equalsIgnoreCase(item.getSubastado())) return;
 
         // Quitar en_vivo de todos y activar este
         Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId).orElse(null);
@@ -610,7 +652,6 @@ public class SubastaService {
         List<ItemCatalogo> todos = itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador());
         Optional<ItemCatalogo> siguienteOpt = todos.stream()
                 .filter(i -> !"si".equalsIgnoreCase(i.getSubastado())
-                          && !"deshabilitado".equalsIgnoreCase(i.getSubastado())
                           && !i.getIdentificador().equals(itemPrevio.getIdentificador()))
                 .findFirst();
 
@@ -675,7 +716,8 @@ public class SubastaService {
                     response.setProximoItem(new CatalogoDTO(
                             nextItem.getIdentificador(), nextItem.getProductoId(),
                             nextItem.getPrecioBase(), nextItem.getComision(),
-                            nextItem.getSubastado(), nextItem.getEnVivo(), nextDesc, nextFoto));
+                            nextItem.getSubastado(), nextItem.getEnVivo(), nextDesc, nextFoto,
+                            esSinPostor(nextItem)));
                 });
             }
         }
@@ -694,7 +736,7 @@ public class SubastaService {
         response.setItemActual(new CatalogoDTO(
                 item.getIdentificador(), item.getProductoId(),
                 item.getPrecioBase(), item.getComision(),
-                item.getSubastado(), item.getEnVivo(), descripcion, foto));
+                item.getSubastado(), item.getEnVivo(), descripcion, foto, esSinPostor(item)));
 
         // Pujas del ítem ordenadas desc por importe
         List<Pujo> pujas = pujoRepository.findByItemId(item.getIdentificador());
@@ -743,15 +785,26 @@ public class SubastaService {
         }
 
         // Timer: cuándo vence y duración total de la fase actual.
-        // Safety net: si el ítem está vivo pero el timer no existe en memoria (reinicio,
-        // bug de concurrencia, etc.), arrancar uno nuevo de 5 minutos para que el ítem
-        // no quede bloqueado indefinidamente.
+        // Safety net: si el ítem está vivo pero el timer no existe en memoria (reinicio
+        // del servidor, bug de concurrencia, etc.), NO le regalamos otros 5 minutos:
+        // tratamos el tiempo como ya vencido y procesamos la expiración ahora mismo
+        // (adjudica si hay pujas, o lo deshabilita y avanza al siguiente ítem).
+        // Así el timer nunca "se reinicia" silenciosamente para el mismo ítem.
         Long deadline = itemTimerService.getDeadline(subastaId);
         if (deadline == null) {
-            final Integer itemIdFinal = item.getIdentificador();
-            itemTimerService.iniciarTimer(subastaId, 300,
-                    () -> self.onTimerExpired(subastaId, itemIdFinal));
-            deadline = itemTimerService.getDeadline(subastaId);
+            // Si onTimerExpired falla acá, NO dejamos que la excepción rompa el polling
+            // (eso convertiría cada request siguiente en un 500 invisible para el usuario,
+            // que ve la app "congelada" sin ningún error). Logueamos y devolvemos la
+            // respuesta tal cual para no romper la sala; el log queda para diagnosticar.
+            try {
+                self.onTimerExpired(subastaId, item.getIdentificador());
+                return construirSalaResponse(subastaId);
+            } catch (RuntimeException e) {
+                System.err.println("[construirSalaResponse] safety-net falló al procesar expiración "
+                        + "subastaId=" + subastaId + " itemId=" + item.getIdentificador() + ": " + e);
+                e.printStackTrace();
+                return response;
+            }
         }
         response.setTiempoLimite(deadline);
         response.setTimerTotalSegundos(itemTimerService.getTotalSegundos(subastaId));
