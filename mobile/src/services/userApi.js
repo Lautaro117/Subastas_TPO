@@ -63,3 +63,49 @@ export async function updateMyProfile(data, token) {
     return null;
   }
 }
+
+export async function getMyStats(token) {
+  const response = await fetch(buildApiUrl('/api/users/me/stats'), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      ...authHeader(token),
+    },
+  });
+
+  const rawBody = await response.text();
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Sesión expirada');
+    throw new Error('No se pudieron cargar las estadísticas');
+  }
+
+  try {
+    return JSON.parse(rawBody);
+  } catch {
+    return null;
+  }
+}
+
+export async function getAuctionHistory(token) {
+  const response = await fetch(buildApiUrl('/api/users/me/auction-history'), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      ...authHeader(token),
+    },
+  });
+
+  const rawBody = await response.text();
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Sesión expirada');
+    throw new Error('No se pudo cargar el historial de subastas');
+  }
+
+  try {
+    return JSON.parse(rawBody);
+  } catch {
+    return null;
+  }
+}
