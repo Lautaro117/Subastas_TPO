@@ -20,13 +20,22 @@ public class MiProductoDTO {
     private String direccionDeposito;
     private String tipo;
     private DetalleObraDTO detalleObra;
+    /**
+     * Resultado de la subasta para este producto, derivado de items_catalogo.subastado:
+     * "vendido_subasta" (adjudicado a un postor), "comprado_empresa" (nadie pujó y se
+     * agotó el timer, la empresa lo compra), o null si todavía no se subastó / no aplica.
+     */
+    private String resultadoVenta;
+    /** Monto de la venta: importe de la adjudicación, o precioBase si lo compró la empresa. */
+    private BigDecimal montoVenta;
 
     public MiProductoDTO(Integer id, String descripcionCatalogo, String descripcionCompleta,
                          String estadoAdmin, String estadoPropuesta, BigDecimal precioPropuesto,
                          BigDecimal comision, LocalDate fechaSubasta, List<String> fotos,
                          String motivoRechazo, String etapaRechazo,
                          String nombreDeposito, String direccionDeposito,
-                         String tipo, DetalleObraDTO detalleObra) {
+                         String tipo, DetalleObraDTO detalleObra,
+                         String resultadoVenta, BigDecimal montoVenta) {
         this.id = id;
         this.descripcionCatalogo = descripcionCatalogo;
         this.descripcionCompleta = descripcionCompleta;
@@ -42,6 +51,8 @@ public class MiProductoDTO {
         this.direccionDeposito = direccionDeposito;
         this.tipo = tipo;
         this.detalleObra = detalleObra;
+        this.resultadoVenta = resultadoVenta;
+        this.montoVenta = montoVenta;
     }
 
     public Integer getId() { return id; }
@@ -59,4 +70,6 @@ public class MiProductoDTO {
     public String getDireccionDeposito() { return direccionDeposito; }
     public String getTipo() { return tipo; }
     public DetalleObraDTO getDetalleObra() { return detalleObra; }
+    public String getResultadoVenta() { return resultadoVenta; }
+    public BigDecimal getMontoVenta() { return montoVenta; }
 }

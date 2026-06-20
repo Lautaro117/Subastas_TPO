@@ -1,6 +1,7 @@
 package com.example.subastas.model;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -30,7 +31,7 @@ public class MedioPago {
     private Boolean verificado = false;
 
     @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneId.of("America/Argentina/Buenos_Aires"));
 
     @Column(name = "cuenta_cobro")
     private Boolean cuentaCobro = false;

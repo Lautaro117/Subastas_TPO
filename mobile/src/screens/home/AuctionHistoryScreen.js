@@ -20,7 +20,7 @@ import {
 } from 'react-native-paper';
 
 import { useAppSession } from '../../navigation/AppSessionContext';
-import { getMyStats, getAuctionHistory } from '../../services/userApi';
+import { getMyStats, getAuctionHistory, getAuctionBids } from '../../services/userApi';
 import { getMisCompras } from '../../services/itemsApi';
 import { COLORS } from '../../theme/colors';
 
@@ -39,6 +39,10 @@ export default function AuctionHistoryScreen({ navigation }) {
 
   // Pestaña activa: 'activity' (participaciones) o 'won' (compras/adjudicaciones)
   const [activeTab, setActiveTab] = useState('activity');
+
+  // Historial de pujas expandido por subasta: { [subastaId]: Pujo[] | 'loading' }
+  const [bidsMap, setBidsMap] = useState({});
+  const [expandedId, setExpandedId] = useState(null);
 
   const loadAllData = useCallback(async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -71,8 +75,24 @@ export default function AuctionHistoryScreen({ navigation }) {
     loadAllData(true);
   };
 
+  const handleToggleBids = async (subastaId) => {
+    if (expandedId === subastaId) { setExpandedId(null); return; }
+    setExpandedId(subastaId);
+    if (bidsMap[subastaId]) return;
+    setBidsMap(prev => ({ ...prev, [subastaId]: 'loading' }));
+    try {
+      const data = await getAuctionBids(session.token, subastaId);
+      setBidsMap(prev => ({ ...prev, [subastaId]: data || [] }));
+    } catch {
+      setBidsMap(prev => ({ ...prev, [subastaId]: [] }));
+    }
+  };
+
   const renderStatsCard = () => {
     if (!stats) return null;
+
+    const fmtImporte = (val) =>
+      val != null ? `$${Number(val).toLocaleString('es-AR', { maximumFractionDigits: 0 })}` : '$0';
 
     return (
       <Surface style={styles.statsContainer} elevation={1}>
@@ -105,24 +125,46 @@ export default function AuctionHistoryScreen({ navigation }) {
             <Text style={styles.statLabel}>Ganados</Text>
           </View>
         </View>
+
+        <View style={styles.statsDivider} />
+
+        <View style={styles.statsRow}>
+          <View style={styles.statColumn}>
+            <View style={styles.statIconWrapper}>
+              <Icon source="swap-vertical" size={24} color={COLORS.primary} />
+            </View>
+            <Text style={[styles.statNumber, styles.statNumberSm]}>
+              {fmtImporte(stats.importeTotalOfertado)}
+            </Text>
+            <Text style={styles.statLabel}>Total ofertado</Text>
+          </View>
+
+          <View style={styles.separator} />
+
+          <View style={styles.statColumn}>
+            <View style={styles.statIconWrapper}>
+              <Icon source="cash-check" size={24} color={COLORS.primary} />
+            </View>
+            <Text style={[styles.statNumber, styles.statNumberSm]}>
+              {fmtImporte(stats.importeTotalPagado)}
+            </Text>
+            <Text style={styles.statLabel}>Total pagado</Text>
+          </View>
+        </View>
       </Surface>
     );
   };
 
   const renderActivityItem = ({ item }) => {
-    // Determinar color de badge según categoría de la subasta
     let categoryBg = COLORS.primaryContainer;
     let categoryText = COLORS.onPrimaryContainer;
     const cat = item.categoria?.toLowerCase() || '';
-    if (cat === 'oro') {
-      categoryBg = '#F59E0B22';
-      categoryText = '#F59E0B';
-    } else if (cat === 'platino') {
-      categoryBg = '#A855F722';
-      categoryText = '#A855F7';
-    }
+    if (cat === 'oro') { categoryBg = '#F59E0B22'; categoryText = '#F59E0B'; }
+    else if (cat === 'platino') { categoryBg = '#A855F722'; categoryText = '#A855F7'; }
 
     const isCerrada = item.estado?.toLowerCase() === 'cerrada' || item.estado?.toLowerCase() === 'finalizado';
+    const isExpanded = expandedId === item.id;
+    const bids = bidsMap[item.id];
 
     return (
       <Surface style={styles.card} elevation={0}>
@@ -146,25 +188,48 @@ export default function AuctionHistoryScreen({ navigation }) {
           <View style={styles.pujaBlock}>
             <Text style={styles.pujaLabel}>Tu mayor oferta:</Text>
             <Text style={styles.pujaValue}>
-              {item.ultimaPuja ? `$${item.ultimaPuja}` : '—'}
+              {item.ultimaPuja ? `$${Number(item.ultimaPuja).toLocaleString('es-AR')}` : '—'}
             </Text>
           </View>
 
           <Chip
-            style={[
-              styles.statusChip,
-              { backgroundColor: isCerrada ? COLORS.surfaceContainerHigh : '#10B98122' },
-            ]}
-            textStyle={{
-              color: isCerrada ? COLORS.onSurfaceVariant : '#10B981',
-              fontSize: 11,
-              fontWeight: '600',
-            }}
+            style={[styles.statusChip, { backgroundColor: isCerrada ? COLORS.surfaceContainerHigh : '#10B98122' }]}
+            textStyle={{ color: isCerrada ? COLORS.onSurfaceVariant : '#10B981', fontSize: 11, fontWeight: '600' }}
             compact
           >
             {isCerrada ? 'Finalizada' : 'Activa'}
           </Chip>
         </View>
+
+        {/* Toggle historial de pujas */}
+        <TouchableOpacity style={styles.toggleBids} onPress={() => handleToggleBids(item.id)}>
+          <Icon source={isExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.primary} />
+          <Text style={styles.toggleBidsText}>
+            {isExpanded ? 'Ocultar pujas' : 'Ver historial de pujas'}
+          </Text>
+        </TouchableOpacity>
+
+        {isExpanded && (
+          <View style={styles.bidsContainer}>
+            {bids === 'loading' ? (
+              <ActivityIndicator size="small" color={COLORS.primary} style={{ marginVertical: 8 }} />
+            ) : bids && bids.length > 0 ? (
+              bids.map((puja, idx) => (
+                <View key={puja.identificador ?? idx} style={styles.bidRow}>
+                  <Text style={styles.bidIdx}>#{idx + 1}</Text>
+                  <Text style={styles.bidImporte}>
+                    ${Number(puja.importe).toLocaleString('es-AR')}
+                  </Text>
+                  {puja.ganador === 'si' && (
+                    <Icon source="trophy" size={14} color="#F59E0B" />
+                  )}
+                </View>
+              ))
+            ) : (
+              <Text style={styles.bidsEmpty}>Sin pujas registradas</Text>
+            )}
+          </View>
+        )}
       </Surface>
     );
   };
@@ -436,6 +501,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.outlineVariant,
     opacity: 0.5,
   },
+  statsDivider: {
+    height: 1,
+    backgroundColor: COLORS.outlineVariant,
+    opacity: 0.3,
+    marginVertical: 16,
+    marginHorizontal: 20,
+  },
+  statNumberSm: { fontSize: 15 },
 
   // Tabs
   tabContainer: {
@@ -572,6 +645,49 @@ const styles = StyleSheet.create({
   confirmStatusText: {
     fontSize: 11,
     fontWeight: '500',
+  },
+
+  // Historial de pujas expandible
+  toggleBids: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  toggleBidsText: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '500',
+  },
+  bidsContainer: {
+    marginTop: 8,
+    gap: 6,
+  },
+  bidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  bidIdx: {
+    fontSize: 11,
+    color: COLORS.onSurfaceVariant,
+    width: 24,
+  },
+  bidImporte: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.onSurface,
+    flex: 1,
+  },
+  bidsEmpty: {
+    fontSize: 12,
+    color: COLORS.onSurfaceVariant,
+    fontStyle: 'italic',
+    paddingVertical: 4,
   },
 
   // Empty State

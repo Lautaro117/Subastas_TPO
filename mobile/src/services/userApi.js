@@ -87,6 +87,16 @@ export async function getMyStats(token) {
   }
 }
 
+export async function getAuctionBids(token, subastaId) {
+  const response = await fetch(buildApiUrl(`/api/users/me/auction-history/${subastaId}/bids`), {
+    method: 'GET',
+    headers: { Accept: 'application/json', ...authHeader(token) },
+  });
+  const rawBody = await response.text();
+  if (!response.ok) throw new Error('No se pudo cargar el historial de pujas');
+  try { return JSON.parse(rawBody); } catch { return []; }
+}
+
 export async function getAuctionHistory(token) {
   const response = await fetch(buildApiUrl('/api/users/me/auction-history'), {
     method: 'GET',

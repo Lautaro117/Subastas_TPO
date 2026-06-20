@@ -2,6 +2,7 @@ package com.example.subastas.service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -22,6 +23,7 @@ import com.example.subastas.dto.CatalogoDTO;
 import com.example.subastas.dto.ProductoDetalleDTO;
 import com.example.subastas.dto.ResultadoItemDTO;
 import com.example.subastas.dto.SalaResponse;
+import com.example.subastas.dto.SubastaDTO;
 import java.time.LocalDateTime;
 import com.example.subastas.model.Adjudicaciones;
 import com.example.subastas.model.Asistente;
@@ -36,7 +38,9 @@ import com.example.subastas.model.Subasta;
 import com.example.subastas.repository.AdjudicacionesRepository;
 import com.example.subastas.repository.AsistenteRepository;
 import com.example.subastas.repository.CatalogoRepository;
+import com.example.subastas.repository.ClienteRepository;
 import com.example.subastas.repository.FotoProductoRepository;
+import com.example.subastas.repository.PersonaRepository;
 import com.example.subastas.repository.ItemCatalogoRepository;
 import com.example.subastas.repository.MedioPagoRepository;
 import com.example.subastas.repository.ProductoRepository;
@@ -67,11 +71,21 @@ public class SubastaService {
     @Autowired private AdjudicacionesRepository adjudicacionesRepository;
     @Autowired private ProductoRepository productoRepository;
     @Autowired private FotoProductoRepository fotoProductoRepository;
+    @Autowired private ClienteRepository clienteRepository;
+    @Autowired private PersonaRepository personaRepository;
 
     private static final List<String> ORDEN_CATEGORIAS = Arrays.asList(
             "comun", "especial", "plata", "oro", "platino");
 
     private static final String MONEDA = "ARS";
+    /**
+     * Zona horaria fija para timestamps que se muestran al usuario (ej: createdAt de
+     * Adjudicaciones). Antes se usaba LocalDateTime.now() "a secas", que toma la zona
+     * default del JVM del servidor — si ese default no es Argentina (p.ej. un host en
+     * UTC), el horario que ve el usuario queda corrido. Fijarlo explícitamente evita
+     * que dependa de cómo esté configurado el servidor.
+     */
+    private static final ZoneId ZONA_AR = ZoneId.of("America/Argentina/Buenos_Aires");
 
     // ── Listado ────────────────────────────────────────────────────────────────
 
@@ -105,17 +119,79 @@ public class SubastaService {
         return subastaRepository.existeEnCierre(subastaId);
     }
 
+    /**
+     * Busca si el cliente ya tiene al menos una puja real (tabla `pujos`) en alguna OTRA
+     * subasta que sigue abierta — y de ser así, devuelve su id.
+     *
+     * Esta es la protección "de verdad" contra estar pujando en dos subastas a la vez: no usa
+     * nada en memoria ni depende de que el cliente avise correctamente que salió de una sala
+     * (eso resultó ser frágil frente a gestos de navegación, tabs, pantallas que quedan
+     * montadas de fondo, etc.). Se basa pura y exclusivamente en datos ya persistidos:
+     * Asistente (a qué subastas se unió alguna vez) + Pujo (si efectivamente pujó ahí) +
+     * Subasta/subastas_cierre (si esa subasta sigue abierta). Ningún bug de navegación puede
+     * saltear esto, porque no depende de la navegación en absoluto.
+     */
+    private Optional<Integer> otraSubastaConPujasActivas(Integer clienteId, Integer subastaIdActual) {
+        return asistenteRepository.findAllByClienteId(clienteId).stream()
+                .filter(a -> !a.getSubastaId().equals(subastaIdActual))
+                .filter(a -> !pujoRepository.findByAsistenteId(a.getIdentificador()).isEmpty())
+                .map(Asistente::getSubastaId)
+                .distinct()
+                .filter(otraId -> {
+                    Subasta otra = subastaRepository.findById(otraId).orElse(null);
+                    return otra != null && "abierta".equalsIgnoreCase(otra.getEstado()) && !esCerrada(otraId);
+                })
+                .findFirst();
+    }
+
     public Subasta buscarPorId(Integer id) {
         return subastaRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Subasta no encontrada"));
     }
 
+    public List<SubastaDTO> listarTodasDTO() {
+        return listarTodas().stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
+    public SubastaDTO buscarPorIdDTO(Integer id) {
+        return toDTO(buscarPorId(id));
+    }
+
+    private SubastaDTO toDTO(Subasta s) {
+        SubastaDTO dto = new SubastaDTO();
+        dto.setIdentificador(s.getIdentificador());
+        dto.setFecha(s.getFecha());
+        dto.setHora(s.getHora());
+        dto.setEstado(s.getEstado());
+        dto.setUbicacion(s.getUbicacion());
+        dto.setCapacidadAsistentes(s.getCapacidadAsistentes());
+        dto.setTieneDeposito(s.getTieneDeposito());
+        dto.setSeguridadPropia(s.getSeguridadPropia());
+        dto.setCategoria(s.getCategoria());
+        dto.setSubastadorId(s.getSubastadorId());
+        if (s.getSubastadorId() != null) {
+            personaRepository.findById(s.getSubastadorId())
+                    .ifPresent(p -> dto.setSubastadorNombre(p.getNombre()));
+        }
+        return dto;
+    }
+
     // ── Catálogo ───────────────────────────────────────────────────────────────
+
+    /**
+     * Sin precio para invitados (estado == null, no mandaron token), E1 (registro pendiente)
+     * y E2 (registrado pero sin medio de pago) — ninguno de estos puede entrar a pujar
+     * todavía, así que tampoco tiene sentido mostrarles el precio base.
+     */
+    private boolean ocultarPrecio(String estado) {
+        return estado == null || "E1".equals(estado) || "E2".equals(estado);
+    }
 
     public List<CatalogoDTO> obtenerCatalogo(Integer subastaId, String estado) {
         Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Catálogo no encontrado"));
 
+        boolean ocultar = ocultarPrecio(estado);
         return itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador()).stream().map(item -> {
             String descripcion = productoRepository.findById(item.getProductoId())
                     .map(Producto::getDescripcionCatalogo).orElse(null);
@@ -125,8 +201,9 @@ public class SubastaService {
                     .orElse(null);
             return new CatalogoDTO(
                     item.getIdentificador(), item.getProductoId(),
-                    "E2".equals(estado) ? null : item.getPrecioBase(),
-                    item.getComision(), item.getSubastado(), descripcion, foto);
+                    ocultar ? null : item.getPrecioBase(),
+                    item.getComision(), item.getSubastado(), item.getEnVivo(),
+                    descripcion, foto, esSinPostor(item));
         }).toList();
     }
 
@@ -134,8 +211,19 @@ public class SubastaService {
         ItemCatalogo item = itemCatalogoRepository.findById(itemId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
         return new CatalogoDTO(item.getIdentificador(), item.getProductoId(),
-                "E2".equals(estado) ? null : item.getPrecioBase(),
-                item.getComision(), item.getSubastado(), null, null);
+                ocultarPrecio(estado) ? null : item.getPrecioBase(),
+                item.getComision(), item.getSubastado(), item.getEnVivo(), null, null, esSinPostor(item));
+    }
+
+    /**
+     * true si el ítem está cerrado (subastado='si') pero no tiene ninguna Adjudicaciones real:
+     * nadie pujó y venció el timer, la empresa lo "compró" simulando la subasta.
+     * No usamos un tercer valor de `subastado` porque la columna tiene un CHECK constraint
+     * que solo permite 'si'/'no' (ver EstructuraActual.md) — 'no' ya significa "pendiente".
+     */
+    private boolean esSinPostor(ItemCatalogo item) {
+        return "si".equalsIgnoreCase(item.getSubastado())
+                && adjudicacionesRepository.findByItemId(item.getIdentificador()).isEmpty();
     }
 
     public ProductoDetalleDTO obtenerDetalleProducto(Integer subastaId, Integer itemId, String estado) {
@@ -149,6 +237,10 @@ public class SubastaService {
         List<String> fotosBase64 = fotoProductoRepository.findByProducto(producto.getIdentificador())
                 .stream().map(f -> Base64.getEncoder().encodeToString(f.getFoto())).toList();
 
+        String duenioNombre = clienteRepository.findById(producto.getDuenio())
+                .map(c -> c.getPersona().getNombre())
+                .orElse(null);
+
         ProductoDetalleDTO dto = new ProductoDetalleDTO();
         dto.setItemId(item.getIdentificador());
         dto.setProductoId(item.getProductoId());
@@ -160,6 +252,8 @@ public class SubastaService {
         dto.setFecha(producto.getFecha());
         dto.setDisponible(producto.getDisponible());
         dto.setFotos(fotosBase64);
+        dto.setDuenioId(producto.getDuenio());
+        dto.setDuenioNombre(duenioNombre);
         return dto;
     }
 
@@ -185,7 +279,11 @@ public class SubastaService {
             return construirSalaResponse(subastaId);
         }
 
-        // Verificar si está activo en OTRA subasta abierta (sesión en memoria)
+        // Verificar si está activo en OTRA subasta abierta (sesión en memoria).
+        // Esto es solo una conveniencia de UX (avisar temprano, antes de pujar) — NO es la
+        // protección real, porque depende de que el cliente avise bien que "salió" (navegación,
+        // gestos, etc.), algo que demostró ser frágil. La protección real e inquebrantable es
+        // otraSubastaConPujasActivas() más abajo, basada en pujas ya guardadas en la base.
         Optional<Integer> otraActiva = sesionSubastaService.getSalaActiva(clienteId);
         if (otraActiva.isPresent() && !otraActiva.get().equals(subastaId)) {
             Subasta otraSubasta = subastaRepository.findById(otraActiva.get()).orElse(null);
@@ -198,6 +296,15 @@ public class SubastaService {
             // La otra subasta ya cerró → limpiar sesión fantasma y continuar
             sesionSubastaService.registrarSalida(clienteId);
         }
+
+        // Protección real: si el cliente ya pujó en OTRA subasta que sigue abierta, no puede
+        // unirse a esta. No depende de sesiones en memoria ni de que el cliente avise que salió
+        // de ningún lado — se basa en pujas (`pujos`) que ya están guardadas en la base, así que
+        // ningún bug de navegación (swipe de iOS, tabs, lo que sea) puede saltearlo.
+        otraSubastaConPujasActivas(clienteId, subastaId).ifPresent(otraId -> {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Ya tenés pujas activas en otra subasta. Esperá a que finalice para unirte a esta.");
+        });
 
         // Reutilizar el Asistente histórico si ya existe (puede haber quedado en DB por FK con pujas),
         // o crear uno nuevo si es la primera vez que el usuario entra a esta subasta.
@@ -267,6 +374,21 @@ public class SubastaService {
         Asistente asistente = asistenteRepository.findByClienteIdAndSubastaId(usuario.getClienteId(), subastaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No estás unido a esta sala"));
 
+        // Chequeo de conveniencia (sesión en memoria) — útil para UX pero NO es la protección
+        // real, ver comentario más abajo.
+        if (!sesionSubastaService.estaEnSala(usuario.getClienteId(), subastaId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No estás conectado a esta subasta");
+        }
+
+        // Protección real e inquebrantable: si el cliente ya tiene pujas en OTRA subasta que
+        // sigue abierta, no puede pujar en esta, sin importar cómo haya llegado hasta acá
+        // (sesión fantasma, pantalla que quedó montada de fondo, lo que sea). Se basa en pujas
+        // (`pujos`) ya guardadas en la base — no en nada que el cliente pueda desincronizar.
+        otraSubastaConPujasActivas(usuario.getClienteId(), subastaId).ifPresent(otraId -> {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Ya tenés pujas activas en otra subasta. Esperá a que finalice para pujar en esta.");
+        });
+
         // Medio de pago: opcional para el demo
         Integer medioPagoId = null;
         if (request.getPayment_method_id() != null) {
@@ -279,13 +401,16 @@ public class SubastaService {
         }
 
         // Validar min/max
+        boolean sinLimiteMax = "oro".equalsIgnoreCase(subasta.getCategoria())
+                || "platino".equalsIgnoreCase(subasta.getCategoria());
         BigDecimal base = item.getPrecioBase();
         if (base != null) {
             Optional<Pujo> mejorActual = pujoRepository.findTopByItemIdOrderByImporteDesc(item.getIdentificador());
             BigDecimal ultima = mejorActual.map(Pujo::getImporte).orElse(base);
             BigDecimal incremento1pct  = base.multiply(new BigDecimal("0.01"));
             BigDecimal incremento20pct = base.multiply(new BigDecimal("0.20"));
-            BigDecimal minPuja = ultima.add(incremento1pct);
+            BigDecimal incrementoMin   = sinLimiteMax ? BigDecimal.ONE : incremento1pct;
+            BigDecimal minPuja = ultima.add(incrementoMin);
             BigDecimal maxPuja = ultima.add(incremento20pct);
 
             // Si no hay pujas previas, mínimo es el precio base
@@ -298,7 +423,7 @@ public class SubastaService {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "La puja mínima es " + minPuja.toPlainString());
             }
-            if (request.getMonto().compareTo(maxPuja) > 0) {
+            if (!sinLimiteMax && request.getMonto().compareTo(maxPuja) > 0) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "La puja máxima es " + maxPuja.toPlainString());
             }
@@ -368,7 +493,7 @@ public class SubastaService {
             adj.setImporte(p.getImporte());
             adj.setComision(itemFinal.getComision() != null ? itemFinal.getComision() : BigDecimal.ZERO);
             adj.setCostoEnvio(BigDecimal.ZERO);
-            adj.setCreatedAt(LocalDateTime.now());
+            adj.setCreatedAt(LocalDateTime.now(ZONA_AR));
             adjudicacionesRepository.save(adj);
 
             // Notificar al ganador en su bandeja de notificaciones
@@ -498,20 +623,41 @@ public class SubastaService {
      * Llamado por ItemTimerService cuando un timer vence.
      * Debe ser público y @Transactional para que Spring gestione la transacción
      * al invocarse a través del proxy (self.onTimerExpired).
+     *
+     * Envuelto en try/catch SOLO para loguear con contexto claro antes de relanzar:
+     * si esto falla silenciosamente (como pasaba antes, atrapado únicamente por el
+     * catch genérico de ItemTimerService), el ítem se queda "vivo" para siempre y la
+     * subasta parece congelarse en 00:00 sin avanzar.
      */
     @Transactional
     public void onTimerExpired(Integer subastaId, Integer itemId) {
+        try {
+            onTimerExpiredInterno(subastaId, itemId);
+        } catch (RuntimeException e) {
+            System.err.println("[onTimerExpired] ERROR procesando expiración subastaId=" + subastaId
+                    + " itemId=" + itemId + ": " + e);
+            e.printStackTrace();
+            throw e;
+        }
+    }
+
+    private void onTimerExpiredInterno(Integer subastaId, Integer itemId) {
         ItemCatalogo item = itemCatalogoRepository.findById(itemId).orElse(null);
         if (item == null) return;
-        // Guard: si el ítem ya fue procesado (adjudicado o deshabilitado), ignorar
-        if ("si".equalsIgnoreCase(item.getSubastado())
-                || "deshabilitado".equalsIgnoreCase(item.getSubastado())) return;
+        // Guard: si el ítem ya fue procesado (adjudicado), ignorar
+        if ("si".equalsIgnoreCase(item.getSubastado())) return;
 
         List<Pujo> pujas = pujoRepository.findByItemId(itemId);
 
         if (pujas.isEmpty()) {
-            // Sin postores → deshabilitar ítem y avanzar al siguiente
-            item.setSubastado("deshabilitado");
+            // Sin postores → cerrar el ítem (lo "compra" la empresa) y avanzar al siguiente.
+            // items_catalogo.subastado tiene un CHECK constraint que SOLO permite 'si'/'no'
+            // (EstructuraActual.md), y 'no' ya es el valor por default para "pendiente"
+            // (lo pone así el panel admin al cargar el ítem al catálogo). No hay un tercer
+            // valor disponible, así que usamos 'si' igual que una venta real, y la diferencia
+            // ("nadie pujó" vs "se vendió a un postor") se calcula por la AUSENCIA de una fila
+            // en Adjudicaciones — ver esSinPostor() y MiProductoService.resolverResultadoVenta().
+            item.setSubastado("si");
             item.setEnVivo("no");
             itemCatalogoRepository.save(item);
         } else {
@@ -533,7 +679,7 @@ public class SubastaService {
                 adj.setImporte(ganadora.getImporte());
                 adj.setComision(item.getComision() != null ? item.getComision() : BigDecimal.ZERO);
                 adj.setCostoEnvio(BigDecimal.ZERO);
-                adj.setCreatedAt(LocalDateTime.now());
+                adj.setCreatedAt(LocalDateTime.now(ZONA_AR));
                 adjudicacionesRepository.save(adj);
             }
 
@@ -567,11 +713,21 @@ public class SubastaService {
      */
     @org.springframework.transaction.annotation.Transactional
     public void activarItemTrasEspera(Integer subastaId, Integer itemId) {
+        try {
+            activarItemTrasEsperaInterno(subastaId, itemId);
+        } catch (RuntimeException e) {
+            System.err.println("[activarItemTrasEspera] ERROR activando siguiente ítem subastaId=" + subastaId
+                    + " itemId=" + itemId + ": " + e);
+            e.printStackTrace();
+            throw e;
+        }
+    }
+
+    private void activarItemTrasEsperaInterno(Integer subastaId, Integer itemId) {
         ItemCatalogo item = itemCatalogoRepository.findById(itemId).orElse(null);
         if (item == null) return;
         // Guard: si el admin intervino (adjudicó o activó otro ítem) durante el cooldown, ignorar
-        if ("si".equalsIgnoreCase(item.getSubastado())
-                || "deshabilitado".equalsIgnoreCase(item.getSubastado())) return;
+        if ("si".equalsIgnoreCase(item.getSubastado())) return;
 
         // Quitar en_vivo de todos y activar este
         Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId).orElse(null);
@@ -609,7 +765,6 @@ public class SubastaService {
         List<ItemCatalogo> todos = itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador());
         Optional<ItemCatalogo> siguienteOpt = todos.stream()
                 .filter(i -> !"si".equalsIgnoreCase(i.getSubastado())
-                          && !"deshabilitado".equalsIgnoreCase(i.getSubastado())
                           && !i.getIdentificador().equals(itemPrevio.getIdentificador()))
                 .findFirst();
 
@@ -628,6 +783,14 @@ public class SubastaService {
             final Integer nextId = siguiente.getIdentificador();
             itemTimerService.iniciarCooldown(subastaId, 30, nextId,
                     () -> self.activarItemTrasEspera(subastaId, nextId));
+
+            // Avisar AHORA MISMO (no recién cuando arranque) a todos los que marcaron la
+            // campanita de este ítem: "va a subastarse en breve". No depende de que la app
+            // de cada usuario esté abierta/polleando en este momento, porque queda guardado
+            // como una notificación real en su bandeja (ver NotificacionService).
+            String descSiguiente = productoRepository.findById(siguiente.getProductoId())
+                    .map(Producto::getDescripcionCatalogo).orElse(null);
+            notificacionService.notificarCampanitaItem(nextId, descSiguiente);
 
             // Notificar estado de cooldown (sin ítem activo, con cooldownHasta y proximoItem)
             SalaResponse estado = construirSalaResponse(subastaId);
@@ -674,7 +837,8 @@ public class SubastaService {
                     response.setProximoItem(new CatalogoDTO(
                             nextItem.getIdentificador(), nextItem.getProductoId(),
                             nextItem.getPrecioBase(), nextItem.getComision(),
-                            nextItem.getSubastado(), nextDesc, nextFoto));
+                            nextItem.getSubastado(), nextItem.getEnVivo(), nextDesc, nextFoto,
+                            esSinPostor(nextItem)));
                 });
             }
         }
@@ -693,7 +857,7 @@ public class SubastaService {
         response.setItemActual(new CatalogoDTO(
                 item.getIdentificador(), item.getProductoId(),
                 item.getPrecioBase(), item.getComision(),
-                item.getSubastado(), descripcion, foto));
+                item.getSubastado(), item.getEnVivo(), descripcion, foto, esSinPostor(item)));
 
         // Pujas del ítem ordenadas desc por importe
         List<Pujo> pujas = pujoRepository.findByItemId(item.getIdentificador());
@@ -725,32 +889,48 @@ public class SubastaService {
         }
 
         // Calcular min/max puja
+        Subasta subastaResp = subastaRepository.findById(subastaId).orElse(null);
+        boolean sinLimiteMaxResp = subastaResp != null
+                && ("oro".equalsIgnoreCase(subastaResp.getCategoria())
+                    || "platino".equalsIgnoreCase(subastaResp.getCategoria()));
         BigDecimal base = item.getPrecioBase();
         if (base != null) {
             BigDecimal ultima = response.getMejorOferta() != null
                     ? response.getMejorOferta().getImporte()
                     : base;
-            BigDecimal inc1  = base.multiply(new BigDecimal("0.01"));
-            BigDecimal inc20 = base.multiply(new BigDecimal("0.20"));
+            BigDecimal inc1   = base.multiply(new BigDecimal("0.01"));
+            BigDecimal inc20  = base.multiply(new BigDecimal("0.20"));
+            BigDecimal incMin = sinLimiteMaxResp ? BigDecimal.ONE : inc1;
             if (response.getMejorOferta() == null) {
                 response.setMinPuja(base);
-                response.setMaxPuja(base.add(inc20));
+                if (!sinLimiteMaxResp) response.setMaxPuja(base.add(inc20));
             } else {
-                response.setMinPuja(ultima.add(inc1));
-                response.setMaxPuja(ultima.add(inc20));
+                response.setMinPuja(ultima.add(incMin));
+                if (!sinLimiteMaxResp) response.setMaxPuja(ultima.add(inc20));
             }
         }
 
         // Timer: cuándo vence y duración total de la fase actual.
-        // Safety net: si el ítem está vivo pero el timer no existe en memoria (reinicio,
-        // bug de concurrencia, etc.), arrancar uno nuevo de 5 minutos para que el ítem
-        // no quede bloqueado indefinidamente.
+        // Safety net: si el ítem está vivo pero el timer no existe en memoria (reinicio
+        // del servidor, bug de concurrencia, etc.), NO le regalamos otros 5 minutos:
+        // tratamos el tiempo como ya vencido y procesamos la expiración ahora mismo
+        // (adjudica si hay pujas, o lo deshabilita y avanza al siguiente ítem).
+        // Así el timer nunca "se reinicia" silenciosamente para el mismo ítem.
         Long deadline = itemTimerService.getDeadline(subastaId);
         if (deadline == null) {
-            final Integer itemIdFinal = item.getIdentificador();
-            itemTimerService.iniciarTimer(subastaId, 300,
-                    () -> self.onTimerExpired(subastaId, itemIdFinal));
-            deadline = itemTimerService.getDeadline(subastaId);
+            // Si onTimerExpired falla acá, NO dejamos que la excepción rompa el polling
+            // (eso convertiría cada request siguiente en un 500 invisible para el usuario,
+            // que ve la app "congelada" sin ningún error). Logueamos y devolvemos la
+            // respuesta tal cual para no romper la sala; el log queda para diagnosticar.
+            try {
+                self.onTimerExpired(subastaId, item.getIdentificador());
+                return construirSalaResponse(subastaId);
+            } catch (RuntimeException e) {
+                System.err.println("[construirSalaResponse] safety-net falló al procesar expiración "
+                        + "subastaId=" + subastaId + " itemId=" + item.getIdentificador() + ": " + e);
+                e.printStackTrace();
+                return response;
+            }
         }
         response.setTiempoLimite(deadline);
         response.setTimerTotalSegundos(itemTimerService.getTotalSegundos(subastaId));

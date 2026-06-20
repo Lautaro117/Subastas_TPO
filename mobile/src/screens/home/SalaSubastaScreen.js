@@ -16,6 +16,7 @@ import {
   Button,
   Chip,
   Dialog,
+  Icon,
   IconButton,
   Portal,
   Snackbar,
@@ -100,9 +101,11 @@ function BidRow({ bid, isTop }) {
 // ─── Fila de ítem del catálogo ────────────────────────────────────────────────
 function CatalogoRow({ item, isActivo, notificado, onBellPress, onPress }) {
   const theme = useTheme();
-  // 'si' = adjudicado con ganador · 'deshabilitado' = venció sin postores
-  const subastado = item.subastado === 'si' || item.subastado === 'deshabilitado';
-  const sinPostores = item.subastado === 'deshabilitado';
+  // 'si' = cerrado (vendido a un postor, o comprado por la empresa si nadie pujó).
+  // sinPostor lo manda el backend (no se puede guardar un 3er valor en subastado: la columna
+  // tiene un CHECK constraint que solo permite 'si'/'no').
+  const subastado = item.subastado === 'si';
+  const sinPostores = item.subastado === 'si' && item.sinPostor === true;
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
@@ -111,13 +114,10 @@ function CatalogoRow({ item, isActivo, notificado, onBellPress, onPress }) {
       style={[
         styles.catalogoRow,
         {
-          backgroundColor: isActivo
-            ? theme.colors.primaryContainer
-            : subastado
-            ? theme.colors.surfaceContainerHigh
-            : theme.colors.surfaceContainerLowest,
+          // Un ítem ya cerrado (vendido o sin postor) se ve igual que uno pendiente —
+          // solo cambia la etiqueta de la derecha (AHORA / SIN POSTOR / campanita).
+          backgroundColor: isActivo ? theme.colors.primaryContainer : theme.colors.surfaceContainerLowest,
           borderColor: isActivo ? theme.colors.primary : theme.colors.outline,
-          opacity: subastado && !isActivo ? 0.55 : 1,
         },
       ]}
     >
@@ -220,6 +220,7 @@ export default function SalaSubastaScreen({ navigation, route }) {
   }, [notificadosIds, STORAGE_KEY]);
 
   const [modalSalir, setModalSalir] = useState(false);
+  const [modalRequiereRegistro, setModalRequiereRegistro] = useState(false);
   const [modalSinMedioPago, setModalSinMedioPago] = useState(false);
   const [modalCategoriaInsuficiente, setModalCategoriaInsuficiente] = useState(false);
   const [modalNotificar, setModalNotificar] = useState(null);
@@ -355,20 +356,31 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
     cooldownNotifiedRef.current.add(proximoItemId);
     const desc = salaData?.proximoItem?.descripcionCatalogo ?? `Producto #${proximoItemId}`;
-    const mensaje = `🔔 "${desc}" va a subastarse en 30 segundos`;
-    setSnackbar(mensaje);
-    // Llamar directamente al servicio (sin pasar por el context) para evitar
-    // que el setApiNotifications del context dispare re-renders en esta pantalla.
-    if (token) createNotification(token, 'campanita_item', mensaje).catch(() => {});
-  }, [salaData?.cooldownHasta, salaData?.proximoItem?.itemId, notificadosIds, token]);
+    // El backend ya crea la notificación real (para este usuario y para cualquier otro que
+    // haya marcado este ítem) apenas arranca el cooldown — ver
+    // SubastaService.autoAvanzarDesdeItem + NotificacionService.notificarCampanitaItem.
+    // Acá solo mostramos el toast instantáneo porque la pantalla ya está abierta.
+    setSnackbar(`🔔 "${desc}" va a subastarse en 30 segundos`);
+  }, [salaData?.cooldownHasta, salaData?.proximoItem?.itemId, notificadosIds]);
 
-  // Salir de la sala cuando joined cambia a false (o al desmontar si joined es true)
-  useEffect(() => {
-    if (!joined) return;
-    return () => {
-      leaveAuction(token, auctionId).catch(() => {});
-    };
-  }, [joined, token, auctionId]);
+  // Salir de la sala cuando esta pantalla pierde el foco mientras joined=true.
+  // OJO: usamos useFocusEffect (no un useEffect atado a mount/unmount) a propósito.
+  // El gesto nativo de swipe-back de iOS navega hacia atrás sin pasar por el botón
+  // "Salir" (que tiene su propio modal + handleLeave), y React Navigation a veces
+  // mantiene la pantalla montada en memoria para volver más rápido — un cleanup de
+  // unmount podría no disparar nunca en ese caso. El evento de "blur" sí se dispara
+  // siempre que se navega fuera de la pantalla, completada por gesto o no, montada o
+  // no, así que es la única forma confiable de avisarle al backend que el usuario
+  // realmente salió (y liberar la sesión para poder unirse a otra subasta).
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        if (joined) {
+          leaveAuction(token, auctionId).catch(() => {});
+        }
+      };
+    }, [joined, token, auctionId])
+  );
 
   // Auto-join cuando se navega desde DetalleProductoSubasta con autoJoin=true
   useEffect(() => {
@@ -380,6 +392,12 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
   // ─── Join ───────────────────────────────────────────────────────────────────
   const handleJoin = useCallback(async () => {
+    // Invitado (sin token) o E1 (registro todavía pendiente): ni intentan unirse,
+    // directo el aviso de que hace falta registrarse.
+    if (!token || userEstado === 'E1') {
+      setModalRequiereRegistro(true);
+      return;
+    }
     if (userEstado === 'E2' || userEstado === 'E3') {
       setModalSinMedioPago(true);
       return;
@@ -566,6 +584,20 @@ export default function SalaSubastaScreen({ navigation, route }) {
     const itemActual = salaData?.itemActual;
     if (!itemActual) { setSnackbar('No hay ítem activo para pujar.'); return; }
 
+    const minPuja = salaData?.minPuja != null ? Number(salaData.minPuja) : null;
+    const maxPuja = salaData?.maxPuja != null ? Number(salaData.maxPuja) : null;
+    const cat = auction?.categoria?.toLowerCase();
+    const sinLimiteMax = cat === 'oro' || cat === 'platino';
+
+    if (minPuja !== null && monto < minPuja) {
+      setSnackbar(`Puja mínima: ${moneda} ${minPuja.toLocaleString('es-AR')}`);
+      return;
+    }
+    if (!sinLimiteMax && maxPuja !== null && monto > maxPuja) {
+      setSnackbar(`Puja máxima: ${moneda} ${maxPuja.toLocaleString('es-AR')}`);
+      return;
+    }
+
     setPujando(true);
     try {
       await sendBid(token, auctionId, {
@@ -596,12 +628,25 @@ export default function SalaSubastaScreen({ navigation, route }) {
   const precioBase = itemActual?.precioBase ?? null;
   const auctionTitle = auction?.ubicacion ?? `Subasta #${auctionId}`;
 
-  // Mostrar desde el ítem activo (o el próximo no subastado) para que el usuario
-  // vea siempre el contexto actual de la subasta, no los ya adjudicados.
+  // ── Ventana de 4 ítems centrada en el contexto actual ──────────────────────
+  // Prioridad 1: enVivo === 'si' en el catálogo (dato directo del backend, siempre fiable)
+  // Prioridad 2: itemActual del SalaResponse (cuando el usuario está unido)
+  // Prioridad 3: primer ítem no adjudicado según campo `subastado`
+  // Prioridad 4: últimos 4 (todo adjudicado)
   const catalogoPreview = (() => {
-    if (!itemActual) return catalogo.slice(0, 4);
-    const idx = catalogo.findIndex((i) => i.itemId === itemActual.itemId);
-    return idx !== -1 ? catalogo.slice(idx, idx + 4) : catalogo.slice(0, 4);
+    // 1. El backend marca el ítem activo con enVivo === 'si'
+    const enVivoIdx = catalogo.findIndex((i) => i.enVivo === 'si');
+    if (enVivoIdx !== -1) return catalogo.slice(enVivoIdx, enVivoIdx + 4);
+    // 2. Tenemos itemActual desde salaData (usuario unido)
+    if (itemActual) {
+      const idx = catalogo.findIndex((i) => i.itemId === itemActual.itemId);
+      if (idx !== -1) return catalogo.slice(idx, idx + 4);
+    }
+    // 3. Inferir posición desde el campo `subastado`
+    const firstPending = catalogo.findIndex((i) => i.subastado !== 'si');
+    if (firstPending !== -1) return catalogo.slice(firstPending, firstPending + 4);
+    // 4. Todo adjudicado: mostrar últimos 4
+    return catalogo.slice(Math.max(0, catalogo.length - 4));
   })();
 
   // ─── Modales ────────────────────────────────────────────────────────────────
@@ -629,17 +674,36 @@ export default function SalaSubastaScreen({ navigation, route }) {
         </Dialog>
 
         <Dialog
+          visible={modalRequiereRegistro}
+          onDismiss={() => setModalRequiereRegistro(false)}
+          style={{ backgroundColor: theme.colors.surfaceContainerHigh, borderRadius: 24 }}
+        >
+          <Dialog.Icon icon="account-alert-outline" color={theme.colors.error} />
+          <Dialog.Title style={{ textAlign: 'center', color: theme.colors.onSurface }}>
+            Necesitás registrarte
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
+              Debés registrarte para poder ingresar a la subasta.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions style={{ justifyContent: 'center' }}>
+            <Button onPress={() => setModalRequiereRegistro(false)} textColor={theme.colors.primary}>Entendido</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog
           visible={modalSinMedioPago}
           onDismiss={() => setModalSinMedioPago(false)}
           style={{ backgroundColor: theme.colors.surfaceContainerHigh, borderRadius: 24 }}
         >
           <Dialog.Icon icon="cancel" color={theme.colors.error} />
           <Dialog.Title style={{ textAlign: 'center', color: theme.colors.onSurface }}>
-            Necesitas Registrarte
+            Falta un medio de pago
           </Dialog.Title>
           <Dialog.Content>
             <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
-              Para acceder es necesario estar registrado y tener un medio de pago configurado.
+              Debés registrar un medio de pago para poder ingresar a la subasta.
             </Text>
           </Dialog.Content>
           <Dialog.Actions style={{ justifyContent: 'center', gap: 16 }}>
@@ -690,9 +754,16 @@ export default function SalaSubastaScreen({ navigation, route }) {
             <Button onPress={() => setModalNotificar(null)} textColor={theme.colors.onSurfaceVariant}>Cancelar</Button>
             <Button
               onPress={() => {
-                setNotificadosIds((prev) => new Set([...prev, modalNotificar]));
+                const itemId = modalNotificar;
+                setNotificadosIds((prev) => new Set([...prev, itemId]));
                 setModalNotificar(null);
                 setSnackbar('Te notificaremos cuando comience.');
+                // Persistir la marca en el backend: así el aviso llega aunque la app
+                // esté cerrada cuando arranque el cooldown de este ítem (no depende
+                // de que este dispositivo esté pollendo la sala en ese momento).
+                if (token) {
+                  createNotification(token, 'campanita_pendiente', String(itemId)).catch(() => {});
+                }
               }}
               textColor={theme.colors.primary}
             >
@@ -727,6 +798,10 @@ export default function SalaSubastaScreen({ navigation, route }) {
         <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
           <Appbar.BackAction onPress={() => setModalSalir(true)} />
           <Appbar.Content title={auctionTitle} />
+          <TouchableOpacity onPress={() => setSnackbar('Ingresando al Streaming')} style={styles.streamingLink}>
+            <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
+            <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
+          </TouchableOpacity>
           <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
         </Appbar.Header>
@@ -766,6 +841,10 @@ export default function SalaSubastaScreen({ navigation, route }) {
         <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
           <Appbar.BackAction onPress={() => setModalSalir(true)} />
           <Appbar.Content title={auctionTitle} titleStyle={styles.appbarTitle} />
+          <TouchableOpacity onPress={() => setSnackbar('Ingresando al Streaming')} style={styles.streamingLink}>
+            <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
+            <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
+          </TouchableOpacity>
           <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
         </Appbar.Header>
@@ -819,6 +898,10 @@ export default function SalaSubastaScreen({ navigation, route }) {
         <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
           <Appbar.BackAction onPress={() => setModalSalir(true)} />
           <Appbar.Content title={auctionTitle} titleStyle={styles.appbarTitle} />
+          <TouchableOpacity onPress={() => setSnackbar('Ingresando al Streaming')} style={styles.streamingLink}>
+            <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
+            <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
+          </TouchableOpacity>
           <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
         </Appbar.Header>
@@ -845,6 +928,10 @@ export default function SalaSubastaScreen({ navigation, route }) {
         <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
           <Appbar.BackAction onPress={() => setModalSalir(true)} />
           <Appbar.Content title={auctionTitle} titleStyle={styles.appbarTitle} />
+          <TouchableOpacity onPress={() => setSnackbar('Ingresando al Streaming')} style={styles.streamingLink}>
+            <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
+            <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
+          </TouchableOpacity>
           <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
         </Appbar.Header>
@@ -946,13 +1033,18 @@ export default function SalaSubastaScreen({ navigation, route }) {
             </Button>
           </View>
           <View style={[styles.pujaHint, { backgroundColor: theme.colors.background }]}>
-            {salaData?.minPuja != null && (
-              <Text style={[styles.pujaHintText, { color: theme.colors.onSurfaceVariant }]}>
-                Mín: {moneda} {Number(salaData.minPuja).toLocaleString('es-AR')}
-                {'  '}
-                Máx: {moneda} {Number(salaData.maxPuja).toLocaleString('es-AR')}
-              </Text>
-            )}
+            {salaData?.minPuja != null && (() => {
+              const cat = auction?.categoria?.toLowerCase();
+              const sinLimiteMax = cat === 'oro' || cat === 'platino';
+              return (
+                <Text style={[styles.pujaHintText, { color: theme.colors.onSurfaceVariant }]}>
+                  Mín: {moneda} {Number(salaData.minPuja).toLocaleString('es-AR')}
+                  {!sinLimiteMax && salaData.maxPuja != null
+                    ? `    Máx: ${moneda} ${Number(salaData.maxPuja).toLocaleString('es-AR')}`
+                    : ''}
+                </Text>
+              );
+            })()}
           </View>
         </KeyboardAvoidingView>
 
@@ -968,6 +1060,10 @@ export default function SalaSubastaScreen({ navigation, route }) {
       <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title={auctionTitle} titleStyle={styles.appbarTitle} />
+        <TouchableOpacity onPress={() => setSnackbar('Ingresando al Streaming')} style={styles.streamingLink}>
+          <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
+          <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
+        </TouchableOpacity>
         {auction?.estado === 'abierta' && (
           <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
@@ -1096,6 +1192,12 @@ const styles = StyleSheet.create({
   proximoItemFotoPlaceholder: { width: 72, height: 72, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   proximoItemTitle: { fontSize: 14, fontWeight: '600', lineHeight: 20, marginBottom: 4 },
   proximoItemBase: { fontSize: 12, lineHeight: 18 },
+
+  streamingLink: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, marginRight: 4,
+  },
+  streamingLinkText: { fontSize: 12, fontWeight: '500', textDecorationLine: 'underline' },
 
   timerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 16,

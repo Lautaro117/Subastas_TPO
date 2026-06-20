@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Checkbox, HelperText, IconButton, SegmentedButtons, Surface, Text, useTheme } from 'react-native-paper';
-
+import { Checkbox, HelperText, Icon, IconButton, SegmentedButtons, Surface, Text, useTheme } from 'react-native-paper';
 import { AuthPrimaryButton, AuthTextInput } from '../../components';
 import { registerSharedStyles } from '../register/sharedStyles';
 import { useAppSession } from '../../navigation/AppSessionContext';
@@ -120,6 +119,13 @@ export default function AddCertifiedCheckScreen({ navigation, route }) {
               El cheque se usará como garantía. El monto determina el límite de compras acumuladas.
             </Text>
 
+            <Surface style={styles.infoBanner} elevation={0}>
+              <Icon source="information-outline" size={22} color={COLORS.primary} />
+              <Text style={[styles.infoText, { color: theme.colors.onSurfaceVariant }]}>
+                Para acreditar el cheque, debés acercarlo físicamente a la empresa de subastas (Lima 757, CABA). El equipo lo validará y activará tu método de pago.
+              </Text>
+            </Surface>
+
             <View style={styles.inputBlock}>
               <AuthTextInput
                 value={form.banco_emisor}
@@ -221,6 +227,22 @@ export default function AddCertifiedCheckScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  infoBanner: {
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderRadius: 14,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
   inputBlock: {
     marginBottom: 6,
   },

@@ -54,6 +54,13 @@ export default function AuctionCard({ item, onPress }) {
           </Text>
         )}
 
+        {/* Subastador */}
+        {item.subastadorNombre && (
+          <Text style={[styles.subastador, { color: theme.colors.onSurfaceVariant }]}>
+            Subastador: {item.subastadorNombre}
+          </Text>
+        )}
+
         {/* Chips: categoría + estado */}
         <View style={styles.chipsRow}>
           <Chip
@@ -84,7 +91,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: { fontSize: 18, fontWeight: '600', lineHeight: 24, marginBottom: 8 },
-  description: { fontSize: 14, lineHeight: 22, marginBottom: 12 },
+  description: { fontSize: 14, lineHeight: 22, marginBottom: 4 },
+  subastador: { fontSize: 13, lineHeight: 20, marginBottom: 12 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderRadius: 999 },
   chipText: { fontSize: 12, lineHeight: 16 },

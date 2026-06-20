@@ -1,5 +1,6 @@
 package com.example.subastas.service;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -11,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.subastas.dto.HistorialPujasDTO;
 import com.example.subastas.dto.UserDTO;
 import com.example.subastas.dto.UserStatsDTO;
+import com.example.subastas.model.Adjudicaciones;
 import com.example.subastas.model.Asistente;
 import com.example.subastas.model.Cliente;
 import com.example.subastas.model.MedioPago;
@@ -176,15 +178,29 @@ public class UserService {
 
         int productosPublicados = productoRepository.findByDuenio(clienteId).size();
 
-        int articulosGanados = asistenteRepository.findAllByClienteId(clienteId).stream()
+        List<Asistente> todosAsistentes = asistenteRepository.findAllByClienteId(clienteId);
+
+        int articulosGanados = todosAsistentes.stream()
         .mapToInt(a -> adjudicacionesRepository.countByAsistenteId(a.getIdentificador()))
         .sum();
-        
+
+        BigDecimal importeTotalOfertado = todosAsistentes.stream()
+        .flatMap(a -> pujoRepository.findByAsistenteId(a.getIdentificador()).stream())
+        .map(Pujo::getImporte)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal importeTotalPagado = todosAsistentes.stream()
+        .flatMap(a -> adjudicacionesRepository.findAllByAsistenteId(a.getIdentificador()).stream())
+        .map(Adjudicaciones::getImporte)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         List<MedioPago> medios = medioPagoRepository.findByClienteId(clienteId).stream()
         .filter(m -> Boolean.TRUE.equals(m.getVerificado()))
         .collect(Collectors.toList());
 
-        return new UserStatsDTO(subastasParticipadas, pujasRealizadas, productosPublicados, articulosGanados, cliente.getCategoria(), medios);
+        return new UserStatsDTO(subastasParticipadas, pujasRealizadas, productosPublicados,
+                articulosGanados, importeTotalOfertado, importeTotalPagado,
+                cliente.getCategoria(), medios);
         }
 
         public Multas getMultaActiva(String email) {

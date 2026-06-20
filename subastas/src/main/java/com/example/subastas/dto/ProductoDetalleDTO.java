@@ -18,6 +18,10 @@ public class ProductoDetalleDTO {
     private LocalDate fecha;
     private String disponible;
 
+    // Dueño
+    private Integer duenioId;
+    private String duenioNombre;
+
     // Fotos en base64
     private List<String> fotos;
 
@@ -49,6 +53,12 @@ public class ProductoDetalleDTO {
 
     public String getDisponible() { return disponible; }
     public void setDisponible(String disponible) { this.disponible = disponible; }
+
+    public Integer getDuenioId() { return duenioId; }
+    public void setDuenioId(Integer duenioId) { this.duenioId = duenioId; }
+
+    public String getDuenioNombre() { return duenioNombre; }
+    public void setDuenioNombre(String duenioNombre) { this.duenioNombre = duenioNombre; }
 
     public List<String> getFotos() { return fotos; }
     public void setFotos(List<String> fotos) { this.fotos = fotos; }

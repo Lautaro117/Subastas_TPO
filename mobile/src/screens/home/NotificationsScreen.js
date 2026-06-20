@@ -7,11 +7,14 @@ import { useAppSession } from '../../navigation/AppSessionContext';
 import { COLORS } from '../../theme/colors';
 
 // ─── Formateo de fecha ────────────────────────────────────────────────────────
-// El backend envía LocalDateTime sin zona horaria (ej: "2026-06-18T15:30:00").
-// Añadimos 'Z' para que JS lo interprete como UTC, y lo mostramos en hora de Argentina.
+// El backend ahora genera el timestamp con LocalDateTime.now(ZoneId Argentina) y lo
+// envía sin offset (ej: "2026-06-18T15:30:00"), pero esos números YA SON hora de
+// Argentina. Antes este código asumía que era UTC y le restaba 3 horas de más
+// (por eso una notificación de las 16:33 se mostraba como 13:33). Le indicamos a JS
+// el offset real (-03:00) en vez de 'Z' para que no haga ninguna conversión extra.
 function formatTimestamp(isoString) {
   if (!isoString) return '';
-  const normalized = /[Z+\-]\d{2}:?\d{2}$/.test(isoString) ? isoString : isoString + 'Z';
+  const normalized = /[Z+\-]\d{2}:?\d{2}$/.test(isoString) ? isoString : isoString + '-03:00';
   const date = new Date(normalized);
   return date.toLocaleString('es-AR', {
     day: '2-digit',

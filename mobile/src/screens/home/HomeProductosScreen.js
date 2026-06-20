@@ -77,6 +77,24 @@ function ProductoCard({ item, onPress }) {
   );
 }
 
+const VENDIDO_COLOR = '#4CAF50';
+
+function VendidoCard({ item, onPress }) {
+  const theme = useTheme();
+
+  return (
+    <TouchableOpacity onPress={onPress}>
+      <View style={[styles.card, { backgroundColor: theme.colors.surfaceContainerLow, borderColor: VENDIDO_COLOR }]}>
+        <Text style={[styles.cardTitle, { color: theme.colors.onSurface }]}>{item.descripcionCatalogo}</Text>
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Vendido por:</Text>
+          <Text style={[styles.infoValue, { color: VENDIDO_COLOR }]}>${item.montoVenta}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 function CompraCard({ item, onPress }) {
   const theme = useTheme();
   return (
@@ -167,9 +185,12 @@ export default function HomeProductosScreen({ navigation }) {
     if (activeTab === 'compras') cargarCompras();
   }, [activeTab, cargarCompras]);
 
+  const vendidos = productos.filter((p) => !!p.resultadoVenta);
+
   const tabs = [
-    { key: 'publicados', label: 'Productos publicados' },
-    { key: 'compras', label: 'Mis compras' },
+    { key: 'publicados', label: 'Publicados' },
+    { key: 'vendidos', label: 'Vendidos' },
+    { key: 'compras', label: 'Compras' },
   ];
 
   return (
@@ -265,6 +286,31 @@ export default function HomeProductosScreen({ navigation }) {
                   showsVerticalScrollIndicator={false}
                 />
               )
+            ) : activeTab === 'vendidos' ? (
+              loading ? (
+                <ActivityIndicator style={styles.loader} />
+              ) : error ? (
+                <Text style={[styles.error, { color: theme.colors.error }]}>{error}</Text>
+              ) : vendidos.length === 0 ? (
+                <View style={styles.placeholder}>
+                  <Text style={[styles.placeholderText, { color: theme.colors.onSurfaceVariant }]}>
+                    Todavía no se vendió ninguno de tus productos
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={vendidos}
+                  keyExtractor={(item) => item.id.toString()}
+                  renderItem={({ item }) => (
+                    <VendidoCard
+                      item={item}
+                      onPress={() => navigation.navigate('DetalleProducto', { productoId: item.id })}
+                    />
+                  )}
+                  contentContainerStyle={styles.list}
+                  showsVerticalScrollIndicator={false}
+                />
+              )
             ) : loadingCompras ? (
               <ActivityIndicator style={styles.loader} />
             ) : compras.length === 0 ? (
@@ -316,9 +362,9 @@ const styles = StyleSheet.create({
   bellButton: { margin: 0, borderRadius: 999 },
   bellWrap: { position: 'relative' },
   bellBadge: { position: 'absolute', top: 2, right: 2 },
-  tabRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  tab: { flex: 1, paddingVertical: 8, borderRadius: 999, alignItems: 'center' },
-  tabText: { fontSize: 13, fontWeight: '600' },
+  tabRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  tab: { flex: 1, paddingVertical: 8, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  tabText: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
   loader: { marginTop: 40 },
   error: { marginTop: 20, fontSize: 14 },
   list: { gap: 12, paddingBottom: 100 },

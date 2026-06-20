@@ -5,7 +5,6 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +18,7 @@ import com.example.subastas.dto.CatalogoDTO;
 import com.example.subastas.dto.ProductoDetalleDTO;
 import com.example.subastas.dto.ResultadoItemDTO;
 import com.example.subastas.dto.SalaResponse;
+import com.example.subastas.dto.SubastaDTO;
 import com.example.subastas.model.Pujo;
 import com.example.subastas.model.Subasta;
 import com.example.subastas.security.JwtUtil;
@@ -35,21 +35,36 @@ public class SubastaController {
     private JwtUtil jwtUtil;
 
     @GetMapping
-    public ResponseEntity<List<Subasta>> listarSubastas() {
-        return ResponseEntity.ok(subastaService.listarTodas());
+    public ResponseEntity<List<SubastaDTO>> listarSubastas() {
+        return ResponseEntity.ok(subastaService.listarTodasDTO());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Subasta> detalle(@PathVariable Integer id) {
-        return ResponseEntity.ok(subastaService.buscarPorId(id));
+    public ResponseEntity<SubastaDTO> detalle(@PathVariable Integer id) {
+        return ResponseEntity.ok(subastaService.buscarPorIdDTO(id));
+    }
+
+    /**
+     * Extrae el "estado" del JWT de forma defensiva: null si no hay header, está mal formado,
+     * o el token no es válido. Se usa en los endpoints de catálogo, que ahora son públicos
+     * (invitados/E1 también pueden ver qué hay en la subasta, sin precios).
+     */
+    private String extraerEstadoSeguro(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) return null;
+        try {
+            String token = authHeader.substring(7);
+            if (!jwtUtil.isTokenValid(token)) return null;
+            return jwtUtil.extractEstado(token);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @GetMapping("/{id}/catalog")
     public ResponseEntity<List<CatalogoDTO>> catalogo(
             @PathVariable Integer id,
-            @RequestHeader("Authorization") String authHeader) {
-        String token = authHeader.substring(7);
-        String estado = jwtUtil.extractEstado(token);
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String estado = extraerEstadoSeguro(authHeader);
         List<CatalogoDTO> items = subastaService.obtenerCatalogo(id, estado);
         return ResponseEntity.ok(items);
     }
@@ -58,9 +73,8 @@ public class SubastaController {
     public ResponseEntity<CatalogoDTO> detalleItem(
             @PathVariable Integer id,
             @PathVariable Integer itemId,
-            @RequestHeader("Authorization") String authHeader) {
-        String token = authHeader.substring(7);
-        String estado = jwtUtil.extractEstado(token);
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String estado = extraerEstadoSeguro(authHeader);
         CatalogoDTO item = subastaService.obtenerItem(id, itemId, estado);
         return ResponseEntity.ok(item);
     }
@@ -132,13 +146,13 @@ public class SubastaController {
     }
 
 
-    @DeleteMapping("/leave-all")
+   /* @DeleteMapping("/leave-all")
     public ResponseEntity<Void> leaveAll(@RequestHeader("Authorization") String authHeader) {
         String token = authHeader.substring(7);
         String email = jwtUtil.extractEmail(token);
         subastaService.salirDeTodas(email);
         return ResponseEntity.ok().build();
-    }
+    }*/
 
     @GetMapping("/{id}/admin-live")
     public ResponseEntity<SalaResponse> adminLive(@PathVariable Integer id) {

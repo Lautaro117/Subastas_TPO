@@ -13,10 +13,14 @@ import {
   useTheme,
 } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAppSession } from '../../navigation/AppSessionContext';
+import { createNotification } from '../../services/notificationsApi';
 
 export default function CatalogoExtendidoScreen({ navigation, route }) {
   const { auctionId, catalogo = [] } = route.params ?? {};
   const theme = useTheme();
+  const { session } = useAppSession();
+  const token = session.token;
 
   const STORAGE_KEY = `@subastas:notificados:${auctionId}`;
 
@@ -39,10 +43,16 @@ export default function CatalogoExtendidoScreen({ navigation, route }) {
   }, [notificadosIds, STORAGE_KEY]);
 
   function handleConfirmarNotificar() {
-    // TODO: llamar endpoint de notificación del ítem
-    setNotificadosIds((prev) => new Set([...prev, modalNotificar]));
+    const itemId = modalNotificar;
+    setNotificadosIds((prev) => new Set([...prev, itemId]));
     setModalNotificar(null);
     setSnackbar('Te notificaremos cuando comience.');
+    // Persistir la marca en el backend: el aviso llega a la bandeja de notificaciones
+    // del usuario en el momento exacto en que termine la puja del ítem anterior,
+    // sin depender de que la app esté abierta en ese momento.
+    if (token) {
+      createNotification(token, 'campanita_pendiente', String(itemId)).catch(() => {});
+    }
   }
 
   return (
@@ -74,11 +84,10 @@ export default function CatalogoExtendidoScreen({ navigation, route }) {
             style={[
               styles.row,
               {
-                backgroundColor: item.subastado === 'si'
-                  ? theme.colors.surfaceContainerHigh
-                  : theme.colors.surfaceContainerLowest,
+                // Un ítem ya cerrado (vendido o sin postor) se ve igual que uno pendiente —
+                // solo cambia el ✓/— de la derecha.
+                backgroundColor: theme.colors.surfaceContainerLowest,
                 borderColor: theme.colors.outline,
-                opacity: item.subastado === 'si' ? 0.55 : 1,
               },
             ]}
           >
@@ -108,9 +117,9 @@ export default function CatalogoExtendidoScreen({ navigation, route }) {
             </View>
 
             {/* Campana o subastado */}
-            {item.subastado === 'si' || item.subastado === 'deshabilitado' ? (
+            {item.subastado === 'si' ? (
               <Text style={[styles.subastadoLabel, { color: theme.colors.onSurfaceVariant }]}>
-                {item.subastado === 'si' ? '✓' : '—'}
+                {item.sinPostor ? '—' : '✓'}
               </Text>
             ) : (
               <IconButton
