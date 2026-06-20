@@ -15,6 +15,8 @@ public class DetalleObra {
     @Column(name = "producto")
     private Integer producto;
 
+    private String tipo;
+
     @Column(name = "nombre_autor")
     private String nombreAutor;
 
@@ -26,6 +28,9 @@ public class DetalleObra {
 
     public Integer getProducto() { return producto; }
     public void setProducto(Integer producto) { this.producto = producto; }
+
+    public String getTipo() { return tipo; }
+    public void setTipo(String tipo) { this.tipo = tipo; }
 
     public String getNombreAutor() { return nombreAutor; }
     public void setNombreAutor(String nombreAutor) { this.nombreAutor = nombreAutor; }

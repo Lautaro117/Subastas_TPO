@@ -33,8 +33,6 @@ public class Producto {
     @Column(name = "estado_admin")
     private String estadoAdmin;
 
-    private String tipo;
-
     public Integer getIdentificador() { return identificador; }
     public void setIdentificador(Integer identificador) { this.identificador = identificador; }
 
@@ -61,7 +59,4 @@ public class Producto {
 
     public String getEstadoAdmin() { return estadoAdmin; }
     public void setEstadoAdmin(String estadoAdmin) { this.estadoAdmin = estadoAdmin; }
-
-    public String getTipo() { return tipo; }
-    public void setTipo(String tipo) { this.tipo = tipo; }
 }

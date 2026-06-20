@@ -139,6 +139,9 @@ public class MiProductoService {
             AdminProducto ap = adminProductoRepository.findByProductoId(p.getIdentificador()).orElse(null);
             String[] dep = resolverDeposito(p.getIdentificador());
             Object[] venta = resolverResultadoVenta(p.getIdentificador());
+            String tipo = detalleObraRepository.findByProducto(p.getIdentificador())
+                .map(DetalleObra::getTipo)
+                .orElse("comun");
             return new MiProductoDTO(
                 p.getIdentificador(),
                 p.getDescripcionCatalogo(),
@@ -152,7 +155,7 @@ public class MiProductoService {
                 ap != null ? ap.getMotivoRechazo() : null,
                 ap != null ? ap.getEtapaRechazo() : null,
                 dep[0], dep[1],
-                p.getTipo(), null,
+                tipo, null,
                 (String) venta[0], (BigDecimal) venta[1]
             );
         }).collect(Collectors.toList());
@@ -195,7 +198,6 @@ public class MiProductoService {
         producto.setDescripcionCompleta(descripcionCompleta);
         producto.setEstadoAdmin("pendiente");
         producto.setRevisor(1);
-        producto.setTipo(tipoFinal);
         productoRepository.save(producto);
 
         for (MultipartFile foto : fotos) {
@@ -218,6 +220,7 @@ public class MiProductoService {
             }
             DetalleObra detalle = new DetalleObra();
             detalle.setProducto(producto.getIdentificador());
+            detalle.setTipo(tipoFinal);
             detalle.setNombreAutor(nombreAutor);
             detalle.setFechaCreacion(fechaCreacion);
             detalle.setHistoria(historia);
@@ -389,7 +392,9 @@ public class MiProductoService {
         String[] dep = resolverDeposito(productoId);
         Object[] venta = resolverResultadoVenta(productoId);
 
-        DetalleObraDTO detalleObraDTO = detalleObraRepository.findByProducto(productoId)
+        Optional<DetalleObra> detalleOpt = detalleObraRepository.findByProducto(productoId);
+        String tipo = detalleOpt.map(DetalleObra::getTipo).orElse("comun");
+        DetalleObraDTO detalleObraDTO = detalleOpt
             .map(d -> new DetalleObraDTO(d.getNombreAutor(), d.getFechaCreacion(), d.getHistoria()))
             .orElse(null);
 
@@ -406,7 +411,7 @@ public class MiProductoService {
             ap != null ? ap.getMotivoRechazo() : null,
             ap != null ? ap.getEtapaRechazo() : null,
             dep[0], dep[1],
-            producto.getTipo(), detalleObraDTO,
+            tipo, detalleObraDTO,
             (String) venta[0], (BigDecimal) venta[1]
         );
     }
