@@ -215,26 +215,7 @@ const { session, exitApp, setAuthToken, localNotifications, markLocalNotificatio
             ))}
           </View>
 
-          {/* [TEST] Salir de todas las salas */}
-          {hasToken && (
-            <Button
-              mode="outlined"
-              onPress={async () => {
-                setLeavingAll(true);
-                try { await leaveAllAuctions(session.token); } catch {}
-                setLeavingAll(false);
-              }}
-              loading={leavingAll}
-              disabled={leavingAll}
-              style={[styles.logoutButton, { borderColor: '#f59e0b', marginBottom: 10 }]}
-              contentStyle={styles.logoutContent}
-              labelStyle={{ fontSize: 14, fontWeight: '500', color: '#f59e0b' }}
-              icon="exit-run"
-            >
-              [TEST] Salir de todas las subastas
-            </Button>
-          )}
-
+        
           {/* Logout */}
           <Button
             mode="contained-tonal"
