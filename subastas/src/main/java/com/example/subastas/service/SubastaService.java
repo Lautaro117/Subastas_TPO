@@ -37,6 +37,7 @@ import com.example.subastas.model.Subasta;
 import com.example.subastas.repository.AdjudicacionesRepository;
 import com.example.subastas.repository.AsistenteRepository;
 import com.example.subastas.repository.CatalogoRepository;
+import com.example.subastas.repository.ClienteRepository;
 import com.example.subastas.repository.FotoProductoRepository;
 import com.example.subastas.repository.ItemCatalogoRepository;
 import com.example.subastas.repository.MedioPagoRepository;
@@ -68,6 +69,7 @@ public class SubastaService {
     @Autowired private AdjudicacionesRepository adjudicacionesRepository;
     @Autowired private ProductoRepository productoRepository;
     @Autowired private FotoProductoRepository fotoProductoRepository;
+    @Autowired private ClienteRepository clienteRepository;
 
     private static final List<String> ORDEN_CATEGORIAS = Arrays.asList(
             "comun", "especial", "plata", "oro", "platino");
@@ -205,6 +207,10 @@ public class SubastaService {
         List<String> fotosBase64 = fotoProductoRepository.findByProducto(producto.getIdentificador())
                 .stream().map(f -> Base64.getEncoder().encodeToString(f.getFoto())).toList();
 
+        String duenioNombre = clienteRepository.findById(producto.getDuenio())
+                .map(c -> c.getPersona().getNombre())
+                .orElse(null);
+
         ProductoDetalleDTO dto = new ProductoDetalleDTO();
         dto.setItemId(item.getIdentificador());
         dto.setProductoId(item.getProductoId());
@@ -216,6 +222,8 @@ public class SubastaService {
         dto.setFecha(producto.getFecha());
         dto.setDisponible(producto.getDisponible());
         dto.setFotos(fotosBase64);
+        dto.setDuenioId(producto.getDuenio());
+        dto.setDuenioNombre(duenioNombre);
         return dto;
     }
 

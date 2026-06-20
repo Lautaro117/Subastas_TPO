@@ -282,6 +282,28 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
             elevation={0}
             style={[styles.infoCard, { backgroundColor: theme.colors.surfaceContainerLow }]}
           >
+            {detalle?.itemId != null && (
+              <View style={styles.infoRow}>
+                <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>
+                  Ítem #
+                </Text>
+                <Text style={[styles.infoValue, { color: theme.colors.onSurface }]}>
+                  {detalle.itemId}
+                </Text>
+              </View>
+            )}
+
+            {detalle?.duenioNombre && (
+              <View style={styles.infoRow}>
+                <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>
+                  Dueño
+                </Text>
+                <Text style={[styles.infoValue, { color: theme.colors.onSurface }]}>
+                  {detalle.duenioNombre}
+                </Text>
+              </View>
+            )}
+
             {userEstado === 'E2' ? (
               <TouchableOpacity
                 onPress={() => navigation.navigate('HomePerfil', { screen: 'PaymentMethods' })}
