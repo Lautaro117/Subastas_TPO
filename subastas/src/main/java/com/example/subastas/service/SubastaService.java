@@ -23,6 +23,7 @@ import com.example.subastas.dto.CatalogoDTO;
 import com.example.subastas.dto.ProductoDetalleDTO;
 import com.example.subastas.dto.ResultadoItemDTO;
 import com.example.subastas.dto.SalaResponse;
+import com.example.subastas.dto.SubastaDTO;
 import java.time.LocalDateTime;
 import com.example.subastas.model.Adjudicaciones;
 import com.example.subastas.model.Asistente;
@@ -39,6 +40,7 @@ import com.example.subastas.repository.AsistenteRepository;
 import com.example.subastas.repository.CatalogoRepository;
 import com.example.subastas.repository.ClienteRepository;
 import com.example.subastas.repository.FotoProductoRepository;
+import com.example.subastas.repository.PersonaRepository;
 import com.example.subastas.repository.ItemCatalogoRepository;
 import com.example.subastas.repository.MedioPagoRepository;
 import com.example.subastas.repository.ProductoRepository;
@@ -70,6 +72,7 @@ public class SubastaService {
     @Autowired private ProductoRepository productoRepository;
     @Autowired private FotoProductoRepository fotoProductoRepository;
     @Autowired private ClienteRepository clienteRepository;
+    @Autowired private PersonaRepository personaRepository;
 
     private static final List<String> ORDEN_CATEGORIAS = Arrays.asList(
             "comun", "especial", "plata", "oro", "platino");
@@ -144,6 +147,33 @@ public class SubastaService {
     public Subasta buscarPorId(Integer id) {
         return subastaRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Subasta no encontrada"));
+    }
+
+    public List<SubastaDTO> listarTodasDTO() {
+        return listarTodas().stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
+    public SubastaDTO buscarPorIdDTO(Integer id) {
+        return toDTO(buscarPorId(id));
+    }
+
+    private SubastaDTO toDTO(Subasta s) {
+        SubastaDTO dto = new SubastaDTO();
+        dto.setIdentificador(s.getIdentificador());
+        dto.setFecha(s.getFecha());
+        dto.setHora(s.getHora());
+        dto.setEstado(s.getEstado());
+        dto.setUbicacion(s.getUbicacion());
+        dto.setCapacidadAsistentes(s.getCapacidadAsistentes());
+        dto.setTieneDeposito(s.getTieneDeposito());
+        dto.setSeguridadPropia(s.getSeguridadPropia());
+        dto.setCategoria(s.getCategoria());
+        dto.setSubastadorId(s.getSubastadorId());
+        if (s.getSubastadorId() != null) {
+            personaRepository.findById(s.getSubastadorId())
+                    .ifPresent(p -> dto.setSubastadorNombre(p.getNombre()));
+        }
+        return dto;
     }
 
     // ── Catálogo ───────────────────────────────────────────────────────────────

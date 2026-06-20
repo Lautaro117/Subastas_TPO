@@ -18,6 +18,7 @@ import com.example.subastas.dto.CatalogoDTO;
 import com.example.subastas.dto.ProductoDetalleDTO;
 import com.example.subastas.dto.ResultadoItemDTO;
 import com.example.subastas.dto.SalaResponse;
+import com.example.subastas.dto.SubastaDTO;
 import com.example.subastas.model.Pujo;
 import com.example.subastas.model.Subasta;
 import com.example.subastas.security.JwtUtil;
@@ -34,13 +35,13 @@ public class SubastaController {
     private JwtUtil jwtUtil;
 
     @GetMapping
-    public ResponseEntity<List<Subasta>> listarSubastas() {
-        return ResponseEntity.ok(subastaService.listarTodas());
+    public ResponseEntity<List<SubastaDTO>> listarSubastas() {
+        return ResponseEntity.ok(subastaService.listarTodasDTO());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Subasta> detalle(@PathVariable Integer id) {
-        return ResponseEntity.ok(subastaService.buscarPorId(id));
+    public ResponseEntity<SubastaDTO> detalle(@PathVariable Integer id) {
+        return ResponseEntity.ok(subastaService.buscarPorIdDTO(id));
     }
 
     /**
