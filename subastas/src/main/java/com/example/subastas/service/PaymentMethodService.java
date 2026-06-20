@@ -1,5 +1,6 @@
 package com.example.subastas.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.subastas.dto.PaymentMethodDTO;
 import com.example.subastas.model.MedioPago;
+import com.example.subastas.repository.AdjudicacionesRepository;
 import com.example.subastas.repository.MedioPagoRepository;
 import com.example.subastas.repository.UsuarioAuthRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,6 +26,9 @@ public class PaymentMethodService {
 
     @Autowired
     private UsuarioAuthRepository usuarioAuthRepository;
+
+    @Autowired
+    private AdjudicacionesRepository adjudicacionesRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -190,6 +195,61 @@ public class PaymentMethodService {
             usuario.setEstado(nuevoEstado);
             usuarioAuthRepository.save(usuario);
         }
+    }
+
+    /**
+     * Límite NOMINAL/total de un medio de pago — sin restar nada de lo que ya se ganó con
+     * él. Se deriva del propio JSON `datos` que cada medio ya guarda, no agrega ninguna
+     * columna nueva.
+     * - "tarjeta": dinero infinito (sin límite) — ver requerimiento del cliente.
+     * - "cuenta_bancaria": fondos_reservados.
+     * - "cheque": monto.
+     * - cualquier otro caso / datos mal formados: 0, por seguridad (mejor bloquear su uso
+     *   que dejar pujar con un medio cuyo límite no podemos calcular).
+     *
+     * Para validar pujas o cambios de medio usar fondosDisponibles(), no este — este es
+     * el total "de fábrica" del medio, no lo que realmente le queda libre ahora.
+     *
+     * @return null = sin límite (infinito). Un valor = tope nominal de ese medio.
+     */
+    public BigDecimal limiteDisponible(MedioPago medio) {
+        if (medio == null) return BigDecimal.ZERO;
+        String tipo = medio.getTipo();
+        if ("tarjeta".equals(tipo)) {
+            return null;
+        }
+        try {
+            var nodo = objectMapper.readTree(medio.getDatos());
+            if ("cuenta_bancaria".equals(tipo) && nodo.has("fondos_reservados")) {
+                return new BigDecimal(nodo.get("fondos_reservados").asText());
+            }
+            if ("cheque".equals(tipo) && nodo.has("monto")) {
+                return new BigDecimal(nodo.get("monto").asText());
+            }
+        } catch (Exception e) {
+            // datos mal formados: tratamos como sin fondos antes que asumir infinito
+        }
+        return BigDecimal.ZERO;
+    }
+
+    /**
+     * Lo que REALMENTE le queda libre a este medio de pago para pujar ahora: el límite
+     * nominal menos todo lo que ya ganó (Adjudicaciones.importe) con ese mismo medio, EN
+     * CUALQUIER subasta — no solo la actual. Esa plata queda reservada para esa compra
+     * (todavía no "gastada" de verdad, eso es la próxima etapa) y no puede volver a
+     * comprometerse en otra puja, sea de este ítem, otro ítem, u otra subasta distinta.
+     *
+     * Ej.: cheque de $10.000, ya ganó un ítem de $6.000 con él → disponible $4.000, en
+     * cualquier subasta donde use este mismo medio.
+     *
+     * @return null = sin límite (infinito, hoy solo "tarjeta"). Un valor = lo disponible.
+     */
+    public BigDecimal fondosDisponibles(MedioPago medio) {
+        BigDecimal limite = limiteDisponible(medio);
+        if (limite == null) return null;
+        BigDecimal reservado = adjudicacionesRepository.sumImporteByMedioPagoId(medio.getId());
+        BigDecimal disponible = limite.subtract(reservado != null ? reservado : BigDecimal.ZERO);
+        return disponible.max(BigDecimal.ZERO);
     }
 
     private String toJson(Map<String, Object> data) {

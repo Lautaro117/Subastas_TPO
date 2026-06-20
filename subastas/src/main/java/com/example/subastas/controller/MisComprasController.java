@@ -56,8 +56,7 @@ public class MisComprasController {
             @RequestBody Map<String, Object> body) {
         String email = jwtUtil.extractEmail(authHeader.substring(7));
         String tipoEntrega = (String) body.get("tipoEntrega"); // "envio" o "retiro"
-        Integer medioPagoId = (Integer) body.get("medioPagoId");
-        misComprasService.confirmarEntrega(email, id, tipoEntrega, medioPagoId);
+        misComprasService.confirmarEntrega(email, id, tipoEntrega);
         return ResponseEntity.ok().build();
 }
 }

@@ -31,6 +31,17 @@ public class SalaResponse {
     /** Próximo ítem que se activará al terminar el cooldown (null si no hay cooldown). */
     private CatalogoDTO proximoItem;
 
+    /**
+     * Medio de pago que ESTE usuario fijó para pujar por el ítem actual (null si todavía
+     * no eligió ninguno). Lo completa obtenerEstadoVivo() después de armar la respuesta
+     * genérica, porque construirSalaResponse() no sabe para qué usuario es — es la misma
+     * idea que miNumeroPostor.
+     */
+    private Integer medioPagoSeleccionadoId;
+    private String medioPagoSeleccionadoTipo;
+    /** null = sin límite (medio "tarjeta", dinero infinito). */
+    private BigDecimal medioPagoSeleccionadoLimite;
+
     public SalaResponse() {}
 
     public CatalogoDTO getItemActual() { return itemActual; }
@@ -65,6 +76,15 @@ public class SalaResponse {
 
     public CatalogoDTO getProximoItem() { return proximoItem; }
     public void setProximoItem(CatalogoDTO proximoItem) { this.proximoItem = proximoItem; }
+
+    public Integer getMedioPagoSeleccionadoId() { return medioPagoSeleccionadoId; }
+    public void setMedioPagoSeleccionadoId(Integer medioPagoSeleccionadoId) { this.medioPagoSeleccionadoId = medioPagoSeleccionadoId; }
+
+    public String getMedioPagoSeleccionadoTipo() { return medioPagoSeleccionadoTipo; }
+    public void setMedioPagoSeleccionadoTipo(String medioPagoSeleccionadoTipo) { this.medioPagoSeleccionadoTipo = medioPagoSeleccionadoTipo; }
+
+    public BigDecimal getMedioPagoSeleccionadoLimite() { return medioPagoSeleccionadoLimite; }
+    public void setMedioPagoSeleccionadoLimite(BigDecimal medioPagoSeleccionadoLimite) { this.medioPagoSeleccionadoLimite = medioPagoSeleccionadoLimite; }
 
     // ── Mejor oferta actual ────────────────────────────────────────────────────
     public static class MejorOferta {

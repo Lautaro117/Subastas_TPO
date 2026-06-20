@@ -38,7 +38,6 @@ export default function DetalleCompra({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tipoEntrega, setTipoEntrega] = useState('envio');
-  const [medioPagoId, setMedioPagoId] = useState(null);
   const [confirmando, setConfirmando] = useState(false);
   const [confirmado, setConfirmado] = useState(false);
   const [fotoActual, setFotoActual] = useState(0);
@@ -54,9 +53,9 @@ export default function DetalleCompra({ navigation, route }) {
       ]);
       const compraData = await compraRes.json();
       setCompra(compraData);
-      const verificados = (mediosRes || []).filter(m => m.verificado);
-      setMedios(verificados);
-      if (verificados.length > 0) setMedioPagoId(verificados[0].id);
+      // Ya no se elige acá: el medio quedó fijo desde que ganó la puja (el mismo con el
+      // que pujó). Solo lo necesitamos para mostrar de qué medio se trata.
+      setMedios(mediosRes || []);
       if (compraData.tipoEntrega) {
         setTipoEntrega(compraData.tipoEntrega);
         setConfirmado(true);
@@ -70,8 +69,9 @@ export default function DetalleCompra({ navigation, route }) {
 
   useEffect(() => { cargar(); }, [cargar]);
 
+  const medioFijo = medios.find((m) => m.id === compra?.medioPagoId) ?? null;
+
   const handleConfirmar = async () => {
-    if (!medioPagoId) { setError('Seleccioná un medio de pago'); return; }
     setConfirmando(true);
     setError('');
     try {
@@ -82,7 +82,7 @@ export default function DetalleCompra({ navigation, route }) {
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
-        body: JSON.stringify({ tipoEntrega, medioPagoId }),
+        body: JSON.stringify({ tipoEntrega }),
       });
       if (!response.ok) throw new Error('No se pudo confirmar');
       setConfirmado(true);
@@ -196,23 +196,21 @@ export default function DetalleCompra({ navigation, route }) {
                     ) : null}
                   </View>
 
-                  {/* Medio de pago */}
+                  {/* Medio de pago — fijo desde que ganó la puja, no se puede cambiar acá */}
                   <Text style={styles.sectionTitle}>Medio de pago</Text>
-                  {medios.length === 0 ? (
-                    <Text style={styles.error}>No tenés medios de pago verificados</Text>
-                  ) : (
-                    <View style={styles.card}>
-                      {medios.map(m => (
-                        <TouchableOpacity key={m.id} style={styles.radioRow} onPress={() => setMedioPagoId(m.id)}>
-                          <RadioButton value={m.id.toString()} status={medioPagoId === m.id ? 'checked' : 'unchecked'} onPress={() => setMedioPagoId(m.id)} color={COLORS.primary} />
-                          <View>
-                            <Text style={styles.radioLabel}>{TIPO_LABEL[m.tipo] ?? m.tipo}</Text>
-                            <Text style={styles.radioSub}>{getSubtitle(m)}</Text>
-                          </View>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
+                  <View style={styles.card}>
+                    {medioFijo ? (
+                      <View style={styles.radioRow}>
+                        <Icon source="lock-outline" size={18} color={COLORS.onSurfaceVariant} />
+                        <View>
+                          <Text style={styles.radioLabel}>{TIPO_LABEL[medioFijo.tipo] ?? medioFijo.tipo}</Text>
+                          <Text style={styles.radioSub}>{getSubtitle(medioFijo)}</Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <Text style={styles.error}>No se encontró el medio de pago con el que pujaste</Text>
+                    )}
+                  </View>
 
                   {error ? <Text style={styles.error}>{error}</Text> : null}
 

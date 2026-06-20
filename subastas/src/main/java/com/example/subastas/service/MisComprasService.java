@@ -72,7 +72,7 @@ public class MisComprasService {
 }
                 return new MisComprasDTO(adj.getId(), adj.getItemId(), descripcion, null,
     adj.getImporte(), adj.getComision(), adj.getCostoEnvio(), adj.getDireccionEnvio(),
-    null, null, null);
+    null, null, null, adj.getMedioPagoId());
             })
             .collect(Collectors.toList());
     }
@@ -116,7 +116,7 @@ public class MisComprasService {
 
     return new MisComprasDTO(adj.getId(), adj.getItemId(), descripcion, descripcionCompleta,
         adj.getImporte(), adj.getComision(), adj.getCostoEnvio(), adj.getDireccionEnvio(),
-        nroPoliza, companiaSeguro, fotos);
+        nroPoliza, companiaSeguro, fotos, adj.getMedioPagoId());
 }
 
     public void setDireccionEnvio(String email, Integer adjId) {
@@ -139,7 +139,10 @@ public class MisComprasService {
 }
 
 
-public void confirmarEntrega(String email, Integer adjId, String tipoEntrega, Integer medioPagoId) {
+// El medioPagoId YA NO se recibe por parámetro acá: queda fijo desde el momento en que
+// se adjudicó (es el medio con el que pujó y ganó, ver SubastaService.enviarPuja /
+// onTimerExpired / adjudicarItem). Esta confirmación solo define cómo se entrega.
+public void confirmarEntrega(String email, Integer adjId, String tipoEntrega) {
     Integer clienteId = getClienteId(email);
 
     Adjudicaciones adj = adjudicacionesRepository.findById(adjId)
@@ -157,7 +160,6 @@ public void confirmarEntrega(String email, Integer adjId, String tipoEntrega, In
     }
 
     adj.setTipoEntrega(tipoEntrega);
-    adj.setMedioPagoId(medioPagoId);
     adjudicacionesRepository.save(adj);
     }
 }
