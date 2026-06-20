@@ -22,6 +22,8 @@ import com.example.subastas.repository.ClienteRepository;
 import com.example.subastas.repository.FotoProductoRepository;
 import com.example.subastas.repository.ItemCatalogoRepository;
 import com.example.subastas.repository.ProductoRepository;
+import com.example.subastas.model.PagoAdjudicacion;
+import com.example.subastas.repository.PagoAdjudicacionRepository;
 import com.example.subastas.repository.SeguroRepository;
 import com.example.subastas.repository.UsuarioAuthRepository;
 
@@ -51,7 +53,10 @@ public class MisComprasService {
     @Autowired
     private SeguroRepository seguroRepository;
 
+    @Autowired
+    private PagoAdjudicacionRepository pagoAdjudicacionRepository;
 
+    private static final java.time.ZoneId ZONA_AR = java.time.ZoneId.of("America/Argentina/Buenos_Aires");
 
     private Integer getClienteId(String email) {
         return usuarioAuthRepository.findByEmail(email)
@@ -161,5 +166,34 @@ public void confirmarEntrega(String email, Integer adjId, String tipoEntrega) {
 
     adj.setTipoEntrega(tipoEntrega);
     adjudicacionesRepository.save(adj);
-    }
+
+    // Crear registro de pago si todavía no existe
+    pagoAdjudicacionRepository.findByAdjudicacionId(adjId).ifPresentOrElse(
+        p -> {},
+        () -> {
+            PagoAdjudicacion pago = new PagoAdjudicacion();
+            pago.setAdjudicacionId(adjId);
+            pago.setItemId(adj.getItemId());
+            pago.setMedioPagoId(adj.getMedioPagoId());
+            pago.setEstado("pendiente");
+            pago.setCreatedAt(java.time.LocalDateTime.now(ZONA_AR));
+            pago.setUpdatedAt(java.time.LocalDateTime.now(ZONA_AR));
+            pagoAdjudicacionRepository.save(pago);
+        }
+    );
+}
+
+public PagoAdjudicacion getPago(String email, Integer adjId) {
+    Integer clienteId = getClienteId(email);
+
+    Adjudicaciones adj = adjudicacionesRepository.findById(adjId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Compra no encontrada"));
+
+    boolean esDelUsuario = asistenteRepository.findAllByClienteId(clienteId).stream()
+        .anyMatch(a -> a.getIdentificador().equals(adj.getAsistenteId()));
+
+    if (!esDelUsuario) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+
+    return pagoAdjudicacionRepository.findByAdjudicacionId(adjId).orElse(null);
+}
 }
