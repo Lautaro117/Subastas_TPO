@@ -8,11 +8,18 @@ import { COLORS } from '../../theme/colors';
 import { useAppSession } from '../../navigation/AppSessionContext';
 import { agregarProducto } from '../../services/itemsApi';
 
+const TIPOS = [
+  { value: 'comun', label: 'Producto común' },
+  { value: 'arte', label: 'Obra de arte' },
+  { value: 'diseno', label: 'Obj. de diseñador' },
+];
+
 export default function AgregarProducto({ navigation }) {
   const { session } = useAppSession();
   const [descripcionCatalogo, setDescripcionCatalogo] = useState('');
   const [descripcionCompleta, setDescripcionCompleta] = useState('');
   const [fotos, setFotos] = useState([]);
+  const [tipo, setTipo] = useState('comun');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -32,12 +39,20 @@ export default function AgregarProducto({ navigation }) {
     setFotos(prev => prev.filter((_, i) => i !== index));
   };
 
-
+  const validar = () => {
+    if (!descripcionCatalogo.trim()) { setError('La descripción corta es requerida'); return false; }
+    if (!descripcionCompleta.trim()) { setError('La descripción completa es requerida'); return false; }
+    if (fotos.length < 6) { setError('Se requieren al menos 6 fotos'); return false; }
+    return true;
+  };
 
   const handleSubmit = async () => {
-    if (!descripcionCatalogo.trim()) { setError('La descripción corta es requerida'); return; }
-    if (!descripcionCompleta.trim()) { setError('La descripción completa es requerida'); return; }
-    if (fotos.length < 6) { setError('Se requieren al menos 6 fotos'); return; }
+    if (!validar()) return;
+
+    if (tipo === 'arte' || tipo === 'diseno') {
+      navigation.navigate('DetalleObra', { descripcionCatalogo, descripcionCompleta, fotos, tipo });
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -81,6 +96,22 @@ export default function AgregarProducto({ navigation }) {
             style={[styles.textInput, { height: 100, textAlignVertical: 'top' }]}
           />
 
+          <Text style={styles.label}>Tipo de producto</Text>
+          <View style={styles.tipoRow}>
+            {TIPOS.map(t => (
+              <TouchableOpacity
+                key={t.value}
+                style={[styles.tipoChip, tipo === t.value && styles.tipoChipSelected]}
+                onPress={() => setTipo(t.value)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.tipoChipLabel, tipo === t.value && styles.tipoChipLabelSelected]}>
+                  {t.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <View style={styles.fotosHeader}>
             <Text style={styles.label}>Fotos ({fotos.length}/6 mínimo)</Text>
             <TouchableOpacity onPress={seleccionarFoto}>
@@ -109,7 +140,9 @@ export default function AgregarProducto({ navigation }) {
             contentStyle={styles.buttonContent}
             labelStyle={styles.buttonLabel}
           >
-            {loading ? <ActivityIndicator size="small" color={COLORS.onPrimary} /> : 'Enviar para revisión'}
+            {loading
+              ? <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              : (tipo === 'arte' || tipo === 'diseno') ? 'Continuar' : 'Enviar para revisión'}
           </Button>
 
         </View>
@@ -133,6 +166,29 @@ const styles = StyleSheet.create({
     color: COLORS.onSurface,
     borderWidth: 1,
     borderColor: COLORS.outlineVariant,
+  },
+  tipoRow: { flexDirection: 'row', gap: 8 },
+  tipoChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.outlineVariant,
+    backgroundColor: COLORS.surfaceContainerHigh,
+    alignItems: 'center',
+  },
+  tipoChipSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  tipoChipLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.onSurfaceVariant,
+    textAlign: 'center',
+  },
+  tipoChipLabelSelected: {
+    color: COLORS.onPrimary,
   },
   fotosHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 8 },
   fotosGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
