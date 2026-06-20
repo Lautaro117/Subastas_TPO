@@ -371,13 +371,16 @@ public class SubastaService {
         }
 
         // Validar min/max
+        boolean sinLimiteMax = "oro".equalsIgnoreCase(subasta.getCategoria())
+                || "platino".equalsIgnoreCase(subasta.getCategoria());
         BigDecimal base = item.getPrecioBase();
         if (base != null) {
             Optional<Pujo> mejorActual = pujoRepository.findTopByItemIdOrderByImporteDesc(item.getIdentificador());
             BigDecimal ultima = mejorActual.map(Pujo::getImporte).orElse(base);
             BigDecimal incremento1pct  = base.multiply(new BigDecimal("0.01"));
             BigDecimal incremento20pct = base.multiply(new BigDecimal("0.20"));
-            BigDecimal minPuja = ultima.add(incremento1pct);
+            BigDecimal incrementoMin   = sinLimiteMax ? BigDecimal.ONE : incremento1pct;
+            BigDecimal minPuja = ultima.add(incrementoMin);
             BigDecimal maxPuja = ultima.add(incremento20pct);
 
             // Si no hay pujas previas, mínimo es el precio base
@@ -390,7 +393,7 @@ public class SubastaService {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "La puja mínima es " + minPuja.toPlainString());
             }
-            if (request.getMonto().compareTo(maxPuja) > 0) {
+            if (!sinLimiteMax && request.getMonto().compareTo(maxPuja) > 0) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "La puja máxima es " + maxPuja.toPlainString());
             }
@@ -856,19 +859,24 @@ public class SubastaService {
         }
 
         // Calcular min/max puja
+        Subasta subastaResp = subastaRepository.findById(subastaId).orElse(null);
+        boolean sinLimiteMaxResp = subastaResp != null
+                && ("oro".equalsIgnoreCase(subastaResp.getCategoria())
+                    || "platino".equalsIgnoreCase(subastaResp.getCategoria()));
         BigDecimal base = item.getPrecioBase();
         if (base != null) {
             BigDecimal ultima = response.getMejorOferta() != null
                     ? response.getMejorOferta().getImporte()
                     : base;
-            BigDecimal inc1  = base.multiply(new BigDecimal("0.01"));
-            BigDecimal inc20 = base.multiply(new BigDecimal("0.20"));
+            BigDecimal inc1   = base.multiply(new BigDecimal("0.01"));
+            BigDecimal inc20  = base.multiply(new BigDecimal("0.20"));
+            BigDecimal incMin = sinLimiteMaxResp ? BigDecimal.ONE : inc1;
             if (response.getMejorOferta() == null) {
                 response.setMinPuja(base);
-                response.setMaxPuja(base.add(inc20));
+                if (!sinLimiteMaxResp) response.setMaxPuja(base.add(inc20));
             } else {
-                response.setMinPuja(ultima.add(inc1));
-                response.setMaxPuja(ultima.add(inc20));
+                response.setMinPuja(ultima.add(incMin));
+                if (!sinLimiteMaxResp) response.setMaxPuja(ultima.add(inc20));
             }
         }
 

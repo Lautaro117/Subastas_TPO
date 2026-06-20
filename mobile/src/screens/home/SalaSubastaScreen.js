@@ -584,6 +584,20 @@ export default function SalaSubastaScreen({ navigation, route }) {
     const itemActual = salaData?.itemActual;
     if (!itemActual) { setSnackbar('No hay ítem activo para pujar.'); return; }
 
+    const minPuja = salaData?.minPuja != null ? Number(salaData.minPuja) : null;
+    const maxPuja = salaData?.maxPuja != null ? Number(salaData.maxPuja) : null;
+    const cat = auction?.categoria?.toLowerCase();
+    const sinLimiteMax = cat === 'oro' || cat === 'platino';
+
+    if (minPuja !== null && monto < minPuja) {
+      setSnackbar(`Puja mínima: ${moneda} ${minPuja.toLocaleString('es-AR')}`);
+      return;
+    }
+    if (!sinLimiteMax && maxPuja !== null && monto > maxPuja) {
+      setSnackbar(`Puja máxima: ${moneda} ${maxPuja.toLocaleString('es-AR')}`);
+      return;
+    }
+
     setPujando(true);
     try {
       await sendBid(token, auctionId, {
@@ -1019,13 +1033,18 @@ export default function SalaSubastaScreen({ navigation, route }) {
             </Button>
           </View>
           <View style={[styles.pujaHint, { backgroundColor: theme.colors.background }]}>
-            {salaData?.minPuja != null && (
-              <Text style={[styles.pujaHintText, { color: theme.colors.onSurfaceVariant }]}>
-                Mín: {moneda} {Number(salaData.minPuja).toLocaleString('es-AR')}
-                {'  '}
-                Máx: {moneda} {Number(salaData.maxPuja).toLocaleString('es-AR')}
-              </Text>
-            )}
+            {salaData?.minPuja != null && (() => {
+              const cat = auction?.categoria?.toLowerCase();
+              const sinLimiteMax = cat === 'oro' || cat === 'platino';
+              return (
+                <Text style={[styles.pujaHintText, { color: theme.colors.onSurfaceVariant }]}>
+                  Mín: {moneda} {Number(salaData.minPuja).toLocaleString('es-AR')}
+                  {!sinLimiteMax && salaData.maxPuja != null
+                    ? `    Máx: ${moneda} ${Number(salaData.maxPuja).toLocaleString('es-AR')}`
+                    : ''}
+                </Text>
+              );
+            })()}
           </View>
         </KeyboardAvoidingView>
 
