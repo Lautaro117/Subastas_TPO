@@ -31,6 +31,7 @@ import com.example.subastas.model.Catalogo;
 import com.example.subastas.model.FotoProducto;
 import com.example.subastas.model.ItemCatalogo;
 import com.example.subastas.model.MedioPago;
+import com.example.subastas.model.MedioPagoSeleccionado;
 import com.example.subastas.model.Producto;
 import com.example.subastas.model.Pujo;
 import com.example.subastas.model.PujoExt;
@@ -43,6 +44,7 @@ import com.example.subastas.repository.FotoProductoRepository;
 import com.example.subastas.repository.PersonaRepository;
 import com.example.subastas.repository.ItemCatalogoRepository;
 import com.example.subastas.repository.MedioPagoRepository;
+import com.example.subastas.repository.MedioPagoSeleccionadoRepository;
 import com.example.subastas.repository.ProductoRepository;
 import com.example.subastas.repository.PujoExtRepository;
 import com.example.subastas.repository.PujoRepository;
@@ -68,6 +70,8 @@ public class SubastaService {
     @Autowired private PujoRepository pujoRepository;
     @Autowired private PujoExtRepository pujoExtRepository;
     @Autowired private MedioPagoRepository medioPagoRepository;
+    @Autowired private MedioPagoSeleccionadoRepository medioPagoSeleccionadoRepository;
+    @Autowired private PaymentMethodService paymentMethodService;
     @Autowired private AdjudicacionesRepository adjudicacionesRepository;
     @Autowired private ProductoRepository productoRepository;
     @Autowired private FotoProductoRepository fotoProductoRepository;
@@ -322,6 +326,7 @@ public class SubastaService {
         // Informar al usuario su número de postor (solo en la respuesta del JOIN,
         // no en los broadcasts generales) para que pueda detectar si ganó un ítem.
         sala.setMiNumeroPostor(asistente.getNumeroPostor());
+        completarMedioSeleccionado(sala, clienteId);
         return sala;
     }
 
@@ -351,7 +356,93 @@ public class SubastaService {
         if (!sesionSubastaService.estaEnSala(usuario.getClienteId(), subastaId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No estás conectado a esta subasta");
         }
-        return construirSalaResponse(subastaId);
+        SalaResponse sala = construirSalaResponse(subastaId);
+        completarMedioSeleccionado(sala, usuario.getClienteId());
+        return sala;
+    }
+
+    /**
+     * Completa los campos medioPagoSeleccionado* de la respuesta para ESTE usuario puntual.
+     * construirSalaResponse() es genérica (la usan los broadcasts de WS también), así que
+     * no sabe para quién es — se parchea acá después, igual que con miNumeroPostor.
+     */
+    private void completarMedioSeleccionado(SalaResponse sala, Integer clienteId) {
+        if (sala.getItemActual() == null) return;
+        obtenerMedioSeleccionado(clienteId, sala.getItemActual().getItemId()).ifPresent(medio -> {
+            sala.setMedioPagoSeleccionadoId(medio.getId());
+            sala.setMedioPagoSeleccionadoTipo(medio.getTipo());
+            sala.setMedioPagoSeleccionadoLimite(paymentMethodService.fondosDisponibles(medio));
+        });
+    }
+
+    // ── Medio de pago para pujar ────────────────────────────────────────────────
+    // El medio elegido queda FIJO por ítem (persistido en medio_pago_seleccionado, no en
+    // memoria) para que sobreviva a que el usuario salga y vuelva a entrar a la subasta.
+    // Solo se puede cambiar a través de seleccionarMedioPago(), que valida fondos antes
+    // de permitirlo. La resta real de saldo (cuando se adjudica/paga) queda para más
+    // adelante — esto solo cubre la selección y la validación de fondos al pujar.
+
+    /** Devuelve el medio de pago fijado para este ítem por este cliente, si eligió uno. */
+    private Optional<MedioPago> obtenerMedioSeleccionado(Integer clienteId, Integer itemId) {
+        return medioPagoSeleccionadoRepository.findByClienteIdAndItemId(clienteId, itemId)
+                .flatMap(sel -> medioPagoRepository.findById(sel.getMedioPagoId()));
+    }
+
+    /**
+     * Elige (o cambia) el medio de pago con el que el cliente va a pujar por un ítem.
+     * Si ya tiene una puja propia activa en ese ítem, el nuevo medio tiene que poder
+     * cubrirla — si no, se rechaza (ver ejemplo del cliente: pujó $16.000 con tarjeta,
+     * no puede pasarse a un cheque de $15.000).
+     */
+    @Transactional
+    public void seleccionarMedioPago(Integer subastaId, Integer itemId, String email, Integer medioPagoId) {
+        buscarPorId(subastaId);
+        ItemCatalogo item = itemCatalogoRepository.findById(itemId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ítem no encontrado"));
+        if ("si".equalsIgnoreCase(item.getSubastado())) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "El ítem ya fue adjudicado");
+        }
+
+        var usuario = usuarioAuthRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        Integer clienteId = usuario.getClienteId();
+
+        MedioPago medio = medioPagoRepository.findById(medioPagoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Medio de pago no encontrado"));
+        if (!medio.getClienteId().equals(clienteId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ese medio de pago no es tuyo");
+        }
+        if (!Boolean.TRUE.equals(medio.getVerificado())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El medio de pago no está verificado");
+        }
+
+        // Si ya tiene una puja propia en este ítem, el nuevo medio tiene que cubrirla.
+        Asistente asistente = asistenteRepository.findByClienteIdAndSubastaId(clienteId, subastaId).orElse(null);
+        if (asistente != null) {
+            Optional<BigDecimal> miMejorPuja = pujoRepository.findByItemId(itemId).stream()
+                    .filter(p -> p.getAsistenteId().equals(asistente.getIdentificador()))
+                    .map(Pujo::getImporte)
+                    .max(Comparator.naturalOrder());
+            if (miMejorPuja.isPresent()) {
+                BigDecimal limite = paymentMethodService.fondosDisponibles(medio);
+                if (limite != null && miMejorPuja.get().compareTo(limite) > 0) {
+                    throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                            "Con el medio de pago que querés usar no tenés los fondos necesarios.");
+                }
+            }
+        }
+
+        MedioPagoSeleccionado seleccion = medioPagoSeleccionadoRepository
+                .findByClienteIdAndItemId(clienteId, itemId)
+                .orElseGet(() -> {
+                    MedioPagoSeleccionado nueva = new MedioPagoSeleccionado();
+                    nueva.setClienteId(clienteId);
+                    nueva.setItemId(itemId);
+                    return nueva;
+                });
+        seleccion.setMedioPagoId(medioPagoId);
+        seleccion.setUpdatedAt(LocalDateTime.now(ZONA_AR));
+        medioPagoSeleccionadoRepository.save(seleccion);
     }
 
     // ── Pujas ──────────────────────────────────────────────────────────────────
@@ -389,16 +480,13 @@ public class SubastaService {
                     "Ya tenés pujas activas en otra subasta. Esperá a que finalice para pujar en esta.");
         });
 
-        // Medio de pago: opcional para el demo
-        Integer medioPagoId = null;
-        if (request.getPayment_method_id() != null) {
-            MedioPago medio = medioPagoRepository.findById(request.getPayment_method_id())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Medio de pago no encontrado"));
-            if (!medio.getClienteId().equals(usuario.getClienteId()) || !Boolean.TRUE.equals(medio.getVerificado())) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El medio de pago no está verificado");
-            }
-            medioPagoId = medio.getId();
-        }
+        // Medio de pago: OBLIGATORIO. Ya no se manda en el body de la puja — viene de la
+        // selección fija hecha antes con seleccionarMedioPago(), persistida en
+        // medio_pago_seleccionado. Si todavía no eligió ninguno, no puede pujar.
+        MedioPago medio = obtenerMedioSeleccionado(usuario.getClienteId(), item.getIdentificador())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Debés seleccionar un medio de pago antes de pujar."));
+        Integer medioPagoId = medio.getId();
 
         // Validar min/max
         boolean sinLimiteMax = "oro".equalsIgnoreCase(subasta.getCategoria())
@@ -427,6 +515,14 @@ public class SubastaService {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "La puja máxima es " + maxPuja.toPlainString());
             }
+        }
+
+        // Fondos del medio seleccionado: tiene que cubrir el monto que está pujando ahora,
+        // descontando lo que ya tiene reservado por otras compras ganadas (cualquier subasta).
+        BigDecimal limiteMedio = paymentMethodService.fondosDisponibles(medio);
+        if (limiteMedio != null && request.getMonto().compareTo(limiteMedio) > 0) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Con el medio de pago seleccionado no tenés los fondos necesarios para hacerlo.");
         }
 
         Pujo pujo = new Pujo();
@@ -494,6 +590,10 @@ public class SubastaService {
             adj.setComision(itemFinal.getComision() != null ? itemFinal.getComision() : BigDecimal.ZERO);
             adj.setCostoEnvio(BigDecimal.ZERO);
             adj.setCreatedAt(LocalDateTime.now(ZONA_AR));
+            // El medio de pago queda fijo: es el mismo que eligió (y validó tener fondos
+            // para) en su puja ganadora — no se puede elegir otro después de ganar.
+            pujoExtRepository.findByPujoId(p.getIdentificador())
+                    .ifPresent(ext -> adj.setMedioPagoId(ext.getMedioPagoId()));
             adjudicacionesRepository.save(adj);
 
             // Notificar al ganador en su bandeja de notificaciones
@@ -680,6 +780,9 @@ public class SubastaService {
                 adj.setComision(item.getComision() != null ? item.getComision() : BigDecimal.ZERO);
                 adj.setCostoEnvio(BigDecimal.ZERO);
                 adj.setCreatedAt(LocalDateTime.now(ZONA_AR));
+                // El medio de pago queda fijo: el mismo con el que pujó y ganó.
+                pujoExtRepository.findByPujoId(ganadora.getIdentificador())
+                        .ifPresent(ext -> adj.setMedioPagoId(ext.getMedioPagoId()));
                 adjudicacionesRepository.save(adj);
             }
 

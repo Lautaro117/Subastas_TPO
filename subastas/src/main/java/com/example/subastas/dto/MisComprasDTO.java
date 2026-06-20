@@ -15,10 +15,13 @@ public class MisComprasDTO {
     private String nroPoliza;
     private String companiaSeguro;
     private List<String> fotos;
+    /** Medio de pago con el que ganó esta puja — fijo desde la adjudicación, no se puede cambiar. */
+    private Integer medioPagoId;
 
     public MisComprasDTO(Integer id, Integer itemId, String descripcion, String descripcionCompleta,
                          BigDecimal importe, BigDecimal comision, BigDecimal costoEnvio,
-                         String direccionEnvio, String nroPoliza, String companiaSeguro, List<String> fotos) {
+                         String direccionEnvio, String nroPoliza, String companiaSeguro, List<String> fotos,
+                         Integer medioPagoId) {
         this.id = id;
         this.itemId = itemId;
         this.descripcion = descripcion;
@@ -30,6 +33,7 @@ public class MisComprasDTO {
         this.nroPoliza = nroPoliza;
         this.companiaSeguro = companiaSeguro;
         this.fotos = fotos;
+        this.medioPagoId = medioPagoId;
     }
 
     public Integer getId() { return id; }
@@ -43,4 +47,5 @@ public class MisComprasDTO {
     public String getNroPoliza() { return nroPoliza; }
     public String getCompaniaSeguro() { return companiaSeguro; }
     public List<String> getFotos() { return fotos; }
+    public Integer getMedioPagoId() { return medioPagoId; }
 }

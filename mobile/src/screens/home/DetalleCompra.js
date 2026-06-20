@@ -38,10 +38,10 @@ export default function DetalleCompra({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tipoEntrega, setTipoEntrega] = useState('envio');
-  const [medioPagoId, setMedioPagoId] = useState(null);
   const [confirmando, setConfirmando] = useState(false);
   const [confirmado, setConfirmado] = useState(false);
   const [fotoActual, setFotoActual] = useState(0);
+  const [pago, setPago] = useState(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -54,12 +54,21 @@ export default function DetalleCompra({ navigation, route }) {
       ]);
       const compraData = await compraRes.json();
       setCompra(compraData);
-      const verificados = (mediosRes || []).filter(m => m.verificado);
-      setMedios(verificados);
-      if (verificados.length > 0) setMedioPagoId(verificados[0].id);
+      // Ya no se elige acá: el medio quedó fijo desde que ganó la puja (el mismo con el
+      // que pujó). Solo lo necesitamos para mostrar de qué medio se trata.
+      setMedios(mediosRes || []);
       if (compraData.tipoEntrega) {
         setTipoEntrega(compraData.tipoEntrega);
         setConfirmado(true);
+      }
+      // Cargar estado del pago si ya confirmó entrega
+      if (compraData.tipoEntrega) {
+        const pagoRes = await fetch(buildApiUrl(`/api/my-purchases/${compraId}/payment`), {
+          headers: { Authorization: `Bearer ${session.token}`, Accept: 'application/json' },
+        });
+        if (pagoRes.ok && pagoRes.status !== 204) {
+          setPago(await pagoRes.json());
+        }
       }
     } catch {
       setError('No se pudo cargar la compra');
@@ -70,8 +79,9 @@ export default function DetalleCompra({ navigation, route }) {
 
   useEffect(() => { cargar(); }, [cargar]);
 
+  const medioFijo = medios.find((m) => m.id === compra?.medioPagoId) ?? null;
+
   const handleConfirmar = async () => {
-    if (!medioPagoId) { setError('Seleccioná un medio de pago'); return; }
     setConfirmando(true);
     setError('');
     try {
@@ -82,10 +92,15 @@ export default function DetalleCompra({ navigation, route }) {
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
-        body: JSON.stringify({ tipoEntrega, medioPagoId }),
+        body: JSON.stringify({ tipoEntrega }),
       });
       if (!response.ok) throw new Error('No se pudo confirmar');
       setConfirmado(true);
+      // Cargar el registro de pago recién creado
+      const pagoRes = await fetch(buildApiUrl(`/api/my-purchases/${compraId}/payment`), {
+        headers: { Authorization: `Bearer ${session.token}`, Accept: 'application/json' },
+      });
+      if (pagoRes.ok && pagoRes.status !== 204) setPago(await pagoRes.json());
     } catch (e) {
       setError(e.message);
     } finally {
@@ -196,23 +211,21 @@ export default function DetalleCompra({ navigation, route }) {
                     ) : null}
                   </View>
 
-                  {/* Medio de pago */}
+                  {/* Medio de pago — fijo desde que ganó la puja, no se puede cambiar acá */}
                   <Text style={styles.sectionTitle}>Medio de pago</Text>
-                  {medios.length === 0 ? (
-                    <Text style={styles.error}>No tenés medios de pago verificados</Text>
-                  ) : (
-                    <View style={styles.card}>
-                      {medios.map(m => (
-                        <TouchableOpacity key={m.id} style={styles.radioRow} onPress={() => setMedioPagoId(m.id)}>
-                          <RadioButton value={m.id.toString()} status={medioPagoId === m.id ? 'checked' : 'unchecked'} onPress={() => setMedioPagoId(m.id)} color={COLORS.primary} />
-                          <View>
-                            <Text style={styles.radioLabel}>{TIPO_LABEL[m.tipo] ?? m.tipo}</Text>
-                            <Text style={styles.radioSub}>{getSubtitle(m)}</Text>
-                          </View>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
+                  <View style={styles.card}>
+                    {medioFijo ? (
+                      <View style={styles.radioRow}>
+                        <Icon source="lock-outline" size={18} color={COLORS.onSurfaceVariant} />
+                        <View>
+                          <Text style={styles.radioLabel}>{TIPO_LABEL[medioFijo.tipo] ?? medioFijo.tipo}</Text>
+                          <Text style={styles.radioSub}>{getSubtitle(medioFijo)}</Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <Text style={styles.error}>No se encontró el medio de pago con el que pujaste</Text>
+                    )}
+                  </View>
 
                   {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -228,12 +241,74 @@ export default function DetalleCompra({ navigation, route }) {
                   </Button>
                 </>
               ) : (
-                <View style={styles.confirmadoCard}>
-                  <Icon source="check-circle-outline" size={28} color="#4CAF50" />
-                  <Text style={styles.confirmadoText}>
-                    Entrega confirmada: {tipoEntrega === 'envio' ? 'Envío a domicilio' : 'Retiro en depósito'}
-                  </Text>
-                </View>
+                <>
+                  <View style={styles.confirmadoCard}>
+                    <Icon source="check-circle-outline" size={28} color="#4CAF50" />
+                    <Text style={styles.confirmadoText}>
+                      Entrega confirmada: {tipoEntrega === 'envio' ? 'Envío a domicilio' : 'Retiro en depósito'}
+                    </Text>
+                  </View>
+
+                  {/* Medio de pago fijo */}
+                  <Text style={styles.sectionTitle}>Medio de pago</Text>
+                  <View style={styles.card}>
+                    {medioFijo ? (
+                      <View style={styles.radioRow}>
+                        <Icon source="lock-outline" size={18} color={COLORS.onSurfaceVariant} />
+                        <View>
+                          <Text style={styles.radioLabel}>{TIPO_LABEL[medioFijo.tipo] ?? medioFijo.tipo}</Text>
+                          <Text style={styles.radioSub}>{getSubtitle(medioFijo)}</Text>
+                        </View>
+                      </View>
+                    ) : (
+                      <Text style={{ color: COLORS.onSurfaceVariant, fontSize: 13 }}>Cargando medio de pago...</Text>
+                    )}
+                  </View>
+
+                  {/* Estado del pago */}
+                  <Text style={styles.sectionTitle}>Estado del pago</Text>
+                  {pago ? (
+                    <View style={[
+                      styles.pagoEstadoCard,
+                      pago.estado === 'aprobado'  && { backgroundColor: '#4CAF5022', borderColor: '#4CAF50' },
+                      pago.estado === 'rechazado' && { backgroundColor: '#EF444422', borderColor: '#EF4444' },
+                      pago.estado === 'pendiente' && { backgroundColor: COLORS.surfaceContainerLow, borderColor: COLORS.outlineVariant },
+                    ]}>
+                      <Icon
+                        source={pago.estado === 'aprobado' ? 'check-circle' : pago.estado === 'rechazado' ? 'close-circle' : 'clock-outline'}
+                        size={24}
+                        color={pago.estado === 'aprobado' ? '#4CAF50' : pago.estado === 'rechazado' ? '#EF4444' : COLORS.onSurfaceVariant}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[
+                          styles.pagoEstadoTitle,
+                          pago.estado === 'aprobado'  && { color: '#4CAF50' },
+                          pago.estado === 'rechazado' && { color: '#EF4444' },
+                          pago.estado === 'pendiente' && { color: COLORS.onSurface },
+                        ]}>
+                          {pago.estado === 'aprobado'  && 'Pago aprobado'}
+                          {pago.estado === 'rechazado' && 'Pago rechazado'}
+                          {pago.estado === 'pendiente' && 'Pendiente de verificación'}
+                        </Text>
+                        {pago.estado === 'rechazado' && (
+                          <Text style={styles.pagoEstadoDesc}>
+                            Se aplicó una multa equivalente al 10% del valor ofertado. Debés abonarla antes de participar en otra subasta.
+                          </Text>
+                        )}
+                        {pago.estado === 'pendiente' && (
+                          <Text style={styles.pagoEstadoDesc}>
+                            La empresa está verificando tu pago. Te notificaremos cuando sea procesado.
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={[styles.pagoEstadoCard, { backgroundColor: COLORS.surfaceContainerLow, borderColor: COLORS.outlineVariant }]}>
+                      <Icon source="clock-outline" size={24} color={COLORS.onSurfaceVariant} />
+                      <Text style={[styles.pagoEstadoDesc, { flex: 1 }]}>El estado del pago se actualizará en breve.</Text>
+                    </View>
+                  )}
+                </>
               )}
             </>
           ) : null}
@@ -270,6 +345,9 @@ const styles = StyleSheet.create({
   btn: { marginTop: 8, borderRadius: 999, backgroundColor: COLORS.primary },
   btnContent: { minHeight: 52 },
   btnLabel: { fontSize: 15, fontWeight: '600', color: COLORS.onPrimary },
-  confirmadoCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#4CAF5022', borderRadius: 14, padding: 16 },
+  confirmadoCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#4CAF5022', borderRadius: 14, padding: 16, marginBottom: 16 },
   confirmadoText: { fontSize: 15, color: '#4CAF50', fontWeight: '600', flex: 1 },
+  pagoEstadoCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, padding: 16, borderWidth: 1, marginBottom: 16 },
+  pagoEstadoTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  pagoEstadoDesc: { fontSize: 13, color: COLORS.onSurfaceVariant, lineHeight: 18 },
 });

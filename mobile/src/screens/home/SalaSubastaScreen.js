@@ -36,9 +36,40 @@ import {
   getAuctionLive,
   joinAuction,
   leaveAuction,
+  selectPaymentMethod,
   sendBid,
 } from '../../services/auctionsApi';
 import { createNotification } from '../../services/notificationsApi';
+import { getPaymentMethods } from '../../services/paymentApi';
+
+const TIPO_MEDIO_LABEL = {
+  cuenta_bancaria: 'Cuenta bancaria',
+  tarjeta: 'Tarjeta',
+  cheque: 'Cheque',
+};
+
+function parseMedioDatos(datos) {
+  try { return typeof datos === 'string' ? JSON.parse(datos) : datos; }
+  catch { return {}; }
+}
+
+function subtituloMedio(medio) {
+  const d = parseMedioDatos(medio.datos);
+  if (medio.tipo === 'cuenta_bancaria') return d.nombre_banco ?? d.cbu_iban ?? '';
+  if (medio.tipo === 'tarjeta') return d.numero ?? '';
+  if (medio.tipo === 'cheque') return `${d.banco_emisor ?? ''}`;
+  return '';
+}
+
+// Solo para mostrar en la lista del selector — la validación real de fondos siempre
+// la hace el backend en seleccionarMedioPago / enviarPuja.
+function limiteMedioCliente(medio) {
+  if (medio.tipo === 'tarjeta') return null;
+  const d = parseMedioDatos(medio.datos);
+  if (medio.tipo === 'cuenta_bancaria') return d.fondos_reservados ?? 0;
+  if (medio.tipo === 'cheque') return d.monto ?? 0;
+  return 0;
+}
 
 const WARMUP_SECONDS = 10;
 
@@ -197,6 +228,11 @@ export default function SalaSubastaScreen({ navigation, route }) {
   const [montoInput, setMontoInput] = useState('');
   const [pujando, setPujando] = useState(false);
   const [countdown, setCountdown] = useState(WARMUP_SECONDS);
+
+  // Medios de pago verificados del usuario y selector para pujar.
+  const [medios, setMedios] = useState([]);
+  const [modalMedioPago, setModalMedioPago] = useState(false);
+  const [seleccionandoMedio, setSeleccionandoMedio] = useState(false);
   const [notificadosIds, setNotificadosIds] = useState(new Set());
 
   const STORAGE_KEY = `@subastas:notificados:${auctionId}`;
@@ -413,6 +449,11 @@ export default function SalaSubastaScreen({ navigation, route }) {
       setJoined(true);
       setFase('sala');
 
+      // Medios de pago verificados, para el selector de la barra de pujas.
+      getPaymentMethods(token)
+        .then((lista) => setMedios((lista || []).filter((m) => m.verificado)))
+        .catch(() => {});
+
       // Polling arranca inmediatamente al unirse, sin depender del WebSocket.
       // Usa refs para leer el estado más fresco sin recrear el intervalo.
       clearInterval(pollingRef.current);
@@ -598,13 +639,19 @@ export default function SalaSubastaScreen({ navigation, route }) {
       return;
     }
 
+    // El medio de pago es obligatorio: sin uno seleccionado, ni se intenta pujar.
+    if (!salaData?.medioPagoSeleccionadoId) {
+      setSnackbar('Debés seleccionar un medio de pago antes de pujar.');
+      setModalMedioPago(true);
+      return;
+    }
+
     setPujando(true);
     try {
       await sendBid(token, auctionId, {
         item_id: itemActual.itemId,
         monto,
         moneda: salaData?.moneda ?? 'ARS',
-        payment_method_id: null,
       });
       setMontoInput('');
       setSnackbar('¡Puja enviada!');
@@ -619,6 +666,26 @@ export default function SalaSubastaScreen({ navigation, route }) {
       setPujando(false);
     }
   }, [token, auctionId, montoInput, salaData]);
+
+  // ─── Elegir / cambiar medio de pago ──────────────────────────────────────────
+  // Queda fijo en el backend (medio_pago_seleccionado) por ítem: el backend valida
+  // que el medio elegido cubra la puja propia actual antes de aceptar el cambio.
+  const handleSeleccionarMedio = useCallback(async (medioPagoId) => {
+    const itemActual = salaData?.itemActual;
+    if (!itemActual) return;
+    setSeleccionandoMedio(true);
+    try {
+      await selectPaymentMethod(token, auctionId, itemActual.itemId, medioPagoId);
+      setModalMedioPago(false);
+      // Refrescar para que la barra de pujas muestre el medio recién fijado.
+      const live = await getAuctionLive(token, auctionId).catch(() => null);
+      if (live) setSalaData(live);
+    } catch (err) {
+      setSnackbar(err.message ?? 'No se pudo seleccionar el medio de pago.');
+    } finally {
+      setSeleccionandoMedio(false);
+    }
+  }, [token, auctionId, salaData]);
 
   // ─── Derivados ──────────────────────────────────────────────────────────────
   const itemActual = salaData?.itemActual ?? null;
@@ -769,6 +836,59 @@ export default function SalaSubastaScreen({ navigation, route }) {
             >
               Confirmar
             </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog
+          visible={modalMedioPago}
+          onDismiss={() => setModalMedioPago(false)}
+          style={{ backgroundColor: theme.colors.surfaceContainerHigh, borderRadius: 24 }}
+        >
+          <Dialog.Icon icon="credit-card-outline" color={theme.colors.primary} />
+          <Dialog.Title style={{ textAlign: 'center', color: theme.colors.onSurface }}>
+            Medio de pago para pujar
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginBottom: 12 }}>
+              Una vez que pujes con este medio, va a quedar fijo si ganás — no se puede cambiar después.
+            </Text>
+            {medios.length === 0 ? (
+              <Text style={{ color: theme.colors.error, textAlign: 'center' }}>
+                No tenés medios de pago verificados.
+              </Text>
+            ) : (
+              medios.map((m) => {
+                const limite = limiteMedioCliente(m);
+                const esElegido = salaData?.medioPagoSeleccionadoId === m.id;
+                return (
+                  <TouchableOpacity
+                    key={m.id}
+                    disabled={seleccionandoMedio}
+                    onPress={() => handleSeleccionarMedio(m.id)}
+                    style={[
+                      styles.medioOpcion,
+                      {
+                        backgroundColor: esElegido ? theme.colors.primaryContainer : theme.colors.surfaceContainerLow,
+                        borderColor: esElegido ? theme.colors.primary : theme.colors.outline,
+                      },
+                    ]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.medioOpcionTitulo, { color: theme.colors.onSurface }]}>
+                        {TIPO_MEDIO_LABEL[m.tipo] ?? m.tipo}{subtituloMedio(m) ? ` — ${subtituloMedio(m)}` : ''}
+                      </Text>
+                      <Text style={[styles.medioOpcionSub, { color: theme.colors.onSurfaceVariant }]}>
+                        {limite == null ? 'Sin límite' : `Límite: ${moneda} ${Number(limite).toLocaleString('es-AR')}`}
+                      </Text>
+                    </View>
+                    {esElegido ? <Icon source="check-circle" size={20} color={theme.colors.primary} /> : null}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </Dialog.Content>
+          <Dialog.Actions style={{ justifyContent: 'center' }}>
+            <Button onPress={() => setModalMedioPago(false)} textColor={theme.colors.onSurfaceVariant}>Cerrar</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -1014,6 +1134,29 @@ export default function SalaSubastaScreen({ navigation, route }) {
             <View style={{ height: 120 }} />
           </ScrollView>
 
+          {/* Medio de pago — fijo por ítem, hay que elegirlo antes de pujar */}
+          <TouchableOpacity
+            style={[styles.medioPagoRow, { backgroundColor: theme.colors.surfaceContainerLow, borderColor: theme.colors.outline }]}
+            onPress={() => setModalMedioPago(true)}
+          >
+            <Icon source="credit-card-outline" size={16} color={theme.colors.primary} />
+            {salaData?.medioPagoSeleccionadoId ? (
+              <Text style={[styles.medioPagoText, { color: theme.colors.onSurface }]}>
+                {TIPO_MEDIO_LABEL[salaData.medioPagoSeleccionadoTipo] ?? salaData.medioPagoSeleccionadoTipo}
+                {salaData.medioPagoSeleccionadoLimite != null
+                  ? ` · disponible ${moneda} ${Number(salaData.medioPagoSeleccionadoLimite).toLocaleString('es-AR')}`
+                  : ' · sin límite'}
+              </Text>
+            ) : (
+              <Text style={[styles.medioPagoText, { color: theme.colors.error }]}>
+                Elegí un medio de pago para pujar
+              </Text>
+            )}
+            <Text style={[styles.medioPagoCambiar, { color: theme.colors.primary }]}>
+              {salaData?.medioPagoSeleccionadoId ? 'Cambiar' : 'Elegir'}
+            </Text>
+          </TouchableOpacity>
+
           {/* Barra puja */}
           <View style={[styles.pujaBar, { backgroundColor: theme.colors.background, borderTopColor: theme.colors.outlineVariant }]}>
             <View style={[styles.pujaInputWrap, { borderColor: theme.colors.outline, backgroundColor: theme.colors.surfaceContainerLow }]}>
@@ -1167,6 +1310,20 @@ const styles = StyleSheet.create({
   bidPostor: { fontSize: 14, fontWeight: '500' },
   bidTime: { fontSize: 12 },
   bidMonto: { fontSize: 14, fontWeight: '600' },
+
+  medioPagoRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 20, marginBottom: 8, paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 10, borderWidth: 1,
+  },
+  medioPagoText: { flex: 1, fontSize: 12, fontWeight: '500' },
+  medioPagoCambiar: { fontSize: 12, fontWeight: '600' },
+  medioOpcion: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 8,
+  },
+  medioOpcionTitulo: { fontSize: 14, fontWeight: '600' },
+  medioOpcionSub: { fontSize: 12, marginTop: 2 },
 
   pujaBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderTopWidth: 1, gap: 12 },
   pujaInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, height: 48, gap: 8 },

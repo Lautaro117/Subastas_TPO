@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 
 import com.example.subastas.dto.MisComprasDTO;
+import com.example.subastas.model.PagoAdjudicacion;
 import com.example.subastas.security.JwtUtil;
 import com.example.subastas.service.MisComprasService;
 
@@ -49,6 +50,14 @@ public class MisComprasController {
         misComprasService.setDireccionEnvio(email, id);
     return ResponseEntity.ok().build();
     }
+    @GetMapping("/{id}/payment")
+    public ResponseEntity<PagoAdjudicacion> getPago(@PathVariable Integer id,
+                                                    @RequestHeader("Authorization") String authHeader) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        PagoAdjudicacion pago = misComprasService.getPago(email, id);
+        return pago != null ? ResponseEntity.ok(pago) : ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/confirm")
     public ResponseEntity<Void> confirmarEntrega(
             @PathVariable Integer id,
@@ -56,8 +65,7 @@ public class MisComprasController {
             @RequestBody Map<String, Object> body) {
         String email = jwtUtil.extractEmail(authHeader.substring(7));
         String tipoEntrega = (String) body.get("tipoEntrega"); // "envio" o "retiro"
-        Integer medioPagoId = (Integer) body.get("medioPagoId");
-        misComprasService.confirmarEntrega(email, id, tipoEntrega, medioPagoId);
+        misComprasService.confirmarEntrega(email, id, tipoEntrega);
         return ResponseEntity.ok().build();
 }
 }

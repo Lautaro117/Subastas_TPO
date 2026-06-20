@@ -108,11 +108,35 @@ export async function getAuctionLive(token, id) {
 }
 
 /**
+ * POST /api/auctions/:id/items/:itemId/payment-method
+ * Elige (o cambia) con qué medio de pago va a pujar el usuario por este ítem.
+ * Queda fijo en el backend aunque salga y vuelva a entrar a la subasta — no hace
+ * falta volver a elegirlo salvo que quiera cambiarlo.
+ */
+export async function selectPaymentMethod(token, auctionId, itemId, medioPagoId) {
+  const response = await fetch(
+    buildApiUrl(`/api/auctions/${auctionId}/items/${itemId}/payment-method`),
+    {
+      method: 'POST',
+      headers: buildAuthHeaders(token),
+      body: JSON.stringify({ medioPagoId }),
+    }
+  );
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const error = new Error(body.detail || body.message || `Error al seleccionar medio de pago: ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+}
+
+/**
  * POST /api/auctions/:id/bids
  * Enviar una puja.
  * @param {string} token
  * @param {number} id - ID de la subasta
- * @param {{ item_id: number, monto: number, moneda: string, payment_method_id: number }} bid
+ * @param {{ item_id: number, monto: number, moneda: string }} bid
  */
 export async function sendBid(token, id, bid) {
   const response = await fetch(buildApiUrl(`/api/auctions/${id}/bids`), {

@@ -1,6 +1,7 @@
 package com.example.subastas.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -97,6 +98,18 @@ public class SubastaController {
         String token = authHeader.substring(7);
         String email = jwtUtil.extractEmail(token);
         subastaService.salirDeSala(id, email);
+        return ResponseEntity.ok().build();
+    }
+
+    /** Elige (o cambia) con qué medio de pago va a pujar el usuario por este ítem. */
+    @PostMapping("/{id}/items/{itemId}/payment-method")
+    public ResponseEntity<Void> seleccionarMedioPago(
+            @PathVariable Integer id,
+            @PathVariable Integer itemId,
+            @RequestBody Map<String, Integer> body,
+            @RequestHeader("Authorization") String authHeader) {
+        String email = jwtUtil.extractEmail(authHeader.substring(7));
+        subastaService.seleccionarMedioPago(id, itemId, email, body.get("medioPagoId"));
         return ResponseEntity.ok().build();
     }
 
