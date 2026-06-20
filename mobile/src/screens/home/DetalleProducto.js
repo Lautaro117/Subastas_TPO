@@ -5,7 +5,7 @@ import { ActivityIndicator, Button, Icon, IconButton, Surface, Text } from 'reac
 
 import { COLORS } from '../../theme/colors';
 import { useAppSession } from '../../navigation/AppSessionContext';
-import { aceptarPropuesta, rechazarPropuesta, marcarEnviado } from '../../services/itemsApi';
+import { aceptarPropuesta, rechazarPropuesta, marcarEnviado, getCustodia } from '../../services/itemsApi';
 import { buildApiUrl } from '../../config/api';
 
 const { width } = Dimensions.get('window');
@@ -53,6 +53,7 @@ export default function DetalleProducto({ navigation, route }) {
   const [error, setError] = useState('');
   const [accionando, setAccionando] = useState(false);
   const [fotoActual, setFotoActual] = useState(0);
+  const [custodia, setCustodia] = useState(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -62,6 +63,11 @@ export default function DetalleProducto({ navigation, route }) {
       });
       const data = await response.json();
       setProducto(data);
+      if (data?.estadoAdmin === 'en_deposito') {
+        getCustodia(session.token, productoId)
+          .then(setCustodia)
+          .catch(() => {});
+      }
     } catch {
       setError('No se pudo cargar el producto');
     } finally {
@@ -244,6 +250,49 @@ export default function DetalleProducto({ navigation, route }) {
                 </Surface>
               )}
 
+              {/* Banner: en depósito — ubicación + seguro */}
+              {producto.estadoAdmin === 'en_deposito' && (
+                <Surface elevation={0} style={[styles.banner, { backgroundColor: '#42A5F522', borderColor: '#42A5F5', flexDirection: 'column', gap: 12 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Icon source="warehouse" size={22} color="#42A5F5" />
+                    <Text style={[styles.bannerTitle, { color: '#42A5F5' }]}>Pieza en depósito</Text>
+                  </View>
+
+                  {/* Ubicación */}
+                  <View style={styles.custodiaBlock}>
+                    <Text style={styles.custodiaLabel}>UBICACIÓN</Text>
+                    {custodia?.nombreDeposito ? (
+                      <>
+                        <Text style={[styles.custodiaValor, { color: COLORS.onSurface }]}>{custodia.nombreDeposito}</Text>
+                        <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>{custodia.direccionDeposito}</Text>
+                      </>
+                    ) : producto.nombreDeposito ? (
+                      <>
+                        <Text style={[styles.custodiaValor, { color: COLORS.onSurface }]}>{producto.nombreDeposito}</Text>
+                        <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>{producto.direccionDeposito}</Text>
+                      </>
+                    ) : (
+                      <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>Sin información de depósito</Text>
+                    )}
+                  </View>
+
+                  {/* Póliza de seguro */}
+                  <View style={[styles.custodiaBlock, { borderTopWidth: 1, borderTopColor: 'rgba(66,165,245,0.2)', paddingTop: 10 }]}>
+                    <Text style={styles.custodiaLabel}>PÓLIZA DE SEGURO</Text>
+                    {custodia?.nroPoliza ? (
+                      <>
+                        <Text style={[styles.custodiaValor, { color: COLORS.onSurface }]}>Nº {custodia.nroPoliza}</Text>
+                        {custodia.companiaSeguro ? (
+                          <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>{custodia.companiaSeguro}</Text>
+                        ) : null}
+                      </>
+                    ) : (
+                      <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>La empresa asignará el seguro a la brevedad</Text>
+                    )}
+                  </View>
+                </Surface>
+              )}
+
               {/* Info general */}
               <View style={styles.card}>
                 <Text style={styles.cardDesc}>{producto.descripcionCompleta}</Text>
@@ -344,6 +393,10 @@ const styles = StyleSheet.create({
   bannerTitle: { fontSize: 14, fontWeight: '700', lineHeight: 20 },
   bannerDesc: { fontSize: 13, lineHeight: 18 },
   bannerField: { fontSize: 13, fontWeight: '500', lineHeight: 18 },
+  custodiaBlock: { gap: 2 },
+  custodiaLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: '#42A5F5', marginBottom: 2 },
+  custodiaValor: { fontSize: 14, fontWeight: '600' },
+  custodiaSub: { fontSize: 12 },
   aviso: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 8, padding: 10 },
   avisoText: { fontSize: 12, lineHeight: 17, flex: 1 },
   envioCard: { borderRadius: 16, overflow: 'hidden', marginBottom: 16, backgroundColor: COLORS.surfaceContainerLow, borderWidth: 1, borderColor: '#FFA726' },
