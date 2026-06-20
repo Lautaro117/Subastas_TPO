@@ -75,9 +75,11 @@ public class MisComprasService {
                     Producto producto = productoRepository.findById(item.getProductoId()).orElse(null);
                     if (producto != null) descripcion = producto.getDescripcionCatalogo();
 }
+                String estadoPago = pagoAdjudicacionRepository.findByAdjudicacionId(adj.getId())
+                    .map(PagoAdjudicacion::getEstado).orElse(null);
                 return new MisComprasDTO(adj.getId(), adj.getItemId(), descripcion, null,
     adj.getImporte(), adj.getComision(), adj.getCostoEnvio(), adj.getDireccionEnvio(),
-    null, null, null, adj.getMedioPagoId());
+    null, null, null, adj.getMedioPagoId(), adj.getTipoEntrega(), estadoPago);
             })
             .collect(Collectors.toList());
     }
@@ -119,9 +121,11 @@ public class MisComprasService {
         }
     }
 
+    String estadoPago = pagoAdjudicacionRepository.findByAdjudicacionId(adj.getId())
+        .map(PagoAdjudicacion::getEstado).orElse(null);
     return new MisComprasDTO(adj.getId(), adj.getItemId(), descripcion, descripcionCompleta,
         adj.getImporte(), adj.getComision(), adj.getCostoEnvio(), adj.getDireccionEnvio(),
-        nroPoliza, companiaSeguro, fotos, adj.getMedioPagoId());
+        nroPoliza, companiaSeguro, fotos, adj.getMedioPagoId(), adj.getTipoEntrega(), estadoPago);
 }
 
     public void setDireccionEnvio(String email, Integer adjId) {

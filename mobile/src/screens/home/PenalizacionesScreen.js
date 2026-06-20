@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
@@ -22,8 +22,27 @@ import { getPaymentMethods } from '../../services/paymentApi';
 const ESTADO_CONFIG = {
   pendiente: { label: 'Pendiente', color: '#FF6B6B' },
   en_proceso: { label: 'En proceso', color: '#FFA726' },
-  pagada: { label: 'Pagada', color: '#4CAF50' },
+  pagada: { label: 'Abonada', color: '#4CAF50' },
 };
+
+const TIPO_MEDIO_LABEL = {
+  cuenta_bancaria: 'Cuenta bancaria',
+  tarjeta: 'Tarjeta',
+  cheque: 'Cheque',
+};
+
+function parseMedioDatos(datos) {
+  try { return typeof datos === 'string' ? JSON.parse(datos) : datos; }
+  catch { return {}; }
+}
+
+function subtituloMedio(medio) {
+  const d = parseMedioDatos(medio.datos);
+  if (medio.tipo === 'cuenta_bancaria') return d.nombre_banco ?? d.cbu_iban ?? '';
+  if (medio.tipo === 'tarjeta') return d.numero ?? '';
+  if (medio.tipo === 'cheque') return d.banco_emisor ?? '';
+  return '';
+}
 
 export default function PenalizacionesScreen({ navigation }) {
   const theme = useTheme();
@@ -65,7 +84,7 @@ export default function PenalizacionesScreen({ navigation }) {
     if (!multa || !medioPagoSeleccionado) return;
     setPagando(true);
     try {
-      await pagarMulta(token, multa.id);
+      await pagarMulta(token, multa.id, medioPagoSeleccionado);
       setModalPagar(false);
       setSnackbar('Multa pagada correctamente.');
       fetchData(); // recargar estado
@@ -217,9 +236,32 @@ export default function PenalizacionesScreen({ navigation }) {
             Pagar multa
           </Dialog.Title>
           <Dialog.Content>
-            <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
-              ¿Confirmás el pago de ${multa?.importe?.toLocaleString('es-AR')} con tu medio de pago verificado?
+            <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginBottom: 12 }}>
+              Importe a abonar: $ {multa?.importe?.toLocaleString('es-AR')}
             </Text>
+            {mediosPago.map((m) => {
+              const elegido = medioPagoSeleccionado === m.id;
+              return (
+                <TouchableOpacity
+                  key={m.id}
+                  onPress={() => setMedioPagoSeleccionado(m.id)}
+                  style={[
+                    styles.medioOpcion,
+                    {
+                      backgroundColor: elegido ? theme.colors.primaryContainer : theme.colors.surfaceContainerLow,
+                      borderColor: elegido ? theme.colors.primary : theme.colors.outline,
+                    },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.medioOpcionTitulo, { color: theme.colors.onSurface }]}>
+                      {TIPO_MEDIO_LABEL[m.tipo] ?? m.tipo}{subtituloMedio(m) ? ` — ${subtituloMedio(m)}` : ''}
+                    </Text>
+                  </View>
+                  {elegido ? <Icon source="check-circle" size={20} color={theme.colors.primary} /> : null}
+                </TouchableOpacity>
+              );
+            })}
           </Dialog.Content>
           <Dialog.Actions style={{ justifyContent: 'center', gap: 16 }}>
             <Button
@@ -231,7 +273,7 @@ export default function PenalizacionesScreen({ navigation }) {
             <Button
               onPress={handlePagar}
               loading={pagando}
-              disabled={pagando}
+              disabled={pagando || !medioPagoSeleccionado}
               textColor={theme.colors.primary}
             >
               Confirmar
@@ -295,4 +337,10 @@ const styles = StyleSheet.create({
   pagarButton: { borderRadius: 28 },
   pagarButtonContent: { paddingVertical: 6 },
   agregarMedioButton: { borderRadius: 28 },
+
+  medioOpcion: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 8,
+  },
+  medioOpcionTitulo: { fontSize: 14, fontWeight: '600' },
 });

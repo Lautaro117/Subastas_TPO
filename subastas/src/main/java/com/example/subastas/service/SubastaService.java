@@ -276,6 +276,12 @@ public class SubastaService {
         }
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        // E5 = tiene una multa pendiente sin abonar — no puede ni entrar a ninguna subasta
+        // hasta que la pague (ver UserService.pagarMulta, que lo devuelve a E4).
+        if ("E5".equals(usuario.getEstado())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Tenés una multa pendiente. Debés abonarla antes de participar en otra subasta.");
+        }
         Integer clienteId = usuario.getClienteId();
 
         // Ya está activo en esta subasta (sesión en memoria) → devolver estado actual
@@ -462,6 +468,13 @@ public class SubastaService {
 
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        // E5 = multa pendiente sin abonar — ni siquiera debería haber llegado a "unido a esta
+        // sala", pero por si la multa le llegó mientras ya estaba adentro, lo frenamos también
+        // al momento de pujar.
+        if ("E5".equals(usuario.getEstado())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Tenés una multa pendiente. Debés abonarla antes de participar en otra subasta.");
+        }
         Asistente asistente = asistenteRepository.findByClienteIdAndSubastaId(usuario.getClienteId(), subastaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No estás unido a esta sala"));
 

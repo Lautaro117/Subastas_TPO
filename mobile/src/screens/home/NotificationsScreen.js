@@ -32,6 +32,8 @@ function iconForTipo(tipo) {
     case 'ganador_item':      return { source: 'trophy-outline',      color: '#f59e0b' };
     case 'campanita_item':    return { source: 'bell-ring-outline',    color: COLORS.primary };
     case 'registro_aprobado': return { source: 'check-circle-outline', color: '#22c55e' };
+    case 'multa_recibida':    return { source: 'alert-circle-outline', color: '#EF4444' };
+    case 'propuesta_precio':  return { source: 'tag-outline',          color: COLORS.primary };
     default:                  return { source: 'bell-outline',         color: COLORS.onSurfaceVariant };
   }
 }

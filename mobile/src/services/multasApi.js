@@ -19,12 +19,13 @@ export async function getMultaActiva(token) {
 // Paga la multa activa.
 // @param {string} token
 // @param {number} multaId - ID de la multa a pagar
+// @param {number} medioPagoId - con qué medio de pago (el backend valida fondos)
 
-export async function pagarMulta(token, multaId) {
+export async function pagarMulta(token, multaId, medioPagoId) {
   const response = await fetch(buildApiUrl('/api/users/me/penalty/pay'), {
     method: 'POST',
     headers: buildAuthHeaders(token),
-    body: JSON.stringify({ multaId }),
+    body: JSON.stringify({ multaId, medioPagoId }),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));

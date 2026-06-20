@@ -64,6 +64,9 @@ public class UserService {
     @Autowired
     private MultasRepository multasRepository;
 
+    @Autowired
+    private PaymentMethodService paymentMethodService;
+
     public List<HistorialPujasDTO> obtenerHistorial(String email) {
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
@@ -211,7 +214,7 @@ public class UserService {
         .stream().findFirst().orElse(null);
 }
 
-public void pagarMulta(String email, Integer multaId) {
+public void pagarMulta(String email, Integer multaId, Integer medioPagoId) {
     UsuarioAuth auth = usuarioAuthRepository.findByEmail(email)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
@@ -221,9 +224,41 @@ public void pagarMulta(String email, Integer multaId) {
     if (!multa.getClienteId().equals(auth.getClienteId())) {
         throw new ResponseStatusException(HttpStatus.FORBIDDEN);
     }
+    if (!"pendiente".equals(multa.getEstado())) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta multa ya fue procesada");
+    }
+
+    // Mismo criterio que para pujar: el medio tiene que ser propio, estar verificado, y
+    // tener fondos suficientes (descontando lo que ya tenga reservado por otras compras
+    // ganadas) para cubrir el importe de la multa.
+    if (medioPagoId == null) {
+        throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Debés seleccionar un medio de pago.");
+    }
+    MedioPago medio = medioPagoRepository.findById(medioPagoId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Medio de pago no encontrado"));
+    if (!medio.getClienteId().equals(auth.getClienteId())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ese medio de pago no es tuyo");
+    }
+    if (!Boolean.TRUE.equals(medio.getVerificado())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El medio de pago no está verificado");
+    }
+    BigDecimal disponible = paymentMethodService.fondosDisponibles(medio);
+    if (disponible != null && multa.getImporte().compareTo(disponible) > 0) {
+        throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                "Con el medio de pago seleccionado no tenés los fondos necesarios para abonar la multa.");
+    }
 
     multa.setEstado("pagada");
     multasRepository.save(multa);
+
+    // Si no le queda ninguna otra multa pendiente, vuelve a poder participar (E5 → E4).
+    // Si todavía tiene otra multa pendiente, se queda en E5 hasta saldarlas todas.
+    boolean tieneOtrasPendientes = !multasRepository
+        .findByClienteIdAndEstado(auth.getClienteId(), "pendiente").isEmpty();
+    if (!tieneOtrasPendientes && "E5".equals(auth.getEstado())) {
+        auth.setEstado("E4");
+        usuarioAuthRepository.save(auth);
+    }
 }
 
 }
