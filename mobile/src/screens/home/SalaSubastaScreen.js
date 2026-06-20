@@ -257,6 +257,7 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
   const [modalSalir, setModalSalir] = useState(false);
   const [modalRequiereRegistro, setModalRequiereRegistro] = useState(false);
+  const [modalMultaPendiente, setModalMultaPendiente] = useState(false);
   const [modalSinMedioPago, setModalSinMedioPago] = useState(false);
   const [modalCategoriaInsuficiente, setModalCategoriaInsuficiente] = useState(false);
   const [modalNotificar, setModalNotificar] = useState(null);
@@ -432,6 +433,15 @@ export default function SalaSubastaScreen({ navigation, route }) {
     // directo el aviso de que hace falta registrarse.
     if (!token || userEstado === 'E1') {
       setModalRequiereRegistro(true);
+      return;
+    }
+    // E5 = tiene una multa pendiente sin abonar. El backend también lo bloquea (esto es
+    // solo para no ni siquiera intentar el join y mostrar un mensaje claro). OJO: el
+    // estado viene del JWT, que puede haber quedado desactualizado si la multa le llegó
+    // después de loguearse — por eso la validación real e inquebrantable está en el
+    // backend (unirseASala/enviarPuja), no acá.
+    if (userEstado === 'E5') {
+      setModalMultaPendiente(true);
       return;
     }
     if (userEstado === 'E2' || userEstado === 'E3') {
@@ -756,6 +766,31 @@ export default function SalaSubastaScreen({ navigation, route }) {
           </Dialog.Content>
           <Dialog.Actions style={{ justifyContent: 'center' }}>
             <Button onPress={() => setModalRequiereRegistro(false)} textColor={theme.colors.primary}>Entendido</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog
+          visible={modalMultaPendiente}
+          onDismiss={() => setModalMultaPendiente(false)}
+          style={{ backgroundColor: theme.colors.surfaceContainerHigh, borderRadius: 24 }}
+        >
+          <Dialog.Icon icon="alert-circle-outline" color={theme.colors.error} />
+          <Dialog.Title style={{ textAlign: 'center', color: theme.colors.onSurface }}>
+            Tenés una multa pendiente
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
+              Debés abonarla antes de poder participar en otra subasta.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions style={{ justifyContent: 'center', gap: 16 }}>
+            <Button onPress={() => setModalMultaPendiente(false)} textColor={theme.colors.onSurfaceVariant}>Cerrar</Button>
+            <Button
+              onPress={() => { setModalMultaPendiente(false); navigation.navigate('HomePerfil', { screen: 'Penalizaciones' }); }}
+              textColor={theme.colors.primary}
+            >
+              Ver multa
+            </Button>
           </Dialog.Actions>
         </Dialog>
 

@@ -95,14 +95,30 @@ function VendidoCard({ item, onPress }) {
   );
 }
 
+const ESTADO_PAGO_CONFIG = {
+  pendiente: { label: 'Pago en revisión', color: '#FFA726' },
+  aprobado: { label: 'Pago aprobado', color: '#4CAF50' },
+  rechazado: { label: 'Pago rechazado', color: '#EF4444' },
+};
+
 function CompraCard({ item, onPress }) {
   const theme = useTheme();
+  // Sin tipoEntrega todavía no confirmó nada, así que tampoco hay registro de pago.
+  const estadoInfo = !item.tipoEntrega
+    ? { label: 'Falta confirmar entrega', color: theme.colors.onSurfaceVariant }
+    : ESTADO_PAGO_CONFIG[item.estadoPago] ?? { label: 'Procesando…', color: theme.colors.onSurfaceVariant };
+
   return (
     <TouchableOpacity onPress={onPress}>
       <View style={[styles.card, { backgroundColor: theme.colors.surfaceContainerLow }]}>
-        <Text style={[styles.cardTitle, { color: theme.colors.onSurface }]}>
-          {item.descripcion || `Ítem #${item.itemId}`}
-        </Text>
+        <View style={styles.compraCardHeader}>
+          <Text style={[styles.cardTitle, { flex: 1 }, { color: theme.colors.onSurface }]}>
+            {item.descripcion || `Ítem #${item.itemId}`}
+          </Text>
+          <View style={[styles.estadoPagoBadge, { backgroundColor: estadoInfo.color + '22' }]}>
+            <Text style={[styles.estadoPagoBadgeText, { color: estadoInfo.color }]}>{estadoInfo.label}</Text>
+          </View>
+        </View>
         <View style={styles.infoRow}>
           <Text style={[styles.infoLabel, { color: theme.colors.onSurfaceVariant }]}>Importe:</Text>
           <Text style={[styles.infoValue, { color: theme.colors.primary }]}>${item.importe}</Text>
@@ -371,6 +387,9 @@ const styles = StyleSheet.create({
   card: { borderRadius: 12, padding: 16, gap: 8, borderWidth: 2, borderColor: 'rgba(255, 255, 255, 0.64)' },
   cardTitle: { fontSize: 16, fontWeight: '600' },
   cardDesc: { fontSize: 13, lineHeight: 18 },
+  compraCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  estadoPagoBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  estadoPagoBadgeText: { fontSize: 11, fontWeight: '600' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   chip: { borderRadius: 999 },
   chipText: { fontSize: 12, fontWeight: '500' },

@@ -87,7 +87,7 @@ public class UserController {
         public ResponseEntity<Void> pagarMulta(@RequestHeader("Authorization") String authHeader,
                                             @RequestBody Map<String, Integer> body) {
         String email = jwtUtil.extractEmail(authHeader.substring(7));
-        userService.pagarMulta(email, body.get("multaId"));
+        userService.pagarMulta(email, body.get("multaId"), body.get("medioPagoId"));
     return ResponseEntity.ok().build();
 }
 
