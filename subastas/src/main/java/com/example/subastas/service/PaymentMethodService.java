@@ -7,6 +7,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.subastas.dto.PaymentMethodDTO;
@@ -160,6 +161,7 @@ public class PaymentMethodService {
         return medioPagoRepository.save(medio);
     }
 
+    @Transactional
     public void eliminar(Integer id, String email) {
         var usuario = usuarioAuthRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
@@ -169,6 +171,25 @@ public class PaymentMethodService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tenés permiso para eliminar este medio");
         }
         medioPagoRepository.deleteById(id);
+
+        // Recalcular el estado según lo que le queda DESPUÉS de borrar: sin esto, alguien
+        // podía quedar en E4 (o E3) sin tener en realidad ningún medio de pago utilizable.
+        // - Sin ninguno restante → E2.
+        // - Le queda al menos uno verificado → E4.
+        // - Le quedan algunos, pero ninguno verificado → E3.
+        List<MedioPago> restantes = medioPagoRepository.findByClienteId(usuario.getClienteId());
+        String nuevoEstado;
+        if (restantes.isEmpty()) {
+            nuevoEstado = "E2";
+        } else if (restantes.stream().anyMatch(m -> Boolean.TRUE.equals(m.getVerificado()))) {
+            nuevoEstado = "E4";
+        } else {
+            nuevoEstado = "E3";
+        }
+        if (!nuevoEstado.equals(usuario.getEstado())) {
+            usuario.setEstado(nuevoEstado);
+            usuarioAuthRepository.save(usuario);
+        }
     }
 
     private String toJson(Map<String, Object> data) {

@@ -146,10 +146,20 @@ public class SubastaService {
 
     // ── Catálogo ───────────────────────────────────────────────────────────────
 
+    /**
+     * Sin precio para invitados (estado == null, no mandaron token), E1 (registro pendiente)
+     * y E2 (registrado pero sin medio de pago) — ninguno de estos puede entrar a pujar
+     * todavía, así que tampoco tiene sentido mostrarles el precio base.
+     */
+    private boolean ocultarPrecio(String estado) {
+        return estado == null || "E1".equals(estado) || "E2".equals(estado);
+    }
+
     public List<CatalogoDTO> obtenerCatalogo(Integer subastaId, String estado) {
         Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Catálogo no encontrado"));
 
+        boolean ocultar = ocultarPrecio(estado);
         return itemCatalogoRepository.findByCatalogoId(catalogo.getIdentificador()).stream().map(item -> {
             String descripcion = productoRepository.findById(item.getProductoId())
                     .map(Producto::getDescripcionCatalogo).orElse(null);
@@ -159,7 +169,7 @@ public class SubastaService {
                     .orElse(null);
             return new CatalogoDTO(
                     item.getIdentificador(), item.getProductoId(),
-                    "E2".equals(estado) ? null : item.getPrecioBase(),
+                    ocultar ? null : item.getPrecioBase(),
                     item.getComision(), item.getSubastado(), item.getEnVivo(),
                     descripcion, foto, esSinPostor(item));
         }).toList();
@@ -169,7 +179,7 @@ public class SubastaService {
         ItemCatalogo item = itemCatalogoRepository.findById(itemId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item no encontrado"));
         return new CatalogoDTO(item.getIdentificador(), item.getProductoId(),
-                "E2".equals(estado) ? null : item.getPrecioBase(),
+                ocultarPrecio(estado) ? null : item.getPrecioBase(),
                 item.getComision(), item.getSubastado(), item.getEnVivo(), null, null, esSinPostor(item));
     }
 

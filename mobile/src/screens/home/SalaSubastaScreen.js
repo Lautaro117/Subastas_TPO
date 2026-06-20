@@ -219,6 +219,7 @@ export default function SalaSubastaScreen({ navigation, route }) {
   }, [notificadosIds, STORAGE_KEY]);
 
   const [modalSalir, setModalSalir] = useState(false);
+  const [modalRequiereRegistro, setModalRequiereRegistro] = useState(false);
   const [modalSinMedioPago, setModalSinMedioPago] = useState(false);
   const [modalCategoriaInsuficiente, setModalCategoriaInsuficiente] = useState(false);
   const [modalNotificar, setModalNotificar] = useState(null);
@@ -390,6 +391,12 @@ export default function SalaSubastaScreen({ navigation, route }) {
 
   // ─── Join ───────────────────────────────────────────────────────────────────
   const handleJoin = useCallback(async () => {
+    // Invitado (sin token) o E1 (registro todavía pendiente): ni intentan unirse,
+    // directo el aviso de que hace falta registrarse.
+    if (!token || userEstado === 'E1') {
+      setModalRequiereRegistro(true);
+      return;
+    }
     if (userEstado === 'E2' || userEstado === 'E3') {
       setModalSinMedioPago(true);
       return;
@@ -652,17 +659,36 @@ export default function SalaSubastaScreen({ navigation, route }) {
         </Dialog>
 
         <Dialog
+          visible={modalRequiereRegistro}
+          onDismiss={() => setModalRequiereRegistro(false)}
+          style={{ backgroundColor: theme.colors.surfaceContainerHigh, borderRadius: 24 }}
+        >
+          <Dialog.Icon icon="account-alert-outline" color={theme.colors.error} />
+          <Dialog.Title style={{ textAlign: 'center', color: theme.colors.onSurface }}>
+            Necesitás registrarte
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
+              Debés registrarte para poder ingresar a la subasta.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions style={{ justifyContent: 'center' }}>
+            <Button onPress={() => setModalRequiereRegistro(false)} textColor={theme.colors.primary}>Entendido</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog
           visible={modalSinMedioPago}
           onDismiss={() => setModalSinMedioPago(false)}
           style={{ backgroundColor: theme.colors.surfaceContainerHigh, borderRadius: 24 }}
         >
           <Dialog.Icon icon="cancel" color={theme.colors.error} />
           <Dialog.Title style={{ textAlign: 'center', color: theme.colors.onSurface }}>
-            Necesitas Registrarte
+            Falta un medio de pago
           </Dialog.Title>
           <Dialog.Content>
             <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
-              Para acceder es necesario estar registrado y tener un medio de pago configurado.
+              Debés registrar un medio de pago para poder ingresar a la subasta.
             </Text>
           </Dialog.Content>
           <Dialog.Actions style={{ justifyContent: 'center', gap: 16 }}>

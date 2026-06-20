@@ -43,6 +43,10 @@ public class SecurityConfig {
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/error").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/auctions").permitAll()
+                // Catálogo público: invitados y E1 pueden ver qué hay en la subasta (sin precio,
+                // ver SubastaService) — solo entrar a pujar requiere estar registrado.
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/auctions/*/catalog").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/auctions/*/catalog/*").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET,  "/api/auctions/*/admin-live").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auctions/*/items/*/adjudicate").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auctions/*/items/*/activate").permitAll()
