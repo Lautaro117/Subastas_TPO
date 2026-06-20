@@ -16,6 +16,7 @@ import {
   Button,
   Chip,
   Dialog,
+  Icon,
   IconButton,
   Portal,
   Snackbar,
@@ -783,6 +784,10 @@ export default function SalaSubastaScreen({ navigation, route }) {
         <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
           <Appbar.BackAction onPress={() => setModalSalir(true)} />
           <Appbar.Content title={auctionTitle} />
+          <TouchableOpacity onPress={() => setSnackbar('Ingresando al Streaming')} style={styles.streamingLink}>
+            <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
+            <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
+          </TouchableOpacity>
           <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
         </Appbar.Header>
@@ -822,6 +827,10 @@ export default function SalaSubastaScreen({ navigation, route }) {
         <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
           <Appbar.BackAction onPress={() => setModalSalir(true)} />
           <Appbar.Content title={auctionTitle} titleStyle={styles.appbarTitle} />
+          <TouchableOpacity onPress={() => setSnackbar('Ingresando al Streaming')} style={styles.streamingLink}>
+            <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
+            <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
+          </TouchableOpacity>
           <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
         </Appbar.Header>
@@ -875,6 +884,10 @@ export default function SalaSubastaScreen({ navigation, route }) {
         <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
           <Appbar.BackAction onPress={() => setModalSalir(true)} />
           <Appbar.Content title={auctionTitle} titleStyle={styles.appbarTitle} />
+          <TouchableOpacity onPress={() => setSnackbar('Ingresando al Streaming')} style={styles.streamingLink}>
+            <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
+            <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
+          </TouchableOpacity>
           <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
         </Appbar.Header>
@@ -901,6 +914,10 @@ export default function SalaSubastaScreen({ navigation, route }) {
         <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
           <Appbar.BackAction onPress={() => setModalSalir(true)} />
           <Appbar.Content title={auctionTitle} titleStyle={styles.appbarTitle} />
+          <TouchableOpacity onPress={() => setSnackbar('Ingresando al Streaming')} style={styles.streamingLink}>
+            <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
+            <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
+          </TouchableOpacity>
           <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
         </Appbar.Header>
@@ -1024,6 +1041,10 @@ export default function SalaSubastaScreen({ navigation, route }) {
       <Appbar.Header style={{ backgroundColor: theme.colors.background }}>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title={auctionTitle} titleStyle={styles.appbarTitle} />
+        <TouchableOpacity onPress={() => setSnackbar('Ingresando al Streaming')} style={styles.streamingLink}>
+          <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
+          <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
+        </TouchableOpacity>
         {auction?.estado === 'abierta' && (
           <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
@@ -1152,6 +1173,12 @@ const styles = StyleSheet.create({
   proximoItemFotoPlaceholder: { width: 72, height: 72, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   proximoItemTitle: { fontSize: 14, fontWeight: '600', lineHeight: 20, marginBottom: 4 },
   proximoItemBase: { fontSize: 12, lineHeight: 18 },
+
+  streamingLink: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, marginRight: 4,
+  },
+  streamingLinkText: { fontSize: 12, fontWeight: '500', textDecorationLine: 'underline' },
 
   timerRow: {
     flexDirection: 'row', alignItems: 'center', gap: 16,
