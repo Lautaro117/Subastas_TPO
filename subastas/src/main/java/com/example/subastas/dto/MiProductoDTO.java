@@ -16,10 +16,10 @@ public class MiProductoDTO {
     private List<String> fotos;
     private String motivoRechazo;
     private String etapaRechazo;
-    /** Nombre del depósito asignado (presente cuando estadoAdmin es enviar_deposito o en_deposito). */
     private String nombreDeposito;
-    /** Dirección del depósito asignado. */
     private String direccionDeposito;
+    private String tipo;
+    private DetalleObraDTO detalleObra;
     /**
      * Resultado de la subasta para este producto, derivado de items_catalogo.subastado:
      * "vendido_subasta" (adjudicado a un postor), "comprado_empresa" (nadie pujó y se
@@ -34,6 +34,7 @@ public class MiProductoDTO {
                          BigDecimal comision, LocalDate fechaSubasta, List<String> fotos,
                          String motivoRechazo, String etapaRechazo,
                          String nombreDeposito, String direccionDeposito,
+                         String tipo, DetalleObraDTO detalleObra,
                          String resultadoVenta, BigDecimal montoVenta) {
         this.id = id;
         this.descripcionCatalogo = descripcionCatalogo;
@@ -48,6 +49,8 @@ public class MiProductoDTO {
         this.etapaRechazo = etapaRechazo;
         this.nombreDeposito = nombreDeposito;
         this.direccionDeposito = direccionDeposito;
+        this.tipo = tipo;
+        this.detalleObra = detalleObra;
         this.resultadoVenta = resultadoVenta;
         this.montoVenta = montoVenta;
     }
@@ -65,6 +68,8 @@ public class MiProductoDTO {
     public String getEtapaRechazo() { return etapaRechazo; }
     public String getNombreDeposito() { return nombreDeposito; }
     public String getDireccionDeposito() { return direccionDeposito; }
+    public String getTipo() { return tipo; }
+    public DetalleObraDTO getDetalleObra() { return detalleObra; }
     public String getResultadoVenta() { return resultadoVenta; }
     public BigDecimal getMontoVenta() { return montoVenta; }
 }

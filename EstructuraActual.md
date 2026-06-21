@@ -109,10 +109,23 @@ create table productos(
 	descripcionCompleta varchar(300) not null,
 	revisor int not null,
 	duenio int not null,
-	seguro varchar(30) null,  
+	seguro varchar(30) null,
 	constraint pk_productos primary key (identificador),
 	constraint fk_productos_empleados foreign key (revisor) references empleados(identificador),
 	constraint fk_productos_duenios foreign key (duenio) references duenios(identificador)
+)
+go
+-- Datos adicionales para obras de arte u objetos de diseñador (relacion 1-a-1 opcional).
+-- Si no existe fila para un producto, se considera de tipo comun.
+-- El campo tipo distingue entre 'arte' y 'diseno'.
+create table detalles_obra(
+	producto int not null,
+	tipo varchar(20) not null constraint chkTipoObra check (tipo in ('arte', 'diseno')),
+	nombre_autor varchar(200) not null,
+	fecha_creacion date null,
+	historia varchar(1000) not null,
+	constraint pk_detalles_obra primary key (producto),
+	constraint fk_detalles_obra_productos foreign key (producto) references productos(identificador)
 )
 go
 create table fotos(
