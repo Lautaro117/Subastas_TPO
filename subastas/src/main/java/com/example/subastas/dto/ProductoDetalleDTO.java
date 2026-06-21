@@ -22,6 +22,12 @@ public class ProductoDetalleDTO {
     private Integer duenioId;
     private String duenioNombre;
 
+    // Obra de arte / objeto de diseñador (null si es producto común)
+    private String tipoObra;       // "arte" | "diseno" | null
+    private String nombreAutor;
+    private String fechaCreacion;  // ISO date string
+    private String historia;
+
     // Fotos en base64
     private List<String> fotos;
 
@@ -59,6 +65,18 @@ public class ProductoDetalleDTO {
 
     public String getDuenioNombre() { return duenioNombre; }
     public void setDuenioNombre(String duenioNombre) { this.duenioNombre = duenioNombre; }
+
+    public String getTipoObra() { return tipoObra; }
+    public void setTipoObra(String tipoObra) { this.tipoObra = tipoObra; }
+
+    public String getNombreAutor() { return nombreAutor; }
+    public void setNombreAutor(String nombreAutor) { this.nombreAutor = nombreAutor; }
+
+    public String getFechaCreacion() { return fechaCreacion; }
+    public void setFechaCreacion(String fechaCreacion) { this.fechaCreacion = fechaCreacion; }
+
+    public String getHistoria() { return historia; }
+    public void setHistoria(String historia) { this.historia = historia; }
 
     public List<String> getFotos() { return fotos; }
     public void setFotos(List<String> fotos) { this.fotos = fotos; }

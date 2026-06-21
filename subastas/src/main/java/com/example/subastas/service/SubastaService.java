@@ -77,6 +77,7 @@ public class SubastaService {
     @Autowired private FotoProductoRepository fotoProductoRepository;
     @Autowired private ClienteRepository clienteRepository;
     @Autowired private PersonaRepository personaRepository;
+    @Autowired private com.example.subastas.repository.DetalleObraRepository detalleObraRepository;
 
     private static final List<String> ORDEN_CATEGORIAS = Arrays.asList(
             "comun", "especial", "plata", "oro", "platino");
@@ -203,11 +204,15 @@ public class SubastaService {
                     .stream().findFirst()
                     .map(f -> Base64.getEncoder().encodeToString(f.getFoto()))
                     .orElse(null);
-            return new CatalogoDTO(
+            String tipoObra = detalleObraRepository.findByProducto(item.getProductoId())
+                    .map(com.example.subastas.model.DetalleObra::getTipo).orElse(null);
+            CatalogoDTO dto = new CatalogoDTO(
                     item.getIdentificador(), item.getProductoId(),
                     ocultar ? null : item.getPrecioBase(),
                     item.getComision(), item.getSubastado(), item.getEnVivo(),
                     descripcion, foto, esSinPostor(item));
+            dto.setTipoObra(tipoObra);
+            return dto;
         }).toList();
     }
 
@@ -258,6 +263,12 @@ public class SubastaService {
         dto.setFotos(fotosBase64);
         dto.setDuenioId(producto.getDuenio());
         dto.setDuenioNombre(duenioNombre);
+        detalleObraRepository.findByProducto(producto.getIdentificador()).ifPresent(obra -> {
+            dto.setTipoObra(obra.getTipo());
+            dto.setNombreAutor(obra.getNombreAutor());
+            if (obra.getFechaCreacion() != null) dto.setFechaCreacion(obra.getFechaCreacion().toString());
+            dto.setHistoria(obra.getHistoria());
+        });
         return dto;
     }
 

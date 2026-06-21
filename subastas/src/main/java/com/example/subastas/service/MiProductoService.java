@@ -139,9 +139,11 @@ public class MiProductoService {
             AdminProducto ap = adminProductoRepository.findByProductoId(p.getIdentificador()).orElse(null);
             String[] dep = resolverDeposito(p.getIdentificador());
             Object[] venta = resolverResultadoVenta(p.getIdentificador());
-            String tipo = detalleObraRepository.findByProducto(p.getIdentificador())
-                .map(DetalleObra::getTipo)
-                .orElse("comun");
+            Optional<DetalleObra> obraOpt = detalleObraRepository.findByProducto(p.getIdentificador());
+            String tipo = obraOpt.map(DetalleObra::getTipo).orElse("comun");
+            DetalleObraDTO obraDTO = obraOpt.map(d ->
+                new DetalleObraDTO(d.getNombreAutor(), d.getFechaCreacion(), d.getHistoria())
+            ).orElse(null);
             return new MiProductoDTO(
                 p.getIdentificador(),
                 p.getDescripcionCatalogo(),
@@ -155,7 +157,7 @@ public class MiProductoService {
                 ap != null ? ap.getMotivoRechazo() : null,
                 ap != null ? ap.getEtapaRechazo() : null,
                 dep[0], dep[1],
-                tipo, null,
+                tipo, obraDTO,
                 (String) venta[0], (BigDecimal) venta[1]
             );
         }).collect(Collectors.toList());

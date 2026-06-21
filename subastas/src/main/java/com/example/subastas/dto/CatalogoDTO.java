@@ -19,6 +19,8 @@ public class CatalogoDTO {
      * valor posible), por eso esta distinción se calcula acá en vez de guardarse en la DB.
      */
     private Boolean sinPostor;
+    // "arte" | "diseno" | null (productos comunes)
+    private String tipoObra;
 
     public CatalogoDTO(Integer itemId, Integer productoId, BigDecimal precioBase,
                        BigDecimal comision, String subastado, String enVivo,
@@ -43,4 +45,6 @@ public class CatalogoDTO {
     public String getDescripcionCatalogo() { return descripcionCatalogo; }
     public String getFotoPrincipal() { return fotoPrincipal; }
     public Boolean getSinPostor() { return sinPostor; }
+    public String getTipoObra() { return tipoObra; }
+    public void setTipoObra(String tipoObra) { this.tipoObra = tipoObra; }
 }
