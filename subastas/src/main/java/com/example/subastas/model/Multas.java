@@ -21,6 +21,13 @@ public class Multas {
     @Column(name = "cliente_id", nullable = false)
     private Integer clienteId;
 
+    // Vincula la multa con la adjudicación/pago que la generó (rechazo de pago final).
+    // Nullable porque podría haber otros motivos de multa a futuro que no vengan de un
+    // pago rechazado puntual. Permite, al pagar la multa, reabrir automáticamente el pago
+    // rechazado (volverlo a "pendiente") sin tener que parsear el texto libre de "motivo".
+    @Column(name = "adjudicacion_id")
+    private Integer adjudicacionId;
+
     @Column(nullable = false)
     private String motivo;
 
@@ -38,6 +45,9 @@ public class Multas {
 
     public Integer getClienteId() { return clienteId; }
     public void setClienteId(Integer clienteId) { this.clienteId = clienteId; }
+
+    public Integer getAdjudicacionId() { return adjudicacionId; }
+    public void setAdjudicacionId(Integer adjudicacionId) { this.adjudicacionId = adjudicacionId; }
 
     public String getMotivo() { return motivo; }
     public void setMotivo(String motivo) { this.motivo = motivo; }

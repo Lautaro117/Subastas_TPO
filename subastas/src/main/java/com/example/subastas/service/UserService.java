@@ -17,6 +17,7 @@ import com.example.subastas.model.Asistente;
 import com.example.subastas.model.Cliente;
 import com.example.subastas.model.MedioPago;
 import com.example.subastas.model.Multas;
+import com.example.subastas.model.PagoAdjudicacion;
 import com.example.subastas.model.Persona;
 import com.example.subastas.model.Pujo;
 import com.example.subastas.model.UsuarioAuth;
@@ -25,6 +26,7 @@ import com.example.subastas.repository.AsistenteRepository;
 import com.example.subastas.repository.ClienteRepository;
 import com.example.subastas.repository.MedioPagoRepository;
 import com.example.subastas.repository.MultasRepository;
+import com.example.subastas.repository.PagoAdjudicacionRepository;
 import com.example.subastas.repository.PersonaRepository;
 import com.example.subastas.repository.ProductoRepository;
 import com.example.subastas.repository.PujoRepository;
@@ -66,6 +68,9 @@ public class UserService {
 
     @Autowired
     private PaymentMethodService paymentMethodService;
+
+    @Autowired
+    private PagoAdjudicacionRepository pagoAdjudicacionRepository;
 
     public List<HistorialPujasDTO> obtenerHistorial(String email) {
         var usuario = usuarioAuthRepository.findByEmail(email)
@@ -250,6 +255,21 @@ public void pagarMulta(String email, Integer multaId, Integer medioPagoId) {
 
     multa.setEstado("pagada");
     multasRepository.save(multa);
+
+    // Si esta multa vino de un pago rechazado (caso normal: rechazo de pago final →
+    // multa del 10%), reabrir ESE pago puntual volviéndolo a "pendiente" — así el comprador
+    // puede intentar pagarlo de nuevo, ahora que ya saldó la multa. Solo desbloquea ESTE
+    // ítem, no otros: si tiene otra multa distinta pendiente por otro ítem, ese otro sigue
+    // bloqueado hasta que también la pague.
+    if (multa.getAdjudicacionId() != null) {
+        pagoAdjudicacionRepository.findByAdjudicacionId(multa.getAdjudicacionId()).ifPresent(pago -> {
+            if ("rechazado".equals(pago.getEstado())) {
+                pago.setEstado("pendiente");
+                pago.setUpdatedAt(java.time.LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
+                pagoAdjudicacionRepository.save(pago);
+            }
+        });
+    }
 
     // Si no le queda ninguna otra multa pendiente, vuelve a poder participar (E5 → E4).
     // Si todavía tiene otra multa pendiente, se queda en E5 hasta saldarlas todas.
