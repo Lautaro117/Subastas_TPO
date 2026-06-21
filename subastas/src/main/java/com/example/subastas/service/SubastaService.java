@@ -555,7 +555,7 @@ public class SubastaService {
         // Puja recibida → resetear cuenta regresiva a 1 minuto
         // (se hace ANTES de construirSalaResponse para que el deadline quede en el broadcast)
         final Integer itemIdFinal = item.getIdentificador();
-        itemTimerService.iniciarTimer(subastaId, 60,
+        itemTimerService.iniciarTimer(subastaId, itemIdFinal, 60,
                 () -> self.onTimerExpired(subastaId, itemIdFinal));
 
         // Construir sala actualizada y notificar a todos los dispositivos con el estado completo
@@ -696,7 +696,7 @@ public class SubastaService {
 
         // Arrancar cuenta regresiva de 5 minutos para este ítem
         final Integer activatedItemId = target.getIdentificador();
-        itemTimerService.iniciarTimer(subastaId, 300,
+        itemTimerService.iniciarTimer(subastaId, activatedItemId, 300,
                 () -> self.onTimerExpired(subastaId, activatedItemId));
 
         SalaResponse estado = construirSalaResponse(subastaId);
@@ -859,7 +859,7 @@ public class SubastaService {
         itemCatalogoRepository.save(item);
 
         // Arrancar timer de 5 minutos para el ítem recién activado
-        itemTimerService.iniciarTimer(subastaId, 300,
+        itemTimerService.iniciarTimer(subastaId, itemId, 300,
                 () -> self.onTimerExpired(subastaId, itemId));
 
         SalaResponse estado = construirSalaResponse(subastaId);
@@ -1027,13 +1027,32 @@ public class SubastaService {
         }
 
         // Timer: cuándo vence y duración total de la fase actual.
-        // Safety net: si el ítem está vivo pero el timer no existe en memoria (reinicio
-        // del servidor, bug de concurrencia, etc.), NO le regalamos otros 5 minutos:
-        // tratamos el tiempo como ya vencido y procesamos la expiración ahora mismo
-        // (adjudica si hay pujas, o lo deshabilita y avanza al siguiente ítem).
-        // Así el timer nunca "se reinicia" silenciosamente para el mismo ítem.
+        // Safety net: si el ítem está vivo pero el timer no existe en memoria, NO asumimos
+        // automáticamente que "ya venció" — eso era el bug real detrás de los ítems que se
+        // "vendían solos" sin que nadie pujara: la memoria (ConcurrentHashMap) se pierde en
+        // cada reinicio del backend, y tratar esa pérdida como "venció" cerraba el ítem
+        // instantáneamente aunque hubieran pasado solo unos segundos reales. Antes de
+        // procesar la expiración, nos fijamos si hay un deadline PERSISTIDO (sobrevive
+        // reinicios) y si todavía no pasó de verdad — si es así, lo recuperamos con el
+        // tiempo real que queda, en vez de regalarle un cierre instantáneo.
         Long deadline = itemTimerService.getDeadline(subastaId);
         if (deadline == null) {
+            var persistido = itemTimerService.obtenerEstadoPersistido(subastaId);
+            long ahora = System.currentTimeMillis();
+            if (persistido != null && persistido.getDeadlineEpochMs() > ahora) {
+                // Todavía no venció de verdad: re-armamos el timer en memoria con el tiempo
+                // real restante (no con 5 minutos ni 1 minuto de nuevo).
+                int segundosRestantes = (int) Math.max(1, (persistido.getDeadlineEpochMs() - ahora) / 1000);
+                final Integer itemIdRecuperado = item.getIdentificador();
+                itemTimerService.iniciarTimer(subastaId, itemIdRecuperado, segundosRestantes,
+                        () -> self.onTimerExpired(subastaId, itemIdRecuperado));
+                response.setTiempoLimite(persistido.getDeadlineEpochMs());
+                response.setTimerTotalSegundos(persistido.getTotalSegundos());
+                return response;
+            }
+            // No hay nada persistido, o el tiempo persistido ya pasó de verdad (ej.: el
+            // backend estuvo reiniciado más tiempo del que le quedaba al timer) — ahí sí
+            // corresponde procesar la expiración ahora mismo.
             // Si onTimerExpired falla acá, NO dejamos que la excepción rompa el polling
             // (eso convertiría cada request siguiente en un 500 invisible para el usuario,
             // que ve la app "congelada" sin ningún error). Logueamos y devolvemos la

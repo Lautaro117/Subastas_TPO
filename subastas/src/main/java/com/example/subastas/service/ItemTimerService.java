@@ -1,12 +1,18 @@
 package com.example.subastas.service;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import com.example.subastas.model.ItemTimerEstado;
+import com.example.subastas.repository.ItemTimerEstadoRepository;
 
 /**
  * Gestiona los timers de cuenta regresiva para ítems en subasta.
@@ -18,11 +24,22 @@ import org.springframework.stereotype.Service;
  *
  * El deadline (epoch millis) y el total de la fase se exponen para que
  * construirSalaResponse los incluya en cada broadcast.
+ *
+ * El timer del ítem activo además se persiste en item_timer_estado (ver
+ * obtenerEstadoPersistido) porque la memoria (estos ConcurrentHashMap) se pierde en
+ * cada reinicio del backend. Antes eso se interpretaba como "ya venció" y se cerraba
+ * el ítem instantáneamente sin que pasara tiempo real — con esto, SubastaService puede
+ * distinguir "se perdió la memoria pero todavía falta tiempo" de "de verdad venció".
  */
 @Service
 public class ItemTimerService {
 
+    private static final ZoneId ZONA_AR = ZoneId.of("America/Argentina/Buenos_Aires");
+
     private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(4);
+
+    @Autowired
+    private ItemTimerEstadoRepository itemTimerEstadoRepository;
 
     // ── Timer del ítem activo ─────────────────────────────────────────────────
     private final ConcurrentHashMap<Integer, ScheduledFuture<?>> timers    = new ConcurrentHashMap<>();
@@ -38,17 +55,19 @@ public class ItemTimerService {
     // Timer del ítem activo
     // ═════════════════════════════════════════════════════════════════════════
 
-    public void iniciarTimer(Integer subastaId, int segundos, Runnable onExpiry) {
+    public void iniciarTimer(Integer subastaId, Integer itemId, int segundos, Runnable onExpiry) {
         cancelarTimer(subastaId);
 
         long deadline = System.currentTimeMillis() + (segundos * 1000L);
         deadlines.put(subastaId, deadline);
         totales.put(subastaId, segundos);
+        persistir(subastaId, itemId, deadline, segundos);
 
         ScheduledFuture<?> future = executor.schedule(() -> {
             timers.remove(subastaId);
             deadlines.remove(subastaId);
             totales.remove(subastaId);
+            borrarPersistido(subastaId);
             try {
                 onExpiry.run();
             } catch (Exception e) {
@@ -65,10 +84,50 @@ public class ItemTimerService {
         if (f != null) f.cancel(false);
         deadlines.remove(subastaId);
         totales.remove(subastaId);
+        borrarPersistido(subastaId);
     }
 
     public Long getDeadline(Integer subastaId)         { return deadlines.get(subastaId); }
     public Integer getTotalSegundos(Integer subastaId) { return totales.get(subastaId); }
+
+    /**
+     * Estado persistido del timer activo de esta subasta (sobrevive a un reinicio del
+     * backend), o null si no hay ninguno guardado. Ver SubastaService.construirSalaResponse:
+     * si la memoria no tiene nada pero esto sí, hay que fijarse si el deadline real ya
+     * pasó o no antes de decidir si el ítem efectivamente venció.
+     */
+    public ItemTimerEstado obtenerEstadoPersistido(Integer subastaId) {
+        try {
+            return itemTimerEstadoRepository.findById(subastaId).orElse(null);
+        } catch (Exception e) {
+            // Si la tabla todavía no existe (no se corrió el SQL) no queremos romper toda
+            // la sala — solo perdemos la recuperación ante reinicios, nada más.
+            System.err.println("[ItemTimerService] No se pudo leer item_timer_estado: " + e);
+            return null;
+        }
+    }
+
+    private void persistir(Integer subastaId, Integer itemId, long deadlineEpochMs, int segundos) {
+        try {
+            ItemTimerEstado estado = new ItemTimerEstado();
+            estado.setSubastaId(subastaId);
+            estado.setItemId(itemId);
+            estado.setDeadlineEpochMs(deadlineEpochMs);
+            estado.setTotalSegundos(segundos);
+            estado.setUpdatedAt(LocalDateTime.now(ZONA_AR));
+            itemTimerEstadoRepository.save(estado);
+        } catch (Exception e) {
+            System.err.println("[ItemTimerService] No se pudo persistir item_timer_estado: " + e);
+        }
+    }
+
+    private void borrarPersistido(Integer subastaId) {
+        try {
+            itemTimerEstadoRepository.deleteById(subastaId);
+        } catch (Exception e) {
+            System.err.println("[ItemTimerService] No se pudo borrar item_timer_estado: " + e);
+        }
+    }
 
     // ═════════════════════════════════════════════════════════════════════════
     // Cooldown entre ítems
