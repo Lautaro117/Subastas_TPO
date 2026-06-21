@@ -701,7 +701,27 @@ export default function SalaSubastaScreen({ navigation, route }) {
   const itemActual = salaData?.itemActual ?? null;
   const mejorOferta = salaData?.mejorOferta ?? null;
   const historialPujas = salaData?.pujas ?? [];
-  const moneda = salaData?.moneda ?? 'USD';
+  // Fuente de verdad: salaData.moneda (llega del backend). Fallback: auction param.
+  const moneda = salaData?.moneda ?? auction?.moneda ?? 'ARS';
+  // Medios filtrados por moneda: solo se muestran los compatibles con la subasta.
+  const mediosFiltrados = medios.filter((m) => {
+    if (m.tipo === 'cheque') return moneda === 'ARS';
+    if (m.tipo === 'tarjeta') {
+      try {
+        const d = parseMedioDatos(m.datos);
+        const pais = (d.pais_emisor ?? '').toLowerCase();
+        const esArs = pais.includes('argentina') || pais === 'ar';
+        return moneda === 'ARS' ? esArs : !esArs;
+      } catch { return false; }
+    }
+    if (m.tipo === 'cuenta_bancaria') {
+      try {
+        const d = parseMedioDatos(m.datos);
+        return (d.moneda ?? 'ARS').toUpperCase() === moneda;
+      } catch { return false; }
+    }
+    return false;
+  });
   const precioBase = itemActual?.precioBase ?? null;
   const auctionTitle = auction?.ubicacion ?? `Subasta #${auctionId}`;
 
@@ -887,12 +907,14 @@ export default function SalaSubastaScreen({ navigation, route }) {
             <Text style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginBottom: 12 }}>
               Una vez que pujes con este medio, va a quedar fijo si ganás — no se puede cambiar después.
             </Text>
-            {medios.length === 0 ? (
+            {mediosFiltrados.length === 0 ? (
               <Text style={{ color: theme.colors.error, textAlign: 'center' }}>
-                No tenés medios de pago verificados.
+                {medios.length === 0
+                  ? 'No tenés medios de pago verificados.'
+                  : `No tenés medios de pago en ${moneda}. Esta subasta opera en ${moneda}.`}
               </Text>
             ) : (
-              medios.map((m) => {
+              mediosFiltrados.map((m) => {
                 const limite = limiteMedioCliente(m);
                 const esElegido = salaData?.medioPagoSeleccionadoId === m.id;
                 return (
@@ -957,8 +979,12 @@ export default function SalaSubastaScreen({ navigation, route }) {
             <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
             <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
           </TouchableOpacity>
-          <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
+          <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 4 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
+          <Chip compact style={{ backgroundColor: moneda === 'USD' ? '#1B5E20' : theme.colors.secondaryContainer, marginRight: 12 }}
+            textStyle={{ color: moneda === 'USD' ? '#A5D6A7' : theme.colors.onSecondaryContainer, fontSize: 11 }}>
+            {moneda}
+          </Chip>
         </Appbar.Header>
 
         <ScrollView contentContainerStyle={styles.warmupContent}>
@@ -1000,8 +1026,12 @@ export default function SalaSubastaScreen({ navigation, route }) {
             <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
             <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
           </TouchableOpacity>
-          <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
+          <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 4 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
+          <Chip compact style={{ backgroundColor: moneda === 'USD' ? '#1B5E20' : theme.colors.secondaryContainer, marginRight: 12 }}
+            textStyle={{ color: moneda === 'USD' ? '#A5D6A7' : theme.colors.onSecondaryContainer, fontSize: 11 }}>
+            {moneda}
+          </Chip>
         </Appbar.Header>
 
         <View style={styles.centeredPad}>
@@ -1057,8 +1087,12 @@ export default function SalaSubastaScreen({ navigation, route }) {
             <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
             <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
           </TouchableOpacity>
-          <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
+          <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 4 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
+          <Chip compact style={{ backgroundColor: moneda === 'USD' ? '#1B5E20' : theme.colors.secondaryContainer, marginRight: 12 }}
+            textStyle={{ color: moneda === 'USD' ? '#A5D6A7' : theme.colors.onSecondaryContainer, fontSize: 11 }}>
+            {moneda}
+          </Chip>
         </Appbar.Header>
 
         <View style={styles.centeredPad}>
@@ -1087,8 +1121,12 @@ export default function SalaSubastaScreen({ navigation, route }) {
             <Icon source="play-circle-outline" size={14} color={theme.colors.primary} />
             <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
           </TouchableOpacity>
-          <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
+          <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 4 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
+          <Chip compact style={{ backgroundColor: moneda === 'USD' ? '#1B5E20' : theme.colors.secondaryContainer, marginRight: 12 }}
+            textStyle={{ color: moneda === 'USD' ? '#A5D6A7' : theme.colors.onSecondaryContainer, fontSize: 11 }}>
+            {moneda}
+          </Chip>
         </Appbar.Header>
 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={90}>
@@ -1243,8 +1281,14 @@ export default function SalaSubastaScreen({ navigation, route }) {
           <Text style={[styles.streamingLinkText, { color: theme.colors.primary }]}>Streaming</Text>
         </TouchableOpacity>
         {auction?.estado === 'abierta' && (
-          <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 12 }}
+          <Chip compact style={{ backgroundColor: theme.colors.primaryContainer, marginRight: 4 }}
             textStyle={{ color: theme.colors.onPrimaryContainer, fontSize: 11 }}>EN VIVO</Chip>
+        )}
+        {auction?.moneda && (
+          <Chip compact style={{ backgroundColor: auction.moneda === 'USD' ? '#1B5E20' : theme.colors.secondaryContainer, marginRight: 12 }}
+            textStyle={{ color: auction.moneda === 'USD' ? '#A5D6A7' : theme.colors.onSecondaryContainer, fontSize: 11 }}>
+            {auction.moneda}
+          </Chip>
         )}
       </Appbar.Header>
 

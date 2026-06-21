@@ -174,6 +174,7 @@ public class SubastaService {
         dto.setSeguridadPropia(s.getSeguridadPropia());
         dto.setCategoria(s.getCategoria());
         dto.setSubastadorId(s.getSubastadorId());
+        dto.setMoneda(s.getMoneda());
         if (s.getSubastadorId() != null) {
             personaRepository.findById(s.getSubastadorId())
                     .ifPresent(p -> dto.setSubastadorNombre(p.getNombre()));
@@ -433,6 +434,20 @@ public class SubastaService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "El medio de pago no está verificado");
         }
 
+        // Validar que el medio sea compatible con la moneda de la subasta.
+        // Los cheques son instrumentos nacionales (ARS) y nunca se aceptan en subastas USD.
+        Subasta subastaMoneda = buscarPorId(subastaId);
+        String monedaSubasta = subastaMoneda.getMoneda();
+        if ("cheque".equalsIgnoreCase(medio.getTipo()) && "USD".equalsIgnoreCase(monedaSubasta)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Los cheques son instrumentos nacionales y no pueden usarse en subastas en USD.");
+        }
+        String monedaMedio = paymentMethodService.monedaEfectivaMedio(medio);
+        if (!monedaMedio.equalsIgnoreCase(monedaSubasta)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "El medio de pago está en " + monedaMedio + " pero la subasta opera en " + monedaSubasta + ".");
+        }
+
         // Si ya tiene una puja propia en este ítem, el nuevo medio tiene que cubrirla.
         Asistente asistente = asistenteRepository.findByClienteIdAndSubastaId(clienteId, subastaId).orElse(null);
         if (asistente != null) {
@@ -511,6 +526,21 @@ public class SubastaService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "Debés seleccionar un medio de pago antes de pujar."));
         Integer medioPagoId = medio.getId();
+
+        // Guardia de moneda: el medio seleccionado debe coincidir con la moneda de la subasta.
+        // Se valida también aquí (no solo en seleccionarMedioPago) por si el medio fue
+        // seleccionado antes de que la subasta tuviera moneda asignada.
+        String monedaSubasta = subasta.getMoneda();
+        if ("cheque".equalsIgnoreCase(medio.getTipo()) && "USD".equalsIgnoreCase(monedaSubasta)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Los cheques son instrumentos nacionales y no pueden usarse en subastas en USD.");
+        }
+        String monedaMedio = paymentMethodService.monedaEfectivaMedio(medio);
+        if (!monedaMedio.equalsIgnoreCase(monedaSubasta)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Tu medio de pago está en " + monedaMedio + " pero esta subasta opera en " + monedaSubasta
+                            + ". Cambiá el medio de pago antes de pujar.");
+        }
 
         // Validar min/max
         boolean sinLimiteMax = "oro".equalsIgnoreCase(subasta.getCategoria())
@@ -935,7 +965,9 @@ public class SubastaService {
 
     private SalaResponse construirSalaResponse(Integer subastaId) {
         SalaResponse response = new SalaResponse();
-        response.setMoneda(MONEDA);
+        String monedaSubasta = subastaRepository.findById(subastaId)
+                .map(Subasta::getMoneda).orElse(MONEDA);
+        response.setMoneda(monedaSubasta);
         response.setPujas(new ArrayList<>());
 
         Catalogo catalogo = catalogoRepository.findBySubastaId(subastaId).orElse(null);
@@ -1000,7 +1032,7 @@ public class SubastaService {
             String postor = asistenteMap.containsKey(p.getAsistenteId())
                     ? "Postor #" + asistenteMap.get(p.getAsistenteId()).getNumeroPostor()
                     : "Postor";
-            return new SalaResponse.PujoDisplay(p.getImporte(), postor, calcularHace(p.getCreatedAt()), MONEDA);
+            return new SalaResponse.PujoDisplay(p.getImporte(), postor, calcularHace(p.getCreatedAt()), monedaSubasta);
         }).collect(Collectors.toList());
 
         response.setPujas(pujaDisplay);
@@ -1011,7 +1043,7 @@ public class SubastaService {
             mo.setImporte(top.getImporte());
             mo.setPostor(top.getPostor());
             mo.setHace(top.getHace());
-            mo.setMoneda(MONEDA);
+            mo.setMoneda(monedaSubasta);
             response.setMejorOferta(mo);
         }
 

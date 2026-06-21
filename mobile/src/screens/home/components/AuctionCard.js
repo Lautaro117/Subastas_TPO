@@ -61,7 +61,7 @@ export default function AuctionCard({ item, onPress }) {
           </Text>
         )}
 
-        {/* Chips: categoría + estado */}
+        {/* Chips: categoría + estado + moneda */}
         <View style={styles.chipsRow}>
           <Chip
             compact
@@ -77,6 +77,29 @@ export default function AuctionCard({ item, onPress }) {
           >
             {estadoLabel}
           </Chip>
+          {item.moneda && (
+            <Chip
+              compact
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: item.moneda === 'USD'
+                    ? '#1B5E20'
+                    : theme.colors.tertiaryContainer ?? theme.colors.secondaryContainer,
+                },
+              ]}
+              textStyle={[
+                styles.chipText,
+                {
+                  color: item.moneda === 'USD'
+                    ? '#A5D6A7'
+                    : theme.colors.onTertiaryContainer ?? theme.colors.onSecondaryContainer,
+                },
+              ]}
+            >
+              {item.moneda === 'USD' ? '🇺🇸 USD' : '🇦🇷 ARS'}
+            </Chip>
+          )}
         </View>
       </Surface>
     </TouchableOpacity>

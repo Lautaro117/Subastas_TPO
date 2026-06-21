@@ -16,6 +16,7 @@ public class SubastaDTO {
     private String categoria;
     private Integer subastadorId;
     private String subastadorNombre;
+    private String moneda;
 
     public SubastaDTO() {}
 
@@ -51,4 +52,7 @@ public class SubastaDTO {
 
     public String getSubastadorNombre() { return subastadorNombre; }
     public void setSubastadorNombre(String subastadorNombre) { this.subastadorNombre = subastadorNombre; }
+
+    public String getMoneda() { return moneda; }
+    public void setMoneda(String moneda) { this.moneda = moneda; }
 }
