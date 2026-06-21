@@ -35,10 +35,6 @@ public class Subasta {
     @Column(name = "subastador")
     private Integer subastadorId;
 
-    /** "ARS" o "USD". Default ARS para subastas existentes. */
-    @Column(nullable = false, columnDefinition = "VARCHAR(3) DEFAULT 'ARS'")
-    private String moneda = "ARS";
-
     // Getters y Setters
     public Integer getIdentificador() { return identificador; }
     public void setIdentificador(Integer identificador) { this.identificador = identificador; }
@@ -69,7 +65,4 @@ public class Subasta {
 
     public Integer getSubastadorId() { return subastadorId; }
     public void setSubastadorId(Integer subastadorId) { this.subastadorId = subastadorId; }
-
-    public String getMoneda() { return moneda != null ? moneda : "ARS"; }
-    public void setMoneda(String moneda) { this.moneda = moneda; }
 }

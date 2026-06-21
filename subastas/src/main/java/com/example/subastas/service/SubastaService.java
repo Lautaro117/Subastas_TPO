@@ -48,6 +48,7 @@ import com.example.subastas.repository.MedioPagoSeleccionadoRepository;
 import com.example.subastas.repository.ProductoRepository;
 import com.example.subastas.repository.PujoExtRepository;
 import com.example.subastas.repository.PujoRepository;
+import com.example.subastas.repository.SubastaConfigRepository;
 import com.example.subastas.repository.SubastaRepository;
 import com.example.subastas.repository.UsuarioAuthRepository;
 
@@ -78,6 +79,7 @@ public class SubastaService {
     @Autowired private FotoProductoRepository fotoProductoRepository;
     @Autowired private ClienteRepository clienteRepository;
     @Autowired private PersonaRepository personaRepository;
+    @Autowired private SubastaConfigRepository subastaConfigRepository;
     @Autowired private com.example.subastas.repository.DetalleObraRepository detalleObraRepository;
 
     private static final List<String> ORDEN_CATEGORIAS = Arrays.asList(
@@ -92,6 +94,13 @@ public class SubastaService {
      * que dependa de cómo esté configurado el servidor.
      */
     private static final ZoneId ZONA_AR = ZoneId.of("America/Argentina/Buenos_Aires");
+
+    /** Devuelve la moneda de la subasta desde subastas_config; "ARS" si no hay fila. */
+    private String obtenerMonedaSubasta(Integer subastaId) {
+        return subastaConfigRepository.findById(subastaId)
+                .map(config -> config.getMoneda())
+                .orElse(MONEDA);
+    }
 
     // ── Listado ────────────────────────────────────────────────────────────────
 
@@ -175,7 +184,7 @@ public class SubastaService {
         dto.setSeguridadPropia(s.getSeguridadPropia());
         dto.setCategoria(s.getCategoria());
         dto.setSubastadorId(s.getSubastadorId());
-        dto.setMoneda(s.getMoneda());
+        dto.setMoneda(obtenerMonedaSubasta(s.getIdentificador()));
         if (s.getSubastadorId() != null) {
             personaRepository.findById(s.getSubastadorId())
                     .ifPresent(p -> dto.setSubastadorNombre(p.getNombre()));
@@ -437,8 +446,7 @@ public class SubastaService {
 
         // Validar que el medio sea compatible con la moneda de la subasta.
         // Los cheques son instrumentos nacionales (ARS) y nunca se aceptan en subastas USD.
-        Subasta subastaMoneda = buscarPorId(subastaId);
-        String monedaSubasta = subastaMoneda.getMoneda();
+        String monedaSubasta = obtenerMonedaSubasta(subastaId);
         if ("cheque".equalsIgnoreCase(medio.getTipo()) && "USD".equalsIgnoreCase(monedaSubasta)) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Los cheques son instrumentos nacionales y no pueden usarse en subastas en USD.");
@@ -531,7 +539,7 @@ public class SubastaService {
         // Guardia de moneda: el medio seleccionado debe coincidir con la moneda de la subasta.
         // Se valida también aquí (no solo en seleccionarMedioPago) por si el medio fue
         // seleccionado antes de que la subasta tuviera moneda asignada.
-        String monedaSubasta = subasta.getMoneda();
+        String monedaSubasta = obtenerMonedaSubasta(subastaId);
         if ("cheque".equalsIgnoreCase(medio.getTipo()) && "USD".equalsIgnoreCase(monedaSubasta)) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Los cheques son instrumentos nacionales y no pueden usarse en subastas en USD.");
@@ -980,8 +988,7 @@ public class SubastaService {
 
     private SalaResponse construirSalaResponse(Integer subastaId) {
         SalaResponse response = new SalaResponse();
-        String monedaSubasta = subastaRepository.findById(subastaId)
-                .map(Subasta::getMoneda).orElse(MONEDA);
+        String monedaSubasta = obtenerMonedaSubasta(subastaId);
         response.setMoneda(monedaSubasta);
         response.setPujas(new ArrayList<>());
 
