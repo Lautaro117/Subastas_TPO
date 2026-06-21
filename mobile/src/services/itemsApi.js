@@ -39,10 +39,19 @@ export async function getMisProductos(token) {
   return authedRequest('/api/my-items', token);
 }
 
-export async function agregarProducto(token, descripcionCatalogo, descripcionCompleta, fotos) {
+export async function agregarProducto(token, descripcionCatalogo, descripcionCompleta, fotos, tipo = 'comun', detalleObra = null) {
   const formData = new FormData();
   formData.append('descripcionCatalogo', descripcionCatalogo);
   formData.append('descripcionCompleta', descripcionCompleta);
+  formData.append('tipo', tipo);
+
+  if (detalleObra) {
+    formData.append('nombreAutor', detalleObra.nombreAutor);
+    formData.append('historia', detalleObra.historia);
+    if (detalleObra.fechaCreacion) {
+      formData.append('fechaCreacion', detalleObra.fechaCreacion);
+    }
+  }
 
   for (const foto of fotos) {
     formData.append('fotos', {

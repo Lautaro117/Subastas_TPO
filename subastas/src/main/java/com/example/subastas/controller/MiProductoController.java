@@ -41,9 +41,14 @@ public class MiProductoController {
             @RequestHeader("Authorization") String authHeader,
             @RequestParam("descripcionCatalogo") String descripcionCatalogo,
             @RequestParam("descripcionCompleta") String descripcionCompleta,
-            @RequestParam("fotos") List<MultipartFile> fotos) {
+            @RequestParam("fotos") List<MultipartFile> fotos,
+            @RequestParam(value = "tipo", defaultValue = "comun") String tipo,
+            @RequestParam(value = "nombreAutor", required = false) String nombreAutor,
+            @RequestParam(value = "fechaCreacion", required = false) String fechaCreacion,
+            @RequestParam(value = "historia", required = false) String historia) {
         String email = jwtUtil.extractEmail(authHeader.substring(7));
-        return ResponseEntity.ok(miProductoService.agregarProducto(email, descripcionCatalogo, descripcionCompleta, fotos));
+        return ResponseEntity.ok(miProductoService.agregarProducto(
+                email, descripcionCatalogo, descripcionCompleta, fotos, tipo, nombreAutor, fechaCreacion, historia));
     }
 
     @GetMapping("/{id}")

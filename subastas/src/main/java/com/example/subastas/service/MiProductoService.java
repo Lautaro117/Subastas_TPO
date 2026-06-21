@@ -1,5 +1,6 @@
 package com.example.subastas.service;
 
+import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.time.ZoneId;
 import java.util.Base64;
@@ -15,12 +16,14 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.subastas.dto.CustodiaDTO;
+import com.example.subastas.dto.DetalleObraDTO;
 import com.example.subastas.dto.MiProductoDTO;
 import com.example.subastas.dto.PropuestaAdminRequest;
 import com.example.subastas.model.AdminProducto;
 import com.example.subastas.model.Adjudicaciones;
 import com.example.subastas.model.Cliente;
 import com.example.subastas.model.CustodiaProductos;
+import com.example.subastas.model.DetalleObra;
 import com.example.subastas.model.Depositos;
 import com.example.subastas.model.Duenio;
 import com.example.subastas.model.FotoProducto;
@@ -31,6 +34,7 @@ import com.example.subastas.repository.AdjudicacionesRepository;
 import com.example.subastas.repository.AdminProductoRepository;
 import com.example.subastas.repository.ClienteRepository;
 import com.example.subastas.repository.CustodiaProductoRepository;
+import com.example.subastas.repository.DetalleObraRepository;
 import com.example.subastas.repository.DepositoRepository;
 import com.example.subastas.repository.DuenioRepository;
 import com.example.subastas.repository.FotoProductoRepository;
@@ -67,6 +71,9 @@ public class MiProductoService {
 
     @Autowired
     private DuenioRepository duenioRepository;
+
+    @Autowired
+    private DetalleObraRepository detalleObraRepository;
 
     @Autowired
     private ClienteRepository clienteRepository;
@@ -132,6 +139,9 @@ public class MiProductoService {
             AdminProducto ap = adminProductoRepository.findByProductoId(p.getIdentificador()).orElse(null);
             String[] dep = resolverDeposito(p.getIdentificador());
             Object[] venta = resolverResultadoVenta(p.getIdentificador());
+            String tipo = detalleObraRepository.findByProducto(p.getIdentificador())
+                .map(DetalleObra::getTipo)
+                .orElse("comun");
             return new MiProductoDTO(
                 p.getIdentificador(),
                 p.getDescripcionCatalogo(),
@@ -145,54 +155,80 @@ public class MiProductoService {
                 ap != null ? ap.getMotivoRechazo() : null,
                 ap != null ? ap.getEtapaRechazo() : null,
                 dep[0], dep[1],
+                tipo, null,
                 (String) venta[0], (BigDecimal) venta[1]
             );
         }).collect(Collectors.toList());
     }
 
-    public Producto agregarProducto(String email, String descripcionCatalogo, String descripcionCompleta, List<MultipartFile> fotos) {
-    if (fotos == null || fotos.size() < 6) {
-        throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Se requieren al menos 6 fotos");
-    }
- 
-    Integer clienteId = getClienteId(email);
- 
-    // Si el usuario no existe en duenios, lo creamos con valores por defecto
-    if (!duenioRepository.existsById(clienteId)) {
-        Cliente cliente = clienteRepository.findById(clienteId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
- 
-        Duenio duenio = new Duenio();
-        duenio.setIdentificador(clienteId);
-        duenio.setNumeroPais(cliente.getNumeroPais());
-        duenio.setVerificacionFinanciera("no");
-        duenio.setVerificacionJudicial("no");
-        duenio.setCalificacionRiesgo(1);
-        duenio.setVerificador(1);
-        duenioRepository.save(duenio);
-    }
- 
-    Producto producto = new Producto();
-    producto.setDuenio(clienteId);
-    producto.setDescripcionCatalogo(descripcionCatalogo);
-    producto.setDescripcionCompleta(descripcionCompleta);
-    producto.setEstadoAdmin("pendiente");
-    producto.setRevisor(1);
-    productoRepository.save(producto);
- 
-    for (MultipartFile foto : fotos) {
-        try {
-            FotoProducto fp = new FotoProducto();
-            fp.setProducto(producto.getIdentificador());
-            fp.setFoto(foto.getBytes());
-            fotoProductoRepository.save(fp);
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error al guardar foto");
+    public Producto agregarProducto(String email, String descripcionCatalogo, String descripcionCompleta,
+            List<MultipartFile> fotos, String tipo, String nombreAutor, String fechaCreacionStr, String historia) {
+        if (fotos == null || fotos.size() < 6) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Se requieren al menos 6 fotos");
         }
+
+        String tipoFinal = (tipo != null && !tipo.isBlank()) ? tipo : "comun";
+
+        if (("arte".equals(tipoFinal) || "diseno".equals(tipoFinal))
+                && (nombreAutor == null || nombreAutor.isBlank()
+                    || historia == null || historia.isBlank())) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Nombre del autor e historia son requeridos para obras de arte u objetos de diseñador");
+        }
+
+        Integer clienteId = getClienteId(email);
+
+        if (!duenioRepository.existsById(clienteId)) {
+            Cliente cliente = clienteRepository.findById(clienteId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Cliente no encontrado"));
+
+            Duenio duenio = new Duenio();
+            duenio.setIdentificador(clienteId);
+            duenio.setNumeroPais(cliente.getNumeroPais());
+            duenio.setVerificacionFinanciera("no");
+            duenio.setVerificacionJudicial("no");
+            duenio.setCalificacionRiesgo(1);
+            duenio.setVerificador(1);
+            duenioRepository.save(duenio);
+        }
+
+        Producto producto = new Producto();
+        producto.setDuenio(clienteId);
+        producto.setDescripcionCatalogo(descripcionCatalogo);
+        producto.setDescripcionCompleta(descripcionCompleta);
+        producto.setEstadoAdmin("pendiente");
+        producto.setRevisor(1);
+        productoRepository.save(producto);
+
+        for (MultipartFile foto : fotos) {
+            try {
+                FotoProducto fp = new FotoProducto();
+                fp.setProducto(producto.getIdentificador());
+                fp.setFoto(foto.getBytes());
+                fotoProductoRepository.save(fp);
+            } catch (Exception e) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error al guardar foto");
+            }
+        }
+
+        if ("arte".equals(tipoFinal) || "diseno".equals(tipoFinal)) {
+            LocalDate fechaCreacion = null;
+            if (fechaCreacionStr != null && !fechaCreacionStr.isBlank()) {
+                try {
+                    fechaCreacion = LocalDate.parse(fechaCreacionStr);
+                } catch (Exception ignored) {}
+            }
+            DetalleObra detalle = new DetalleObra();
+            detalle.setProducto(producto.getIdentificador());
+            detalle.setTipo(tipoFinal);
+            detalle.setNombreAutor(nombreAutor);
+            detalle.setFechaCreacion(fechaCreacion);
+            detalle.setHistoria(historia);
+            detalleObraRepository.save(detalle);
+        }
+
+        return producto;
     }
- 
-    return producto;
-}
 
     public void aceptarPropuesta(String email, Integer productoId) {
         Integer clienteId = getClienteId(email);
@@ -356,6 +392,12 @@ public class MiProductoService {
         String[] dep = resolverDeposito(productoId);
         Object[] venta = resolverResultadoVenta(productoId);
 
+        Optional<DetalleObra> detalleOpt = detalleObraRepository.findByProducto(productoId);
+        String tipo = detalleOpt.map(DetalleObra::getTipo).orElse("comun");
+        DetalleObraDTO detalleObraDTO = detalleOpt
+            .map(d -> new DetalleObraDTO(d.getNombreAutor(), d.getFechaCreacion(), d.getHistoria()))
+            .orElse(null);
+
         return new MiProductoDTO(
             producto.getIdentificador(),
             producto.getDescripcionCatalogo(),
@@ -369,6 +411,7 @@ public class MiProductoService {
             ap != null ? ap.getMotivoRechazo() : null,
             ap != null ? ap.getEtapaRechazo() : null,
             dep[0], dep[1],
+            tipo, detalleObraDTO,
             (String) venta[0], (BigDecimal) venta[1]
         );
     }
