@@ -60,6 +60,7 @@ public class SubastaService {
     @Autowired private SesionSubastaService sesionSubastaService;
     @Autowired private ItemTimerService itemTimerService;
     @Autowired private NotificacionService notificacionService;
+    @Autowired private EmailService emailService;
     // Auto-inyección lazy para poder llamar métodos @Transactional desde callbacks de timer
     @Lazy @Autowired private SubastaService self;
     @Autowired private SubastaRepository subastaRepository;
@@ -660,6 +661,7 @@ public class SubastaService {
                         "🏆 ¡Ganaste la subasta de \"" + desc + "\" por $"
                                 + p.getImporte().toPlainString() + "!"
                 );
+                enviarMailGanador(a.getClienteId(), desc, p.getImporte(), itemFinal.getComision());
             });
         });
 
@@ -685,6 +687,18 @@ public class SubastaService {
             subastaRepository.cerrarSubasta(subastaId);
             auctionNotificationService.notificarCierre(subastaId);
             return construirSalaResponse(subastaId);
+        }
+    }
+
+    // Manda al ganador un mail con el detalle de lo que tiene que pagar. Si el envío falla
+    // no rompemos la adjudicación: la notificación in-app ya quedó creada igual.
+    private void enviarMailGanador(Integer clienteId, String descripcion, BigDecimal importe, BigDecimal comision) {
+        try {
+            usuarioAuthRepository.findByClienteId(clienteId).ifPresent(auth ->
+                    emailService.sendGanadorPuja(auth.getEmail(), descripcion, importe, comision));
+        } catch (Exception e) {
+            System.err.println("[enviarMailGanador] No se pudo enviar el mail al ganador clienteId="
+                    + clienteId + ": " + e.getMessage());
         }
     }
 
@@ -852,6 +866,7 @@ public class SubastaService {
                         "🏆 ¡Ganaste la subasta de \"" + desc + "\" por $"
                                 + ganadoraFinal.getImporte().toPlainString() + "!"
                 );
+                enviarMailGanador(a.getClienteId(), desc, ganadoraFinal.getImporte(), itemTimer.getComision());
             });
 
             item.setSubastado("si");
