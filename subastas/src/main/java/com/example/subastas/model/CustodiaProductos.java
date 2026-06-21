@@ -28,6 +28,12 @@ public class CustodiaProductos {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "nro_poliza")
+    private String nroPoliza;
+
+    @Column(name = "compania_seguro")
+    private String companiaSeguro;
+
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
 
@@ -42,4 +48,10 @@ public class CustodiaProductos {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getNroPoliza() { return nroPoliza; }
+    public void setNroPoliza(String nroPoliza) { this.nroPoliza = nroPoliza; }
+
+    public String getCompaniaSeguro() { return companiaSeguro; }
+    public void setCompaniaSeguro(String companiaSeguro) { this.companiaSeguro = companiaSeguro; }
 }

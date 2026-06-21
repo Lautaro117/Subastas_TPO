@@ -44,4 +44,5 @@ public class AdminProductoController {
         miProductoService.asignarDepositoYEnviar(id, depositoId);
         return ResponseEntity.ok().build();
     }
+
 }
