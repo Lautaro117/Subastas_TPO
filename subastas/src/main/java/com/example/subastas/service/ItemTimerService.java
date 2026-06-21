@@ -1,7 +1,5 @@
 package com.example.subastas.service;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -12,7 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.example.subastas.model.ItemTimerEstado;
-import com.example.subastas.repository.ItemTimerEstadoRepository;
 
 /**
  * Gestiona los timers de cuenta regresiva para ítems en subasta.
@@ -34,12 +31,16 @@ import com.example.subastas.repository.ItemTimerEstadoRepository;
 @Service
 public class ItemTimerService {
 
-    private static final ZoneId ZONA_AR = ZoneId.of("America/Argentina/Buenos_Aires");
-
     private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(4);
 
+    // Bean separado a propósito: corre la persistencia en su PROPIA transacción
+    // (REQUIRES_NEW). Si esto falla (tabla no creada, etc.) y lo atrapáramos en la MISMA
+    // transacción del que llama (ej. activarItem), Spring marca esa transacción entera
+    // como rollback-only en el momento del error — atraparlo localmente no alcanza, igual
+    // tira UnexpectedRollbackException al final. Aislado en su propia transacción, un
+    // fallo ahí se queda contenido y nunca rompe la operación real de la subasta.
     @Autowired
-    private ItemTimerEstadoRepository itemTimerEstadoRepository;
+    private ItemTimerEstadoService itemTimerEstadoService;
 
     // ── Timer del ítem activo ─────────────────────────────────────────────────
     private final ConcurrentHashMap<Integer, ScheduledFuture<?>> timers    = new ConcurrentHashMap<>();
@@ -98,10 +99,11 @@ public class ItemTimerService {
      */
     public ItemTimerEstado obtenerEstadoPersistido(Integer subastaId) {
         try {
-            return itemTimerEstadoRepository.findById(subastaId).orElse(null);
+            return itemTimerEstadoService.obtener(subastaId);
         } catch (Exception e) {
-            // Si la tabla todavía no existe (no se corrió el SQL) no queremos romper toda
-            // la sala — solo perdemos la recuperación ante reinicios, nada más.
+            // Si la tabla todavía no existe (no se corrió el SQL) o cualquier otro problema
+            // de esa transacción aparte, no queremos romper toda la sala — solo perdemos la
+            // recuperación ante reinicios, nada más.
             System.err.println("[ItemTimerService] No se pudo leer item_timer_estado: " + e);
             return null;
         }
@@ -109,13 +111,7 @@ public class ItemTimerService {
 
     private void persistir(Integer subastaId, Integer itemId, long deadlineEpochMs, int segundos) {
         try {
-            ItemTimerEstado estado = new ItemTimerEstado();
-            estado.setSubastaId(subastaId);
-            estado.setItemId(itemId);
-            estado.setDeadlineEpochMs(deadlineEpochMs);
-            estado.setTotalSegundos(segundos);
-            estado.setUpdatedAt(LocalDateTime.now(ZONA_AR));
-            itemTimerEstadoRepository.save(estado);
+            itemTimerEstadoService.persistir(subastaId, itemId, deadlineEpochMs, segundos);
         } catch (Exception e) {
             System.err.println("[ItemTimerService] No se pudo persistir item_timer_estado: " + e);
         }
@@ -123,7 +119,7 @@ public class ItemTimerService {
 
     private void borrarPersistido(Integer subastaId) {
         try {
-            itemTimerEstadoRepository.deleteById(subastaId);
+            itemTimerEstadoService.borrar(subastaId);
         } catch (Exception e) {
             System.err.println("[ItemTimerService] No se pudo borrar item_timer_estado: " + e);
         }
