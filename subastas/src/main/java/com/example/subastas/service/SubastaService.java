@@ -1027,50 +1027,69 @@ public class SubastaService {
         }
 
         // Timer: cuándo vence y duración total de la fase actual.
-        // Safety net: si el ítem está vivo pero el timer no existe en memoria, NO asumimos
-        // automáticamente que "ya venció" — eso era el bug real detrás de los ítems que se
-        // "vendían solos" sin que nadie pujara: la memoria (ConcurrentHashMap) se pierde en
-        // cada reinicio del backend, y tratar esa pérdida como "venció" cerraba el ítem
-        // instantáneamente aunque hubieran pasado solo unos segundos reales. Antes de
-        // procesar la expiración, nos fijamos si hay un deadline PERSISTIDO (sobrevive
-        // reinicios) y si todavía no pasó de verdad — si es así, lo recuperamos con el
-        // tiempo real que queda, en vez de regalarle un cierre instantáneo.
-        Long deadline = itemTimerService.getDeadline(subastaId);
-        if (deadline == null) {
-            var persistido = itemTimerService.obtenerEstadoPersistido(subastaId);
-            long ahora = System.currentTimeMillis();
-            if (persistido != null && persistido.getDeadlineEpochMs() > ahora) {
-                // Todavía no venció de verdad: re-armamos el timer en memoria con el tiempo
-                // real restante (no con 5 minutos ni 1 minuto de nuevo).
-                int segundosRestantes = (int) Math.max(1, (persistido.getDeadlineEpochMs() - ahora) / 1000);
-                final Integer itemIdRecuperado = item.getIdentificador();
-                itemTimerService.iniciarTimer(subastaId, itemIdRecuperado, segundosRestantes,
-                        () -> self.onTimerExpired(subastaId, itemIdRecuperado));
-                response.setTiempoLimite(persistido.getDeadlineEpochMs());
-                response.setTimerTotalSegundos(persistido.getTotalSegundos());
-                return response;
+        //
+        // Todo este tramo (leer el deadline → decidir si hay que recuperarlo o procesarlo como
+        // vencido → reiniciar/cancelar el timer) corre serializado con un lock POR SUBASTA (ver
+        // ItemTimerService.lockFor). Con un solo postor las requests llegan de a una y nunca hay
+        // problema; apenas hay 2+ personas pujando y polleando /live a la vez sobre la MISMA
+        // subasta, dos hilos pueden entrelazar sus pasos acá (uno leyendo justo cuando otro está
+        // reiniciando el timer) y terminar en un cierre espurio sin que ningún paso individual
+        // sea "incorrecto" por sí solo — por eso andaba bien en solitario y se rompía con un
+        // segundo postor. El lock hace que esta secuencia entera sea atómica de punta a punta
+        // para esta subasta (subastas distintas no se bloquean entre sí).
+        //
+        // Safety net (dentro del lock): si el ítem está vivo pero el timer no existe en memoria,
+        // NO asumimos automáticamente que "ya venció" — eso era el bug original detrás de los
+        // ítems que se "vendían solos" sin que nadie pujara: la memoria (ConcurrentHashMap) se
+        // pierde en cada reinicio del backend, y tratar esa pérdida como "venció" cerraba el ítem
+        // instantáneamente aunque hubieran pasado solo unos segundos reales. Antes de procesar la
+        // expiración, nos fijamos si hay un deadline PERSISTIDO (sobrevive reinicios) y si todavía
+        // no pasó de verdad — si es así, lo recuperamos con el tiempo real que queda, en vez de
+        // regalarle un cierre instantáneo.
+        java.util.concurrent.locks.ReentrantLock lock = itemTimerService.lockFor(subastaId);
+        lock.lock();
+        try {
+            Long deadline = itemTimerService.getDeadline(subastaId);
+            if (deadline == null) {
+                var persistido = itemTimerService.obtenerEstadoPersistido(subastaId);
+                long ahora = System.currentTimeMillis();
+                if (persistido != null && persistido.getDeadlineEpochMs() > ahora) {
+                    // Todavía no venció de verdad: re-armamos el timer en memoria con el tiempo
+                    // real restante (no con 5 minutos ni 1 minuto de nuevo).
+                    int segundosRestantes = (int) Math.max(1, (persistido.getDeadlineEpochMs() - ahora) / 1000);
+                    final Integer itemIdRecuperado = item.getIdentificador();
+                    itemTimerService.iniciarTimer(subastaId, itemIdRecuperado, segundosRestantes,
+                            () -> self.onTimerExpired(subastaId, itemIdRecuperado));
+                    response.setTiempoLimite(persistido.getDeadlineEpochMs());
+                    response.setTimerTotalSegundos(persistido.getTotalSegundos());
+                    return response;
+                }
+                // No hay nada persistido, o el tiempo persistido ya pasó de verdad (ej.: el
+                // backend estuvo reiniciado más tiempo del que le quedaba al timer) — ahí sí
+                // corresponde procesar la expiración ahora mismo.
+                // Si onTimerExpired falla acá, NO dejamos que la excepción rompa el polling
+                // (eso convertiría cada request siguiente en un 500 invisible para el usuario,
+                // que ve la app "congelada" sin ningún error). Logueamos y devolvemos la
+                // respuesta tal cual para no romper la sala; el log queda para diagnosticar.
+                try {
+                    self.onTimerExpired(subastaId, item.getIdentificador());
+                    // Llamada recursiva DENTRO del mismo lock (ReentrantLock: el mismo hilo puede
+                    // volver a tomarlo sin bloquearse a sí mismo) para devolver de una el estado
+                    // ya actualizado (cooldown / siguiente ítem / cierre) sin esperar otro poll.
+                    return construirSalaResponse(subastaId);
+                } catch (RuntimeException e) {
+                    System.err.println("[construirSalaResponse] safety-net falló al procesar expiración "
+                            + "subastaId=" + subastaId + " itemId=" + item.getIdentificador() + ": " + e);
+                    e.printStackTrace();
+                    return response;
+                }
             }
-            // No hay nada persistido, o el tiempo persistido ya pasó de verdad (ej.: el
-            // backend estuvo reiniciado más tiempo del que le quedaba al timer) — ahí sí
-            // corresponde procesar la expiración ahora mismo.
-            // Si onTimerExpired falla acá, NO dejamos que la excepción rompa el polling
-            // (eso convertiría cada request siguiente en un 500 invisible para el usuario,
-            // que ve la app "congelada" sin ningún error). Logueamos y devolvemos la
-            // respuesta tal cual para no romper la sala; el log queda para diagnosticar.
-            try {
-                self.onTimerExpired(subastaId, item.getIdentificador());
-                return construirSalaResponse(subastaId);
-            } catch (RuntimeException e) {
-                System.err.println("[construirSalaResponse] safety-net falló al procesar expiración "
-                        + "subastaId=" + subastaId + " itemId=" + item.getIdentificador() + ": " + e);
-                e.printStackTrace();
-                return response;
-            }
+            response.setTiempoLimite(deadline);
+            response.setTimerTotalSegundos(itemTimerService.getTotalSegundos(subastaId));
+            return response;
+        } finally {
+            lock.unlock();
         }
-        response.setTiempoLimite(deadline);
-        response.setTimerTotalSegundos(itemTimerService.getTotalSegundos(subastaId));
-
-        return response;
     }
 
     private String calcularHace(Instant createdAt) {
