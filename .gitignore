@@ -1,5 +1,8 @@
 # Secrets - nunca subir
-subastas/src/main/resources/application.properties
+# application.properties ya NO tiene secrets (usa variables de entorno, ver Render) y se
+# sube a propósito. Los secrets reales viven en application-local.properties (solo local)
+# y en las env vars del servicio en Render.
+subastas/src/main/resources/application-local.properties
 **/.env
 
 # Build output

@@ -33,5 +33,8 @@ build/
 .vscode/
 
 ### Secrets ###
-src/main/resources/application.properties
+# application.properties YA NO tiene secrets hardcodeados (usa variables de entorno) y se
+# sube al repo a propósito -- Render lo necesita para buildear. Los secrets reales viven
+# en application-local.properties (solo para tu máquina) y en las env vars de Render.
+src/main/resources/application-local.properties
 .env
