@@ -304,10 +304,14 @@ export default function SalaSubastaScreen({ navigation, route }) {
   // sin recrear el intervalo (los estados no son accesibles desde closures de intervalo antiguas).
   const salaDataRef = useRef(null);
   const miNumeroPostorRef = useRef(null);
+  // Idem para el listener de blur/focus de navegación (ver más abajo) — necesita el
+  // valor de "joined" más reciente sin que eso fuerce a recrear el listener.
+  const joinedRef = useRef(false);
 
   // Mantener refs sincronizados en cada render para que los intervalos tengan valores frescos
   salaDataRef.current = salaData;
   miNumeroPostorRef.current = miNumeroPostor;
+  joinedRef.current = joined;
 
   // ─── Carga inicial ──────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -413,25 +417,6 @@ export default function SalaSubastaScreen({ navigation, route }) {
     setSnackbar(`🔔 "${desc}" va a subastarse en 30 segundos`);
   }, [salaData?.cooldownHasta, salaData?.proximoItem?.itemId, notificadosIds]);
 
-  // Salir de la sala cuando esta pantalla pierde el foco mientras joined=true.
-  // OJO: usamos useFocusEffect (no un useEffect atado a mount/unmount) a propósito.
-  // El gesto nativo de swipe-back de iOS navega hacia atrás sin pasar por el botón
-  // "Salir" (que tiene su propio modal + handleLeave), y React Navigation a veces
-  // mantiene la pantalla montada en memoria para volver más rápido — un cleanup de
-  // unmount podría no disparar nunca en ese caso. El evento de "blur" sí se dispara
-  // siempre que se navega fuera de la pantalla, completada por gesto o no, montada o
-  // no, así que es la única forma confiable de avisarle al backend que el usuario
-  // realmente salió (y liberar la sesión para poder unirse a otra subasta).
-  useFocusEffect(
-    React.useCallback(() => {
-      return () => {
-        if (joined) {
-          leaveAuction(token, auctionId).catch(() => {});
-        }
-      };
-    }, [joined, token, auctionId])
-  );
-
   // Auto-join cuando se navega desde DetalleProductoSubasta con autoJoin=true
   useEffect(() => {
     if (route.params?.autoJoin && !autoJoinHandled.current && fase === 'preview' && !joined && !joining && !isLoading) {
@@ -534,6 +519,51 @@ export default function SalaSubastaScreen({ navigation, route }) {
       setJoining(false);
     }
   }, [token, auctionId, userEstado]);
+
+  // ─── Pausar/reanudar al perder o recuperar el foco ───────────────────────────
+  // Usamos navigation.addListener('blur'/'focus', ...) en vez de useFocusEffect a propósito:
+  // useFocusEffect re-ejecuta su callback cada vez que cambia alguna dependencia MIENTRAS
+  // la pantalla sigue enfocada (no solo al perder/ganar foco de verdad) — si "joined" fuera
+  // una dependencia ahí, el instante en que handleJoin() pone joined=true dispararía de
+  // nuevo el cleanup+setup de ESTE mismo efecto, frenando el polling/WS que recién se
+  // acababan de armar. Con addListener + un ref (joinedRef) leído en el momento real del
+  // evento, evitamos ese problema: el listener se registra una sola vez y siempre lee el
+  // valor más fresco de "joined" cuando blur/focus realmente ocurren.
+  //
+  // Por qué hace falta esto: esta pantalla vive dentro de un Bottom Tab Navigator, que por
+  // default mantiene TODAS las pestañas montadas en memoria aunque no se estén viendo — al
+  // cambiar de pestaña (ej. a Perfil → Métodos de pago) esta pantalla no se desmonta, solo
+  // pierde el foco. Antes, perder el foco solo avisaba al backend "salí de la sala"
+  // (leaveAuction) pero NO frenaba el polling de 1.5s ni desconectaba el WebSocket — esos
+  // seguían corriendo de fondo, invisibles, generando tráfico y 403 silenciosos sin parar
+  // (porque el backend ya te había marcado como afuera), compitiendo por el hilo de JS con
+  // lo que sea que el usuario esté mirando en otra pantalla. Con latencia real de red
+  // (backend remoto, no localhost) y más de un postor activo, esto volvía la app casi
+  // inusable fuera de la sala — algo que nunca se notaba en local por la latencia ~0.
+  useEffect(() => {
+    const unsubBlur = navigation.addListener('blur', () => {
+      clearInterval(pollingRef.current);
+      stompClientRef.current?.deactivate?.();
+      if (joinedRef.current) {
+        leaveAuction(token, auctionId).catch(() => {});
+      }
+    });
+
+    const unsubFocus = navigation.addListener('focus', () => {
+      // Si volvemos a esta pantalla con la sala ya unida (ej: volviendo de otra pestaña),
+      // re-unirse de cero: la sesión del backend se cerró explícitamente al perder el foco
+      // (ver arriba), así que hace falta una unión nueva, no solo retomar el polling viejo
+      // contra una sesión que el backend ya descartó.
+      if (joinedRef.current) {
+        handleJoin();
+      }
+    });
+
+    return () => {
+      unsubBlur();
+      unsubFocus();
+    };
+  }, [navigation, token, auctionId, handleJoin]);
 
   // ─── Warmup (solo entre ítems, no al ingresar) ──────────────────────────────
   function startWarmup() {
