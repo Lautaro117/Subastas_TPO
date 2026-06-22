@@ -264,6 +264,28 @@ public class PaymentMethodService {
         return s == null || s.trim().isEmpty();
     }
 
+    /**
+     * Devuelve la moneda efectiva de un medio de pago: "ARS" o "USD".
+     * - Tarjeta: se infiere del pais_emisor; si es Argentina (o AR) → ARS, cualquier otro → USD.
+     * - Cuenta bancaria: lee el campo "moneda" del JSON.
+     * - Cheque: siempre ARS (son instrumentos nacionales).
+     */
+    public String monedaEfectivaMedio(MedioPago medio) {
+        if (medio == null) return "ARS";
+        if ("cheque".equals(medio.getTipo())) return "ARS";
+        try {
+            var nodo = objectMapper.readTree(medio.getDatos());
+            if ("tarjeta".equals(medio.getTipo())) {
+                String pais = nodo.has("pais_emisor") ? nodo.get("pais_emisor").asText("").toLowerCase() : "";
+                return (pais.contains("argentina") || pais.equals("ar")) ? "ARS" : "USD";
+            }
+            if ("cuenta_bancaria".equals(medio.getTipo()) && nodo.has("moneda")) {
+                return nodo.get("moneda").asText("ARS").toUpperCase();
+            }
+        } catch (Exception ignored) {}
+        return "ARS";
+    }
+
     public void setPayoutAccount(Integer medioId, String email) {
     var usuario = usuarioAuthRepository.findByEmail(email)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
