@@ -303,10 +303,10 @@ public class MiProductoService {
         Depositos deposito = depositoRepository.findById(custodia.getDepositoId())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Depósito no encontrado"));
 
-        String nroPoliza = null;
-        String compania = null;
+        String nroPoliza = custodia.getNroPoliza();
+        String compania = custodia.getCompaniaSeguro();
 
-        if (producto.getSeguro() != null) {
+        if (nroPoliza == null && producto.getSeguro() != null) {
             Seguro seguro = seguroRepository.findById(producto.getSeguro().toString()).orElse(null);
             if (seguro != null) {
                 nroPoliza = seguro.getNroPoliza();

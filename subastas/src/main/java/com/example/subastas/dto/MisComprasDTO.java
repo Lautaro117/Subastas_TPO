@@ -15,20 +15,8 @@ public class MisComprasDTO {
     private String nroPoliza;
     private String companiaSeguro;
     private List<String> fotos;
-    /** Medio de pago con el que ganó esta puja — fijo desde la adjudicación, no se puede cambiar. */
     private Integer medioPagoId;
-    /**
-     * "envio" | "retiro" | null (todavía no confirmó la entrega). El mobile usa este campo
-     * para saber si ya pasó por "Confirmar" — antes no se devolvía nunca, así que al salir
-     * y volver a entrar a la pantalla, parecía que la confirmación (y el pago) nunca se
-     * habían hecho, aunque sí habían quedado guardados en la base.
-     */
     private String tipoEntrega;
-    /**
-     * "pendiente" | "aprobado" | "rechazado" | null (todavía no confirmó entrega, así que
-     * no existe ni el registro de pago). Antes esto solo se podía ver entrando al detalle
-     * de cada compra — se agrega acá para que se note en la lista general también.
-     */
     private String estadoPago;
 
     public MisComprasDTO(Integer id, Integer itemId, String descripcion, String descripcionCompleta,
