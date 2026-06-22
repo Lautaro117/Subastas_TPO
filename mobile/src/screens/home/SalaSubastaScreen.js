@@ -544,6 +544,20 @@ export default function SalaSubastaScreen({ navigation, route }) {
     const unsubBlur = navigation.addListener('blur', () => {
       clearInterval(pollingRef.current);
       stompClientRef.current?.deactivate?.();
+      // OJO — estos dos también hace falta frenarlos a mano, y es justo lo que faltaba en
+      // el fix anterior: timerIntervalRef (countdown del ítem) y cooldownIntervalRef (countdown
+      // entre ítems) cada uno tiene su PROPIO setInterval de 1000ms, separado del polling, que
+      // arranca en un useEffect cuyo cleanup solo se dispara cuando cambia salaData.tiempoLimite
+      // / salaData.cooldownHasta — pero como ya frenamos el polling arriba, salaData deja de
+      // actualizarse, esos valores quedan congelados, y el useEffect nunca vuelve a dispararse
+      // para limpiar el setInterval. Resultado: quedaba tickeando cada segundo PARA SIEMPRE en
+      // segundo plano (hasta que el countdown llegara solo a 0), re-renderizando una pantalla
+      // invisible sin parar y compitiendo por el hilo de JS con lo que fuera que el usuario
+      // estuviera mirando en CUALQUIER otra pantalla de la app — esto explica el "refresca cada
+      // 1 segundo en cualquier lado" que se veía incluso fuera de cualquier subasta.
+      clearInterval(timerIntervalRef.current);
+      clearInterval(cooldownIntervalRef.current);
+      clearInterval(countdownRef.current);
       if (joinedRef.current) {
         leaveAuction(token, auctionId).catch(() => {});
       }

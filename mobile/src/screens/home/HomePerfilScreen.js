@@ -41,33 +41,48 @@ const { session, exitApp, setAuthToken, localNotifications, markLocalNotificatio
   const lastFetchRef = useRef(null);
   const CACHE_TTL = 30000; // 30 segundos
 
+  // Refs para que los callbacks lean siempre el valor más fresco sin necesitar esos
+  // valores como dependencias del useCallback (así evitamos loops de re-creación).
+  const sessionTokenRef = useRef(session.token);
+  const setAuthTokenRef = useRef(setAuthToken);
+  sessionTokenRef.current = session.token;
+  setAuthTokenRef.current = setAuthToken;
+
   const loadData = useCallback(async (force = false) => {
-    if (!hasToken) return;
+    const tok = sessionTokenRef.current;
+    if (!tok) return;
     const now = Date.now();
     if (!force && lastFetchRef.current && now - lastFetchRef.current < CACHE_TTL) return;
     lastFetchRef.current = now;
     try {
-      const profile = await getMyProfile(session.token);
+      const profile = await getMyProfile(tok);
       setUserProfile(profile);
     } catch {
       // silent — profile stays null, shows fallback
     } finally {
       setLoading(false);
     }
-  }, [session.token, hasToken]);
+  }, []); // deps vacíos: lee token vía ref, no necesita recrearse cuando el token cambia
 
-  // Refresca el token al montar la pantalla para obtener el estado actualizado (E2→E3→E4)
+  // Refresca el token al montar la pantalla para obtener el estado actualizado (E2→E3→E4).
+  // IMPORTANTE: deps vacíos a propósito. Si session.token o setAuthToken fueran deps aquí,
+  // cada llamada exitosa al /refresh devolvería un JWT nuevo (siempre distinto porque incluye
+  // un nuevo `iat`), lo que cambiaría session.token, lo que recrearía este callback, lo que
+  // dispararía de nuevo el useEffect, lo que llamaría /refresh otra vez — loop infinito a la
+  // tasa de la latencia de red (~1s contra Render), causando el spinner constante en TODAS
+  // las pantallas que usan session.token como dep (PaymentMethods, DetalleCompra, etc.).
   const handleRefreshToken = useCallback(async () => {
-    if (!hasToken) return;
+    const tok = sessionTokenRef.current;
+    if (!tok) return;
     try {
-      const response = await refreshToken(session.token);
-      if (response?.token && response.token !== session.token) {
-        await setAuthToken(response.token);
+      const response = await refreshToken(tok);
+      if (response?.token && response.token !== tok) {
+        await setAuthTokenRef.current(response.token);
       }
     } catch {
       // silent
     }
-  }, [session.token, hasToken, setAuthToken]);
+  }, []); // deps vacíos: lee token y setAuthToken vía refs
 
   useEffect(() => {
     loadData();
@@ -76,13 +91,11 @@ const { session, exitApp, setAuthToken, localNotifications, markLocalNotificatio
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      if (hasToken) {
-        loadData();
-        handleRefreshToken();
-      }
+      loadData();
+      handleRefreshToken();
     });
     return unsubscribe;
-  }, [navigation, hasToken, loadData, handleRefreshToken]);
+  }, [navigation, loadData, handleRefreshToken]);
 
   const displayName = isGuest
     ? 'Usuario invitado'
