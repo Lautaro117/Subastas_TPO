@@ -72,10 +72,18 @@ export default function DetalleObraScreen({ navigation, route }) {
           <Text style={styles.label}>Fecha de creación <Text style={styles.opcional}>(opcional)</Text></Text>
           <TextInput
             value={fechaCreacion}
-            onChangeText={setFechaCreacion}
+            onChangeText={(text) => {
+              // Mantiene solo dígitos y aplica guiones automáticos: AAAA-MM-DD
+              const digits = text.replace(/\D/g, '').slice(0, 8);
+              let formatted = digits;
+              if (digits.length > 4) formatted = digits.slice(0, 4) + '-' + digits.slice(4);
+              if (digits.length > 6) formatted = digits.slice(0, 4) + '-' + digits.slice(4, 6) + '-' + digits.slice(6);
+              setFechaCreacion(formatted);
+            }}
             placeholder="AAAA-MM-DD  (ej: 1889-03-15)"
             placeholderTextColor={COLORS.onSurfaceVariant}
             keyboardType="numeric"
+            maxLength={10}
             style={styles.textInput}
           />
 

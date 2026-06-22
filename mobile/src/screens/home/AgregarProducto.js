@@ -20,6 +20,7 @@ export default function AgregarProducto({ navigation }) {
   const [descripcionCompleta, setDescripcionCompleta] = useState('');
   const [fotos, setFotos] = useState([]);
   const [tipo, setTipo] = useState('comun');
+  const [declaracion, setDeclaracion] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -43,6 +44,7 @@ export default function AgregarProducto({ navigation }) {
     if (!descripcionCatalogo.trim()) { setError('La descripción corta es requerida'); return false; }
     if (!descripcionCompleta.trim()) { setError('La descripción completa es requerida'); return false; }
     if (fotos.length < 6) { setError('Se requieren al menos 6 fotos'); return false; }
+    if (!declaracion) { setError('Debés aceptar la declaración de titularidad para continuar'); return false; }
     return true;
   };
 
@@ -130,6 +132,25 @@ export default function AgregarProducto({ navigation }) {
             ))}
           </View>
 
+          {/* Declaración de titularidad (obligatoria por TPO) */}
+          <TouchableOpacity
+            style={[
+              styles.declaracionCard,
+              declaracion && { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '12' },
+            ]}
+            onPress={() => setDeclaracion(v => !v)}
+            activeOpacity={0.75}
+          >
+            <Icon
+              source={declaracion ? 'checkbox-marked' : 'checkbox-blank-outline'}
+              size={22}
+              color={declaracion ? COLORS.primary : COLORS.onSurfaceVariant}
+            />
+            <Text style={[styles.declaracionText, declaracion && { color: COLORS.onSurface }]}>
+              Declaro que el bien me pertenece y no posee ningún impedimento legal para ser subastado. Comprendo que puedo ser requerido a acreditar el origen lícito del bien.
+            </Text>
+          </TouchableOpacity>
+
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Button
@@ -195,6 +216,23 @@ const styles = StyleSheet.create({
   fotoContainer: { position: 'relative' },
   foto: { width: 90, height: 90, borderRadius: 10 },
   fotoDelete: { position: 'absolute', top: -6, right: -6 },
+  declaracionCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginTop: 24,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: COLORS.outlineVariant,
+    backgroundColor: COLORS.surfaceContainerLow,
+  },
+  declaracionText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: COLORS.onSurfaceVariant,
+  },
   error: { color: COLORS.error, fontSize: 13, marginTop: 12 },
   button: { marginTop: 32, borderRadius: 999, backgroundColor: COLORS.primary },
   buttonContent: { minHeight: 52 },

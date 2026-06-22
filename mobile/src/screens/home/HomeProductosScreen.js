@@ -48,7 +48,19 @@ function ProductoCard({ item, onPress }) {
   return (
     <TouchableOpacity onPress={onPress}>
       <View style={[styles.card, { backgroundColor: theme.colors.surfaceContainerLow }]}>
-        <Text style={[styles.cardTitle, { color: theme.colors.onSurface }]}>{item.descripcionCatalogo}</Text>
+        <View style={styles.cardTitleRow}>
+          <Text style={[styles.cardTitle, { color: theme.colors.onSurface, flex: 1 }]}>{item.descripcionCatalogo}</Text>
+          {item.tipo === 'arte' && (
+            <View style={[styles.tipoChip, { backgroundColor: theme.colors.primary + '22', borderColor: theme.colors.primary + '66' }]}>
+              <Text style={[styles.tipoChipText, { color: theme.colors.primary }]}>Obra de arte</Text>
+            </View>
+          )}
+          {item.tipo === 'diseno' && (
+            <View style={[styles.tipoChip, { backgroundColor: theme.colors.secondary + '22', borderColor: theme.colors.secondary + '66' }]}>
+              <Text style={[styles.tipoChipText, { color: theme.colors.secondary }]}>Obj. diseñador</Text>
+            </View>
+          )}
+        </View>
         <Text style={[styles.cardDesc, { color: theme.colors.onSurfaceVariant }]} numberOfLines={2}>
           {item.descripcionCompleta}
         </Text>
@@ -385,8 +397,11 @@ const styles = StyleSheet.create({
   error: { marginTop: 20, fontSize: 14 },
   list: { gap: 12, paddingBottom: 100 },
   card: { borderRadius: 12, padding: 16, gap: 8, borderWidth: 2, borderColor: 'rgba(255, 255, 255, 0.64)' },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   cardTitle: { fontSize: 16, fontWeight: '600' },
   cardDesc: { fontSize: 13, lineHeight: 18 },
+  tipoChip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginTop: 2 },
+  tipoChipText: { fontSize: 11, fontWeight: '600' },
   compraCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   estadoPagoBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
   estadoPagoBadgeText: { fontSize: 11, fontWeight: '600' },

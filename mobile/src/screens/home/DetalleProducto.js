@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Dimensions, FlatList, Image, ScrollView, StyleSheet, View } from 'react-native';
+import { Dimensions, FlatList, Image, Linking, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Icon, IconButton, Surface, Text } from 'react-native-paper';
 
@@ -63,7 +63,7 @@ export default function DetalleProducto({ navigation, route }) {
       });
       const data = await response.json();
       setProducto(data);
-      if (data?.estadoAdmin === 'en_deposito') {
+      if (data?.estadoAdmin === 'en_deposito' || data?.estadoAdmin === 'aprobado') {
         getCustodia(session.token, productoId)
           .then(setCustodia)
           .catch(() => {});
@@ -250,49 +250,6 @@ export default function DetalleProducto({ navigation, route }) {
                 </Surface>
               )}
 
-              {/* Banner: en depósito — ubicación + seguro */}
-              {producto.estadoAdmin === 'en_deposito' && (
-                <Surface elevation={0} style={[styles.banner, { backgroundColor: '#42A5F522', borderColor: '#42A5F5', flexDirection: 'column', gap: 12 }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <Icon source="warehouse" size={22} color="#42A5F5" />
-                    <Text style={[styles.bannerTitle, { color: '#42A5F5' }]}>Pieza en depósito</Text>
-                  </View>
-
-                  {/* Ubicación */}
-                  <View style={styles.custodiaBlock}>
-                    <Text style={styles.custodiaLabel}>UBICACIÓN</Text>
-                    {custodia?.nombreDeposito ? (
-                      <>
-                        <Text style={[styles.custodiaValor, { color: COLORS.onSurface }]}>{custodia.nombreDeposito}</Text>
-                        <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>{custodia.direccionDeposito}</Text>
-                      </>
-                    ) : producto.nombreDeposito ? (
-                      <>
-                        <Text style={[styles.custodiaValor, { color: COLORS.onSurface }]}>{producto.nombreDeposito}</Text>
-                        <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>{producto.direccionDeposito}</Text>
-                      </>
-                    ) : (
-                      <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>Sin información de depósito</Text>
-                    )}
-                  </View>
-
-                  {/* Póliza de seguro */}
-                  <View style={[styles.custodiaBlock, { borderTopWidth: 1, borderTopColor: 'rgba(66,165,245,0.2)', paddingTop: 10 }]}>
-                    <Text style={styles.custodiaLabel}>PÓLIZA DE SEGURO</Text>
-                    {custodia?.nroPoliza ? (
-                      <>
-                        <Text style={[styles.custodiaValor, { color: COLORS.onSurface }]}>Nº {custodia.nroPoliza}</Text>
-                        {custodia.companiaSeguro ? (
-                          <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>{custodia.companiaSeguro}</Text>
-                        ) : null}
-                      </>
-                    ) : (
-                      <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>La empresa asignará el seguro a la brevedad</Text>
-                    )}
-                  </View>
-                </Surface>
-              )}
-
               {/* Info general */}
               <View style={styles.card}>
                 <Text style={styles.cardDesc}>{producto.descripcionCompleta}</Text>
@@ -340,6 +297,95 @@ export default function DetalleProducto({ navigation, route }) {
                   </View>
                 ) : null}
               </View>
+
+              {/* Obra de arte / Objeto de diseñador */}
+              {(producto.tipo === 'arte' || producto.tipo === 'diseno') && (
+                <Surface elevation={0} style={styles.obraCard}>
+                  <View style={styles.obraHeader}>
+                    <Icon source={producto.tipo === 'arte' ? 'palette' : 'pencil-ruler'} size={20} color={COLORS.primary} />
+                    <Text style={styles.obraHeaderText}>
+                      {producto.tipo === 'arte' ? 'Obra de arte' : 'Objeto de diseñador'}
+                    </Text>
+                  </View>
+                  {producto.detalleObra?.nombreAutor ? (
+                    <View style={styles.obraRow}>
+                      <Text style={styles.obraLabel}>{producto.tipo === 'arte' ? 'Artista' : 'Diseñador'}</Text>
+                      <Text style={styles.obraValor}>{producto.detalleObra.nombreAutor}</Text>
+                    </View>
+                  ) : null}
+                  {producto.detalleObra?.fechaCreacion ? (
+                    <View style={styles.obraRow}>
+                      <Text style={styles.obraLabel}>Fecha de creación</Text>
+                      <Text style={styles.obraValor}>{producto.detalleObra.fechaCreacion}</Text>
+                    </View>
+                  ) : null}
+                  {producto.detalleObra?.historia ? (
+                    <View style={styles.obraHistoriaBlock}>
+                      <Text style={styles.obraLabel}>Historia</Text>
+                      <Text style={styles.obraHistoria}>{producto.detalleObra.historia}</Text>
+                    </View>
+                  ) : null}
+                </Surface>
+              )}
+
+              {/* Banner: en depósito — ubicación + seguro */}
+              {(producto.estadoAdmin === 'en_deposito' || producto.estadoAdmin === 'aprobado') && (
+                <Surface elevation={0} style={[styles.banner, { backgroundColor: '#42A5F522', borderColor: '#42A5F5', flexDirection: 'column', gap: 12 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Icon source="warehouse" size={22} color="#42A5F5" />
+                    <Text style={[styles.bannerTitle, { color: '#42A5F5' }]}>Pieza en depósito</Text>
+                  </View>
+
+                  {/* Ubicación */}
+                  <View style={styles.custodiaBlock}>
+                    <Text style={styles.custodiaLabel}>UBICACIÓN</Text>
+                    {custodia?.nombreDeposito ? (
+                      <>
+                        <Text style={[styles.custodiaValor, { color: COLORS.onSurface }]}>{custodia.nombreDeposito}</Text>
+                        <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>{custodia.direccionDeposito}</Text>
+                      </>
+                    ) : producto.nombreDeposito ? (
+                      <>
+                        <Text style={[styles.custodiaValor, { color: COLORS.onSurface }]}>{producto.nombreDeposito}</Text>
+                        <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>{producto.direccionDeposito}</Text>
+                      </>
+                    ) : (
+                      <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>Sin información de depósito</Text>
+                    )}
+                  </View>
+
+                  {/* Póliza de seguro */}
+                  <View style={[styles.custodiaBlock, { borderTopWidth: 1, borderTopColor: 'rgba(66,165,245,0.2)', paddingTop: 10 }]}>
+                    <Text style={styles.custodiaLabel}>PÓLIZA DE SEGURO</Text>
+                    {custodia?.nroPoliza ? (
+                      <>
+                        <Text style={[styles.custodiaValor, { color: COLORS.onSurface }]}>Nº {custodia.nroPoliza}</Text>
+                        {custodia.companiaSeguro ? (
+                          <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>{custodia.companiaSeguro}</Text>
+                        ) : null}
+                      </>
+                    ) : (
+                      <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>La empresa asignará el seguro a la brevedad</Text>
+                    )}
+                  </View>
+
+                  {/* Contacto aseguradora */}
+                  <View style={[styles.custodiaBlock, { borderTopWidth: 1, borderTopColor: 'rgba(66,165,245,0.2)', paddingTop: 10, gap: 8 }]}>
+                    <Text style={styles.custodiaLabel}>CONTACTO CON LA ASEGURADORA</Text>
+                    <Text style={[styles.custodiaSub, { color: COLORS.onSurfaceVariant }]}>
+                      Para consultas o modificaciones en los términos de tu póliza, comunicate directamente con la aseguradora:
+                    </Text>
+                    <TouchableOpacity style={styles.contactoBtn} onPress={() => Linking.openURL('mailto:seguros@subastas.com')}>
+                      <Icon source="email-outline" size={16} color="#42A5F5" />
+                      <Text style={styles.contactoBtnText}>seguros@subastas.com</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.contactoBtn} onPress={() => Linking.openURL('tel:+541148000000')}>
+                      <Icon source="phone-outline" size={16} color="#42A5F5" />
+                      <Text style={styles.contactoBtnText}>+54 11 4800-0000</Text>
+                    </TouchableOpacity>
+                  </View>
+                </Surface>
+              )}
 
               {/* Acciones aceptar / rechazar */}
               {producto.estadoPropuesta === 'propuesta_enviada' ? (
@@ -397,6 +443,8 @@ const styles = StyleSheet.create({
   custodiaLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: '#42A5F5', marginBottom: 2 },
   custodiaValor: { fontSize: 14, fontWeight: '600' },
   custodiaSub: { fontSize: 12 },
+  contactoBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: 'rgba(66,165,245,0.1)' },
+  contactoBtnText: { fontSize: 13, color: '#42A5F5', fontWeight: '600' },
   aviso: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 8, padding: 10 },
   avisoText: { fontSize: 12, lineHeight: 17, flex: 1 },
   envioCard: { borderRadius: 16, overflow: 'hidden', marginBottom: 16, backgroundColor: COLORS.surfaceContainerLow, borderWidth: 1, borderColor: '#FFA726' },
@@ -411,6 +459,14 @@ const styles = StyleSheet.create({
   envioCosto: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#FEF3C7', borderRadius: 8, padding: 12 },
   envioCostoText: { fontSize: 13, color: '#92400e', flex: 1, lineHeight: 18, fontWeight: '500' },
   envioBtn: { borderRadius: 999, backgroundColor: '#FEF3C7' },
+  obraCard: { backgroundColor: COLORS.primary + '15', borderRadius: 16, borderWidth: 1, borderColor: COLORS.primary + '44', padding: 16, gap: 10, marginBottom: 16 },
+  obraHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  obraHeaderText: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
+  obraRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  obraLabel: { fontSize: 11, fontWeight: '700', color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.5, minWidth: 100 },
+  obraValor: { fontSize: 13, fontWeight: '600', color: COLORS.onSurface, flex: 1 },
+  obraHistoriaBlock: { gap: 4 },
+  obraHistoria: { fontSize: 13, color: COLORS.onSurfaceVariant, lineHeight: 19 },
   card: { backgroundColor: COLORS.surfaceContainerLow, borderRadius: 16, padding: 20, gap: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', marginBottom: 16 },
   cardDesc: { fontSize: 14, lineHeight: 22, color: COLORS.onSurfaceVariant },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

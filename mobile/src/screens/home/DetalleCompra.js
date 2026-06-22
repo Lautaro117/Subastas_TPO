@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Dimensions, FlatList, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Dimensions, FlatList, Image, Linking, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Button, Icon, IconButton, RadioButton, Text } from 'react-native-paper';
 
@@ -174,18 +174,41 @@ export default function DetalleCompra({ navigation, route }) {
                     <Text style={styles.infoValue}>{compra.direccionEnvio}</Text>
                   </View>
                 ) : null}
+              </View>
+
+              {/* Póliza de seguro */}
+              <View style={styles.polizaCard}>
+                <View style={styles.polizaHeader}>
+                  <Icon source="shield-check-outline" size={18} color="#42A5F5" />
+                  <Text style={styles.polizaHeaderText}>Póliza de seguro</Text>
+                </View>
                 {compra.nroPoliza ? (
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Póliza:</Text>
-                    <Text style={styles.infoValue}>{compra.nroPoliza}</Text>
-                  </View>
-                ) : null}
-                {compra.companiaSeguro ? (
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Seguro:</Text>
-                    <Text style={styles.infoValue}>{compra.companiaSeguro}</Text>
-                  </View>
-                ) : null}
+                  <>
+                    <View style={styles.polizaRow}>
+                      <Text style={styles.polizaLabel}>N° de póliza</Text>
+                      <Text style={styles.polizaValor}>{compra.nroPoliza}</Text>
+                    </View>
+                    {compra.companiaSeguro ? (
+                      <View style={styles.polizaRow}>
+                        <Text style={styles.polizaLabel}>Aseguradora</Text>
+                        <Text style={styles.polizaValor}>{compra.companiaSeguro}</Text>
+                      </View>
+                    ) : null}
+                  </>
+                ) : (
+                  <Text style={styles.polizaPendiente}>La empresa asignará el seguro a la brevedad</Text>
+                )}
+                <View style={styles.polizaSeparador} />
+                <Text style={styles.polizaContactoLabel}>Contacto con la aseguradora</Text>
+                <Text style={styles.polizaContactoDesc}>Para consultas o modificaciones en los términos de tu póliza:</Text>
+                <TouchableOpacity style={styles.contactoBtn} onPress={() => Linking.openURL('mailto:seguros@subastas.com')}>
+                  <Icon source="email-outline" size={15} color="#42A5F5" />
+                  <Text style={styles.contactoBtnText}>seguros@subastas.com</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.contactoBtn, { marginTop: 6 }]} onPress={() => Linking.openURL('tel:+541148000000')}>
+                  <Icon source="phone-outline" size={15} color="#42A5F5" />
+                  <Text style={styles.contactoBtnText}>+54 11 4800-0000</Text>
+                </TouchableOpacity>
               </View>
 
               {/* Tipo entrega */}
@@ -350,4 +373,16 @@ const styles = StyleSheet.create({
   pagoEstadoCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, padding: 16, borderWidth: 1, marginBottom: 16 },
   pagoEstadoTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
   pagoEstadoDesc: { fontSize: 13, color: COLORS.onSurfaceVariant, lineHeight: 18 },
+  polizaCard: { backgroundColor: 'rgba(66,165,245,0.08)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(66,165,245,0.3)', padding: 14, marginBottom: 16, gap: 6 },
+  polizaHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  polizaHeaderText: { fontSize: 13, fontWeight: '700', color: '#42A5F5' },
+  polizaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  polizaLabel: { fontSize: 11, fontWeight: '700', color: COLORS.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.4 },
+  polizaValor: { fontSize: 13, fontWeight: '600', color: COLORS.onSurface },
+  polizaPendiente: { fontSize: 12, color: COLORS.onSurfaceVariant, fontStyle: 'italic' },
+  polizaSeparador: { borderTopWidth: 1, borderTopColor: 'rgba(66,165,245,0.2)', marginVertical: 8 },
+  polizaContactoLabel: { fontSize: 11, fontWeight: '700', color: '#42A5F5', textTransform: 'uppercase', letterSpacing: 0.4 },
+  polizaContactoDesc: { fontSize: 12, color: COLORS.onSurfaceVariant, lineHeight: 17, marginBottom: 4 },
+  contactoBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, backgroundColor: 'rgba(66,165,245,0.12)' },
+  contactoBtnText: { fontSize: 13, color: '#42A5F5', fontWeight: '600' },
 });

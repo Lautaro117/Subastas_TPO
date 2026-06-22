@@ -14,6 +14,7 @@ import {
   Button,
   Chip,
   Dialog,
+  Icon,
   IconButton,
   Portal,
   Snackbar,
@@ -277,6 +278,51 @@ export default function DetalleProductoSubastaScreen({ navigation, route }) {
             </Text>
           )}
 
+          {/* Obra de arte / Objeto de diseñador */}
+          {(detalle?.tipoObra === 'arte' || detalle?.tipoObra === 'diseno') && (
+            <Surface
+              elevation={0}
+              style={[styles.obraCard, { backgroundColor: theme.colors.primary + '15', borderColor: theme.colors.primary + '44' }]}
+            >
+              <View style={styles.obraHeader}>
+                <Icon
+                  source={detalle.tipoObra === 'arte' ? 'palette' : 'pencil-ruler'}
+                  size={18}
+                  color={theme.colors.primary}
+                />
+                <Text style={[styles.obraHeaderText, { color: theme.colors.primary }]}>
+                  {detalle.tipoObra === 'arte' ? 'Obra de arte' : 'Objeto de diseñador'}
+                </Text>
+              </View>
+              {detalle.nombreAutor && (
+                <View style={styles.obraFila}>
+                  <Text style={[styles.obraEtiq, { color: theme.colors.onSurfaceVariant }]}>
+                    {detalle.tipoObra === 'arte' ? 'Artista' : 'Diseñador'}
+                  </Text>
+                  <Text style={[styles.obraValor, { color: theme.colors.onSurface }]}>
+                    {detalle.nombreAutor}
+                  </Text>
+                </View>
+              )}
+              {detalle.fechaCreacion && (
+                <View style={styles.obraFila}>
+                  <Text style={[styles.obraEtiq, { color: theme.colors.onSurfaceVariant }]}>Fecha</Text>
+                  <Text style={[styles.obraValor, { color: theme.colors.onSurface }]}>
+                    {detalle.fechaCreacion}
+                  </Text>
+                </View>
+              )}
+              {detalle.historia && (
+                <View style={styles.obraHistoriaBlk}>
+                  <Text style={[styles.obraEtiq, { color: theme.colors.onSurfaceVariant }]}>Historia</Text>
+                  <Text style={[styles.obraHistoriaTxt, { color: theme.colors.onSurfaceVariant }]}>
+                    {detalle.historia}
+                  </Text>
+                </View>
+              )}
+            </Surface>
+          )}
+
           {/* Info económica */}
           <Surface
             elevation={0}
@@ -425,6 +471,15 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 20,
   },
+
+  obraCard: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 20, gap: 10 },
+  obraHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  obraHeaderText: { fontSize: 14, fontWeight: '700' },
+  obraFila: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  obraEtiq: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, minWidth: 70 },
+  obraValor: { fontSize: 13, fontWeight: '600', flex: 1 },
+  obraHistoriaBlk: { gap: 4 },
+  obraHistoriaTxt: { fontSize: 13, lineHeight: 19 },
 
   infoCard: { borderRadius: 12, padding: 16, gap: 12 },
   infoRow: {

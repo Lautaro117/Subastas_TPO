@@ -166,14 +166,27 @@ function CatalogoRow({ item, isActivo, notificado, onBellPress, onPress }) {
       </View>
 
       <View style={styles.catalogoRowText}>
-        <Text
-          style={[styles.catalogoRowTitle, {
-            color: isActivo ? theme.colors.onPrimaryContainer : theme.colors.onSurface,
-          }]}
-          numberOfLines={1}
-        >
-          {item.descripcionCatalogo ?? `Producto #${item.productoId}`}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <Text
+            style={[styles.catalogoRowTitle, {
+              color: isActivo ? theme.colors.onPrimaryContainer : theme.colors.onSurface,
+              flexShrink: 1,
+            }]}
+            numberOfLines={1}
+          >
+            {item.descripcionCatalogo ?? `Producto #${item.productoId}`}
+          </Text>
+          {item.tipoObra === 'arte' && (
+            <View style={[styles.tipoObraChip, { backgroundColor: theme.colors.primary + '22', borderColor: theme.colors.primary + '55' }]}>
+              <Text style={[styles.tipoObraChipText, { color: theme.colors.primary }]}>Arte</Text>
+            </View>
+          )}
+          {item.tipoObra === 'diseno' && (
+            <View style={[styles.tipoObraChip, { backgroundColor: theme.colors.secondary + '22', borderColor: theme.colors.secondary + '55' }]}>
+              <Text style={[styles.tipoObraChipText, { color: theme.colors.secondary }]}>Diseño</Text>
+            </View>
+          )}
+        </View>
         {item.precioBase != null && (
           <Text style={[styles.catalogoRowSub, {
             color: isActivo ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant,
@@ -1388,6 +1401,8 @@ const styles = StyleSheet.create({
   catalogoRowText: { flex: 1 },
   catalogoRowTitle: { fontSize: 14, fontWeight: '500', lineHeight: 20 },
   catalogoRowSub: { fontSize: 12, lineHeight: 18 },
+  tipoObraChip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1 },
+  tipoObraChipText: { fontSize: 10, fontWeight: '700' },
   ahoraLabel: { fontSize: 12, fontWeight: '700' },
 
   joinFloating: { position: 'absolute', bottom: 24, left: 24, right: 24 },
