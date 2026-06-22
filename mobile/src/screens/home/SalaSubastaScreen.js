@@ -499,7 +499,15 @@ export default function SalaSubastaScreen({ navigation, route }) {
           setSnackbar('Ya estás en otra sala. Salí primero.');
         }
       } else if (err.status === 403) {
-        if (msg.includes('categor')) {
+        // OJO: este chequeo de 'multa' tiene que ir ANTES que los demás. El check de
+        // userEstado==='E5' más arriba es solo una conveniencia basada en el JWT (que puede
+        // estar desactualizado si la multa llegó después de loguearse) — cuando ESE chequeo
+        // no detecta nada pero el backend sí bloquea por multa, el error real llega acá. Antes
+        // caía al 'else' y mostraba por error el modal de "categoría insuficiente", un mensaje
+        // totalmente equivocado que no le explicaba al usuario lo que realmente pasaba.
+        if (msg.includes('multa')) {
+          setModalMultaPendiente(true);
+        } else if (msg.includes('categor')) {
           setModalCategoriaInsuficiente(true);
         } else if (msg.includes('otra subasta')) {
           setSnackbar('Ya estás en otra subasta activa. Salí primero.');
@@ -671,7 +679,15 @@ export default function SalaSubastaScreen({ navigation, route }) {
         .then((live) => { if (live) setSalaData(live); })
         .catch(() => {});
     } catch (err) {
-      setSnackbar(err.message ?? 'Error al enviar la puja.');
+      // Mismo criterio que en handleJoin: si el backend rechazó la puja por multa pendiente,
+      // mostrar el modal grande y explícito (igual que para medio de pago faltante) en vez de
+      // un snackbar que se puede pasar por alto fácilmente.
+      const msg = (err.message ?? '').toLowerCase();
+      if (err.status === 403 && msg.includes('multa')) {
+        setModalMultaPendiente(true);
+      } else {
+        setSnackbar(err.message ?? 'Error al enviar la puja.');
+      }
     } finally {
       setPujando(false);
     }

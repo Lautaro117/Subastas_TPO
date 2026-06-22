@@ -2,6 +2,8 @@ package com.example.subastas.service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +37,12 @@ import com.example.subastas.repository.UsuarioAuthRepository;
 
 @Service
 public class UserService {
+
+    // Fallback para multas viejas creadas ANTES de que pagos.html empezara a guardar
+    // multas.adjudicacion_id explícitamente: ese texto siempre incluyó el número de
+    // adjudicación en el "motivo" (ej: "Pago rechazado — Adjudicación #123. Importe..."),
+    // así que lo podemos recuperar de ahí si la columna nueva vino vacía.
+    private static final Pattern ADJUDICACION_EN_MOTIVO = Pattern.compile("Adjudicaci[oó]n #(\\d+)");
 
     @Autowired
     private UsuarioAuthRepository usuarioAuthRepository;
@@ -261,8 +269,21 @@ public void pagarMulta(String email, Integer multaId, Integer medioPagoId) {
     // puede intentar pagarlo de nuevo, ahora que ya saldó la multa. Solo desbloquea ESTE
     // ítem, no otros: si tiene otra multa distinta pendiente por otro ítem, ese otro sigue
     // bloqueado hasta que también la pague.
-    if (multa.getAdjudicacionId() != null) {
-        pagoAdjudicacionRepository.findByAdjudicacionId(multa.getAdjudicacionId()).ifPresent(pago -> {
+    //
+    // adjudicacionId puede venir null en multas creadas ANTES de que pagos.html empezara a
+    // guardar ese vínculo explícitamente — para esas, recuperamos el número de adjudicación
+    // parseándolo del texto de "motivo" (que siempre lo incluyó).
+    Integer adjudicacionVinculada = multa.getAdjudicacionId();
+    if (adjudicacionVinculada == null && multa.getMotivo() != null) {
+        Matcher m = ADJUDICACION_EN_MOTIVO.matcher(multa.getMotivo());
+        if (m.find()) {
+            try {
+                adjudicacionVinculada = Integer.parseInt(m.group(1));
+            } catch (NumberFormatException ignored) { /* motivo mal formado, no hay nada para recuperar */ }
+        }
+    }
+    if (adjudicacionVinculada != null) {
+        pagoAdjudicacionRepository.findByAdjudicacionId(adjudicacionVinculada).ifPresent(pago -> {
             if ("rechazado".equals(pago.getEstado())) {
                 pago.setEstado("pendiente");
                 pago.setUpdatedAt(java.time.LocalDateTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires")));
