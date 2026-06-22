@@ -782,7 +782,17 @@ export default function SalaSubastaScreen({ navigation, route }) {
     if (m.tipo === 'tarjeta') {
       try {
         const d = parseMedioDatos(m.datos);
-        const pais = (d.pais_emisor ?? '').toLowerCase();
+        // Usar el campo 'tipo' de la tarjeta ('nacional'/'internacional') como fuente
+        // principal — el usuario lo seleccionó explícitamente al registrarla, y es más
+        // confiable que pais_emisor para esta clasificación. El problema era que una tarjeta
+        // emitida en Argentina (pais_emisor='AR') pero de tipo 'internacional' (opera en USD)
+        // quedaba excluida de subastas USD porque el filtro anterior solo miraba pais_emisor.
+        const tipoTarjeta = (d.tipo ?? '').toLowerCase();
+        if (tipoTarjeta === 'internacional') return moneda !== 'ARS';
+        if (tipoTarjeta === 'nacional')      return moneda === 'ARS';
+        // Fallback para tarjetas sin campo 'tipo' (registradas antes de este campo):
+        // deducir por pais_emisor igual que antes.
+        const pais  = (d.pais_emisor ?? '').toLowerCase();
         const esArs = pais.includes('argentina') || pais === 'ar';
         return moneda === 'ARS' ? esArs : !esArs;
       } catch { return false; }
